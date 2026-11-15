@@ -4,28 +4,6 @@ import { FRIDGE } from './places';
 
 // ---- Around the room --------------------------------------------------------------------------
 
-export function startRoomTone(a: AudioCore) {
-  const ctx = a.ctx!;
-  // A low rumble of building and traffic...
-  const rumble = a.noise(a.buf.brown, true);
-  const rumbleG = ctx.createGain();
-  rumbleG.gain.value = 0.07;
-  rumble.connect(biquad(ctx, 'lowpass', 300, 0.7)).connect(rumbleG).connect(a.indoors);
-  // ...and the air vents, swelling slowly.
-  const air = a.noise(a.buf.white, true);
-  const airG = ctx.createGain();
-  airG.gain.value = 0.009;
-  const swell = ctx.createOscillator();
-  swell.frequency.value = 0.06;
-  const swellDepth = ctx.createGain();
-  swellDepth.gain.value = 0.004;
-  swell.connect(swellDepth).connect(airG.gain);
-  air.connect(biquad(ctx, 'bandpass', 650, 0.5)).connect(airG).connect(a.indoors);
-  rumble.start();
-  air.start();
-  swell.start();
-}
-
 /** The kitchen's fridge, humming away (not in a castle). */
 export class Fridge {
   private fridge: { gain: GainNode; on: boolean; next: number } | null = null;
