@@ -116,6 +116,8 @@ install_release() {
 
 # Removes the versions this install replaced, except any still running: an office, or the terminal
 # host that keeps its workers alive across office restarts. Without pgrep nothing is removed.
+# -a: macOS's pgrep leaves out its own ancestors otherwise, and run from a worker's terminal, the
+# office is one of them (Linux's only prints more with it).
 prune_versions() {
   local keep="$1" dir real rc
   have pgrep || return 0
@@ -123,10 +125,10 @@ prune_versions() {
     [ -d "$dir" ] && [ "${dir##*/}" != "$keep" ] || continue
     real="$(cd "$dir" && pwd -P)"
     rc=0
-    pgrep -f -- "$dir/" >/dev/null 2>&1 || rc=$?
+    pgrep -a -f -- "$dir/" >/dev/null 2>&1 || rc=$?
     [ "$rc" -eq 1 ] || continue
     rc=0
-    pgrep -f -- "$real/" >/dev/null 2>&1 || rc=$?
+    pgrep -a -f -- "$real/" >/dev/null 2>&1 || rc=$?
     [ "$rc" -eq 1 ] || continue
     rm -rf "$dir"
   done
