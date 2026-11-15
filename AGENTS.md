@@ -7,4 +7,4 @@
 - When a change affects how people run, deploy or use the office, update `README.md` and the matching `docs/*.md` page in the same PR.
 - New features plug in through the registries as modules of their own (see `docs/code-layout.md`), never by adding their code to `main.ts`, `server.ts`, the state store, `protocol.ts` or another feature's files, and `tests/size.test.ts` must stay green.
 - Every modal needs a top-right ✕, and closing it by ✕ or Esc must put the player straight back into mouse-look with no extra click.
-- When asked to merge PRs, merge only webdevcody's (anyone else's only when linked, after a security review), resolve conflicts so both sides survive, and squash-merge.
+- When asked to merge PRs, merge only jjfattz's (anyone else's only when linked, after a security review), resolve conflicts so both sides survive, and squash-merge, except a PR that merges in upstream, which gets a merge commit so the next sync doesn't conflict on the same changes again.
