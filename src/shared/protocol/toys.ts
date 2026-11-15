@@ -1,6 +1,6 @@
 // The toys on every floor: pictures, the jukebox, the arcade, the whiteboard, the ball, the cars and the dog.
 
-import type { CabinetFrame, CabinetState } from '../cabinet.js';
+import type { CabinetFrame, CabinetState, Title } from '../cabinet.js';
 import type { DecorPlacement, Decoration } from '../decor.js';
 import type { DogState } from '../dog.js';
 import type { CarSeat, CarState } from '../garage.js';
@@ -24,11 +24,11 @@ export type JukeboxClientMsg =
 
 export type CabinetClientMsg =
   /**
-   * Step up to the arcade cabinet on your floor to carry on with `game` (one the office started for
-   * you), or to start a new game, even while you're at it; the office answers with `cabinet`, naming
-   * who got it and their game.
+   * Step up to the arcade cabinet on your floor to play `title` (the first of TITLES when it's left
+   * out): to carry on with `game` (one of it the office started for you), or to start a new game, even
+   * while you're at it; the office answers with `cabinet`, naming who got it and their game.
    */
-  | { t: 'cabinet.play'; game?: string }
+  | { t: 'cabinet.play'; title?: Title; game?: string }
   | { t: 'cabinet.leave' }
   /**
    * Your game as it looks now, for everyone else on the floor to watch over your shoulder. It's also

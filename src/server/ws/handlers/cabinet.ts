@@ -1,15 +1,16 @@
 // The arcade cabinet on every floor: who's playing it, the game on its screen, and the high scores.
 import type { Floor } from '../../floor.js';
-import { checkFrame, type CabinetFrame, type CabinetState } from '../../../shared/cabinet.js';
+import { TITLES, checkFrame, isTitle, type CabinetFrame, type CabinetState, type Title } from '../../../shared/cabinet.js';
 import type { CabinetClientMsg } from '../../../shared/protocol.js';
 import type { Ctx } from '../../office/context.js';
 import { throttle, type Client } from '../../office/client.js';
 import { here } from './common.js';
 import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
 
-/** At the arcade cabinet on their floor, playing `game` (see Arcade); `frame` is it as it looks now. */
+/** At the arcade cabinet on their floor, playing `game` of `title` (see Arcade); `frame` is it as it looks now. */
 interface Player {
   playing: boolean;
+  title?: Title;
   game?: string;
   frame?: CabinetFrame;
 }
@@ -24,7 +25,7 @@ const player = (c: Client): Player => {
 export const cabinetPlayer = (ctx: Ctx, floor: Floor): Client | undefined => [...ctx.clients.values()].find((c) => player(c).playing && c.peer.floor === floor.id);
 export const cabinetState = (ctx: Ctx, floor: Floor | undefined): CabinetState => {
   const p = floor && cabinetPlayer(ctx, floor);
-  return { player: p ? { id: p.id, name: p.peer.name, game: player(p).game ?? '' } : null, scores: ctx.highScores.top() };
+  return { player: p ? { id: p.id, name: p.peer.name, title: player(p).title ?? TITLES[0], game: player(p).game ?? '' } : null, scores: ctx.highScores.all() };
 };
 /** Who's at the cabinet, its high scores, and the game on its screen as its player last sent it. */
 export const cabinetView: ViewPieces['cabinet'] = (ctx, floor) => {
@@ -41,7 +42,7 @@ export const stopPlaying = (ctx: Ctx, c: Client, floor = ctx.floorOf(c)) => {
   if (!p.playing) return;
   if (floor) ctx.arcade.leave(p.game, floor.id);
   p.playing = false;
-  p.game = undefined;
+  p.title = p.game = undefined;
   p.frame = undefined;
   cabinetChanged(ctx, floor);
 };
@@ -51,7 +52,9 @@ export const cabinetHandlers = {
     const who = c.peer.name;
     const floor = here(ctx, c);
     const p = player(c);
-    if (!floor || (p.playing && msg.game === p.game)) return;
+    // A page from before the cabinet had a choice of games only ever plays the first.
+    const title = msg.title === undefined ? TITLES[0] : msg.title;
+    if (!floor || !isTitle(title) || (p.playing && title === p.title && msg.game === p.game)) return;
     const at = cabinetPlayer(ctx, floor);
     if (at && at !== c) {
       ctx.warn(c, `${at.peer.name} is on the arcade — press E there to watch`);
@@ -60,7 +63,8 @@ export const cabinetHandlers = {
     }
     // Already at it: that game's over, and this is the next one.
     if (p.playing) ctx.arcade.leave(p.game, floor.id);
-    p.game = ctx.arcade.start({ owner: c.accountId ? `account:${c.accountId}` : `name:${who}`, name: who, color: c.peer.color, connection: c.id }, msg.game);
+    p.title = title;
+    p.game = ctx.arcade.start(title, { owner: c.accountId ? `account:${c.accountId}` : `name:${who}`, name: who, color: c.peer.color, connection: c.id }, msg.game);
     if (p.game !== msg.game && !ctx.arcade.counts(p.game)) ctx.warn(c, "🕹️ That's a lot of new games in a row, so this one won't go on the high-score table");
     p.playing = true;
     p.frame = undefined;

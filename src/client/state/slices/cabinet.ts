@@ -1,9 +1,9 @@
-import type { CabinetFrame, CabinetState } from '../../../shared/cabinet';
+import { noScores, type CabinetFrame, type CabinetState } from '../../../shared/cabinet';
 import type { Slice } from '../store';
 
 declare module '../store' {
   interface Store {
-    /** Who's at the arcade cabinet on your floor, and the building's high scores. */
+    /** Who's at the arcade cabinet on your floor, and the building's high scores, a table a game. */
     cabinet: CabinetState;
     /** The game on the cabinet as its player last sent it; null while nobody plays. */
     cabinetFrame: CabinetFrame | null;
@@ -16,7 +16,7 @@ declare module '../store' {
 
 export const cabinet: Slice = {
   init(s) {
-    s.cabinet = { player: null, scores: [] };
+    s.cabinet = { player: null, scores: noScores() };
     s.cabinetFrame = null;
   },
   on: {

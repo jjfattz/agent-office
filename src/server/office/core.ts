@@ -9,7 +9,7 @@ import { Building } from '../building.js';
 import type { Floor } from '../floor.js';
 import { ChatLog } from '../history.js';
 import { Arcade, HighScores } from '../cabinet.js';
-import { scoreText } from '../../shared/cabinet.js';
+import { GAME_NAMES, scoreText } from '../../shared/cabinet.js';
 import { cabinetChanged } from '../ws/handlers/cabinet.js';
 import type { Core, Ctx } from './context.js';
 import type { Client } from './client.js';
@@ -21,12 +21,12 @@ export function createCore(ctx: Ctx, cfg: Config, publicDir: string): Core {
   const clients = new Map<string, Client>();
   // Kept on disk, so a restart doesn't wipe it.
   const chat = new ChatLog(cfg.dataDir);
-  // The arcade's high scores: one table for the whole building, on every floor's cabinet. The office
-  // follows every game and puts the scores up itself (see Arcade).
+  // The arcade's high scores: a table a game for the whole building, on every floor's cabinet. The
+  // office follows every game and puts the scores up itself (see Arcade).
   const highScores = new HighScores(cfg.dataDir);
   const arcade = new Arcade(highScores, (first) => {
     for (const f of ctx.floors.values()) cabinetChanged(ctx, f);
-    if (first) ctx.toastFloor(ctx.floors.get(first.floor), `🏆 ${first.score.name} set a new arcade high score: ${scoreText(first.score.score)}`);
+    if (first) ctx.toastFloor(ctx.floors.get(first.floor), `🏆 ${first.score.name} set a new ${GAME_NAMES[first.title]} high score: ${scoreText(first.score.score)}`);
   });
   /** What the office is called where it has no project of its own to go by (webhooks, invites). */
   const officeName = cfg.project ? path.basename(cfg.project) : 'the office';

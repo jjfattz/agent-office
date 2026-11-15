@@ -3,9 +3,11 @@ import { CABINET, FLOOR } from '../../../shared/layout';
 import { mesh, roundedBox, toon } from '../../world/toon';
 import type { Collider, Interactable } from '../../world/types';
 import type { Fixture } from '../../world/office/fixture';
+import { lights } from './paint';
 
-// The arcade cabinet in the lounge: an upright in blue side panels, a lit marquee on top, the screen
-// leaning back under it (ui.ts paints the game on it), a joystick and buttons, and a coin door.
+// The arcade cabinet in the lounge: an upright in blue side panels with neon stripes and pixel stars
+// down them, a lit ARCADE marquee on top, the screen leaning back under it (ui.ts paints its games on
+// it), a joystick and buttons, and a coin door.
 
 export interface CabinetModel {
   group: THREE.Group;
@@ -49,7 +51,6 @@ const LEAN = Math.atan2(SCREEN_BOTTOM[0] - SCREEN_TOP[0], SCREEN_TOP[1] - SCREEN
 /** The control panel's top, which rises a little toward the screen. */
 const PANEL_FRONT: [number, number] = [0.4, 0.98];
 const PANEL_BACK: [number, number] = [0.13, 1.05];
-const PIECES = ['#4cc9f0', '#ffd166', '#b388eb', '#06d6a0', '#ef476f', '#4f86f7', '#ff8a5b'];
 
 /** A side-view outline pulled out `thick` wide across the cabinet, from `x0`. */
 function slab(points: [number, number][], thick: number, x0: number): THREE.BufferGeometry {
@@ -69,26 +70,28 @@ export function buildCabinet(): CabinetModel {
   const sideMat = toon('#4361ee');
   for (const x0 of [-W / 2, W / 2 - SIDE_T]) group.add(mesh(slab(SIDE, SIDE_T, x0), sideMat));
 
-  // Falling blocks down each side, as side art: a Z, an L and a T.
-  const cube = new THREE.BoxGeometry(0.02, 0.1, 0.1);
+  // Side art: three neon stripes sweeping up toward the front low down, and pixel stars up top.
+  const stripe = new THREE.BoxGeometry(0.02, 0.05, 0.62);
+  ['#ef476f', '#ffd166', '#4cc9f0'].forEach((c, i) => {
+    for (const sx of [-1, 1]) {
+      const m = mesh(stripe, toon(c), sx * (W / 2 + 0.01), 0.33 + i * 0.12, -0.05, false);
+      m.rotation.x = -0.6;
+      group.add(m);
+    }
+  });
+  const pixel = new THREE.BoxGeometry(0.02, 0.035, 0.035);
   [
-    [0.02, 1.62, 4],
-    [-0.09, 1.62, 4],
-    [-0.09, 1.51, 4],
-    [-0.2, 1.51, 4],
-    [0.02, 1.39, 6],
-    [0.02, 1.28, 6],
-    [0.02, 1.17, 6],
-    [-0.09, 1.17, 6],
-    [-0.12, 0.62, 2],
-    [-0.01, 0.62, 2],
-    [0.1, 0.62, 2],
-    [-0.01, 0.51, 2],
+    [-0.22, 1.74, '#ffd166'],
+    [0.08, 1.8, '#4cc9f0'],
+    [-0.06, 1.4, '#ef476f'],
+    [-0.27, 1.2, '#4cc9f0'],
   ].forEach(([u, v, c]) => {
-    for (const sx of [-1, 1]) group.add(mesh(cube, toon(PIECES[c]), sx * (W / 2 + 0.01), v, u, false));
+    for (const [du, dv] of [[0, 0], [0.035, 0], [-0.035, 0], [0, 0.035], [0, -0.035]]) {
+      for (const sx of [-1, 1]) group.add(mesh(pixel, toon(c as string), sx * (W / 2 + 0.01), (v as number) + dv, (u as number) + du, false));
+    }
   });
 
-  // The marquee: the game's name, lit from behind.
+  // The marquee, lit from behind.
   const marquee = document.createElement('canvas');
   marquee.width = 512;
   marquee.height = 160;
@@ -147,7 +150,7 @@ export function buildCabinet(): CabinetModel {
 
 declare module '../../world/types' {
   interface OfficeHandles {
-    /** The arcade cabinet in the lounge, where BLOCKFALL plays (ui.ts). */
+    /** The arcade cabinet in the lounge, where its games play (ui.ts). */
     cabinet: CabinetModel;
   }
 }
@@ -166,18 +169,16 @@ function paintMarquee(c: HTMLCanvasElement) {
   grad.addColorStop(1, '#1b1d3a');
   g.fillStyle = grad;
   g.fillRect(0, 0, c.width, c.height);
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.font = '900 84px Nunito, ui-rounded, system-ui, sans-serif';
-  const letters = [...'BLOCKFALL'];
-  const widths = letters.map((ch) => g.measureText(ch).width);
-  let x = c.width / 2 - widths.reduce((a, b) => a + b, 0) / 2;
-  letters.forEach((ch, i) => {
-    g.fillStyle = PIECES[i % PIECES.length];
-    g.shadowColor = g.fillStyle;
-    g.shadowBlur = 16;
-    g.fillText(ch, x + widths[i] / 2, c.height / 2 + 4);
-    x += widths[i];
-  });
-  g.shadowBlur = 0;
+  lights(g, 'ARCADE', c.width / 2, c.height / 2 + 4, 92);
+  // A twinkle either side.
+  g.fillStyle = '#ffd166';
+  for (const x of [44, c.width - 44]) {
+    g.beginPath();
+    g.moveTo(x, c.height / 2 - 26);
+    g.quadraticCurveTo(x, c.height / 2, x + 22, c.height / 2);
+    g.quadraticCurveTo(x, c.height / 2, x, c.height / 2 + 26);
+    g.quadraticCurveTo(x, c.height / 2, x - 22, c.height / 2);
+    g.quadraticCurveTo(x, c.height / 2, x, c.height / 2 - 26);
+    g.fill();
+  }
 }

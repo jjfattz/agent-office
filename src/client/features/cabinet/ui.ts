@@ -1,51 +1,38 @@
 import * as THREE from 'three';
-import { GAME, type CabinetFrame } from '../../../shared/cabinet';
+import { GAME_NAMES, TITLES, type CabinetFrame, type Title } from '../../../shared/cabinet';
 import type { WorkerInfo } from '../../../shared/protocol';
 import type { Net } from '../../net';
 import { store } from '../../state';
 import { h, openModal, toast, type Modal } from '../../ui/dom';
 import { ScreenZoom } from '../arcade/ui';
-import { Blocks, H, W, paintScreen, type ScreenView } from './blocks';
+import type { ArcadeSound, CabinetGame, ScreenView } from './cart';
+import { CARTS, cartOf } from './games';
+import { cardAt, paintAttract, paintMenu, type ChoiceView, type MenuView } from './menu';
+import { H, W, scanlines } from './paint';
 
-/** What the cabinet makes a noise about: a piece landing, lines clearing (how many), the game ending. */
-export type CabinetSound = 'land' | 'clear' | 'over';
+/** Keys every game takes, by `code`, besides its own. */
+const COMMON_KEYS: Readonly<Record<string, string>> = { KeyP: 'pause', Enter: 'go', KeyM: 'menu' };
+/** Keys for the menu, by `code`. */
+const MENU_KEYS: Readonly<Record<string, 'up' | 'down' | 'pick'>> = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', Enter: 'pick', Space: 'pick' };
 
-/** Your game goes out to everyone watching at most this often (ms). */
-const FRAME_MS = 90;
-
-/** Keys for the game, by `code`. */
-const KEYS: Record<string, 'left' | 'right' | 'down' | 'turn' | 'back' | 'drop' | 'hold' | 'pause' | 'go'> = {
-  ArrowLeft: 'left',
-  KeyA: 'left',
-  ArrowRight: 'right',
-  KeyD: 'right',
-  ArrowDown: 'down',
-  KeyS: 'down',
-  ArrowUp: 'turn',
-  KeyW: 'turn',
-  KeyX: 'turn',
-  KeyZ: 'back',
-  Space: 'drop',
-  KeyC: 'hold',
-  ShiftLeft: 'hold',
-  ShiftRight: 'hold',
-  KeyP: 'pause',
-  Enter: 'go',
-};
+type Mode = 'menu' | 'play' | 'watch';
 
 /**
  * The arcade cabinet in the lounge. Press E there and the camera glides up to its screen, where you
- * play BLOCKFALL (blocks.ts) on the keyboard. Everyone else on the floor sees your game on the
+ * pick a game (games.ts) and play it on the keyboard. Everyone else on the floor sees your game on the
  * cabinet as you play, and can walk up and press E to watch it up close. One of your workers needing
- * input pauses it and says who; walking away leaves it paused for when you come back. Its score goes
- * on the building's high-score table when you walk away and when the game ends.
+ * input pauses it and says who; walking away, or going back to the games, leaves it paused for when
+ * you come back to it. Its score goes on that game's high-score table when you step away from it and
+ * when it ends.
  */
 export class Cabinet {
-  private mode: 'play' | 'watch' | null = null;
+  private mode: Mode | null = null;
   private modal: Modal | null = null;
   private readonly view: ScreenZoom;
-  /** Your game: the one you're playing, or the one you left paused. */
-  private game: Blocks | null = null;
+  /** Your games, a game each: the one you're playing, and any you left paused. */
+  private readonly games = new Map<Title, CabinetGame>();
+  /** The game picked out on the menu, or being played. */
+  private title: Title = TITLES[0];
   /** The game you last asked the office to carry on with, until it says which one you're on ('' for a new one). */
   private asked = '';
   /** Its game-over sound has played. */
@@ -58,8 +45,9 @@ export class Cabinet {
   /** What the cabinet in the office shows. */
   private readonly picture = document.createElement('canvas');
   private readonly texture = new THREE.CanvasTexture(this.picture);
-  /** The screen you play or watch on up close, drawn at the size it shows on the page so it stays crisp. */
+  /** The screen up close, drawn at the size it shows on the page so it stays crisp, and what's under it. */
   private board: HTMLCanvasElement | null = null;
+  private bar: { name: HTMLElement; tip: HTMLElement; games: HTMLButtonElement; stop: HTMLButtonElement } | null = null;
   /** Over the screen while a worker waits on you: who, and a way to its terminal. */
   private call: HTMLElement | null = null;
   private dirty = true;
@@ -71,7 +59,7 @@ export class Cabinet {
   constructor(
     screen: THREE.Mesh,
     private readonly net: Net,
-    private readonly opts: { openTerminal(workerId: string): void; sound(kind: CabinetSound, lines?: number): void },
+    private readonly opts: { openTerminal(workerId: string): void; sound(kind: ArcadeSound, n?: number): void },
   ) {
     this.view = new ScreenZoom(screen);
     this.picture.width = 512;
@@ -106,19 +94,17 @@ export class Cabinet {
     this.modal?.close();
   }
 
-  /** Your game's score, while you've left it paused here. */
-  get leftAt(): number | null {
-    return this.game && !this.game.over && this.mode !== 'play' ? this.game.score : null;
+  /** Your game that's waiting for you, if you've stepped away from one: the last you played. */
+  paused(): { title: Title; score: number } | null {
+    const g = this.game;
+    return g && !g.over && this.mode !== 'play' ? { title: this.title, score: g.score } : null;
   }
 
-  /** E at the cabinet: play, or carry on with the game you left; watch whoever's on it already. */
+  /** E at the cabinet: the games to choose from, or whoever's on it already to watch. */
   play() {
     if (this.modal || !store.floor) return;
     const p = store.cabinet.player;
-    if (p && p.id !== store.you) return this.open('watch');
-    if (!this.game || this.game.over) this.newGame();
-    this.ask(this.game!.id);
-    this.open('play');
+    this.open(p && p.id !== store.you ? 'watch' : 'menu');
   }
 
   /** One of your workers started waiting on an answer: your game stops for it, and says who. */
@@ -132,39 +118,44 @@ export class Cabinet {
 
   /** Runs the game, sends it to everyone watching, keeps the screens drawn and moves the camera. Call it once the player has placed the camera. */
   update(camera: THREE.PerspectiveCamera, dt: number) {
-    const g = this.game;
+    const g = this.mode === 'play' ? this.game : undefined;
     const now = performance.now();
-    if (this.mode === 'play' && g) {
+    if (g) {
       g.update(dt);
       if (g.over && !this.ended) {
         this.ended = true;
         this.opts.sound('over');
       }
-      if (g.version !== this.sent.version && now - this.sent.at >= FRAME_MS) this.sendFrame();
+      if (g.version !== this.sent.version && now - this.sent.at >= CARTS[this.title].frameMs) this.sendFrame();
       if (g.version !== this.painted) this.dirty = true;
     }
-    // The blinking "press E" with nobody playing.
+    // The blinking "press E", and the menu's.
     const blink = Math.floor((now / 1000) * 1.6) % 2;
     if (blink !== this.blink) {
       this.blink = blink;
-      if (this.idle()) this.dirty = true;
+      if (this.idle() || this.mode === 'menu') this.dirty = true;
     }
     if (this.dirty) this.paint(now);
     this.view.update(camera, dt, !!this.modal);
   }
 
-  private newGame() {
-    const g = new Blocks();
-    g.onLand = (lines) => this.opts.sound(lines ? 'clear' : 'land', lines);
-    this.game = g;
-    this.ended = false;
-    this.sent.version = -1;
+  /** Your game of the one picked out (or being played), if you have one. */
+  private get game(): CabinetGame | undefined {
+    return this.games.get(this.title);
   }
 
-  /** Asks the office to carry on with game `id`, or to start a new one (''): it says which you're on in `cabinet`. */
+  private newGame(): CabinetGame {
+    const g = CARTS[this.title].start((kind, n) => this.opts.sound(kind, n));
+    this.games.set(this.title, g);
+    this.ended = false;
+    this.sent.version = -1;
+    return g;
+  }
+
+  /** Asks the office to carry on with game `id` of the one picked out, or to start a new one (''): it says which you're on in `cabinet`. */
   private ask(id: string) {
     this.asked = id;
-    this.net.send({ t: 'cabinet.play', game: id || undefined });
+    this.net.send({ t: 'cabinet.play', title: this.title, game: id || undefined });
   }
 
   /**
@@ -184,20 +175,31 @@ export class Cabinet {
     this.game?.pause(false);
   }
 
-  private open(mode: 'play' | 'watch') {
-    this.mode = mode;
-    this.watching = mode === 'watch' ? (store.cabinet.player?.name ?? '') : '';
-    const board = h('canvas', { 'aria-label': mode === 'play' ? GAME : `${this.watching} playing ${GAME}` });
-    const stop = h('button.btn', { type: 'button' }, mode === 'play' ? '✕ Stop playing' : '✕ Stop watching');
-    const tip = mode === 'play' ? '← → move · ↑ turn · ↓ faster · Space drop · C hold · P pause' : `👀 Watching ${this.watching}`;
+  /** Plays the game picked out on the menu: the one of it you left paused, or a new one. */
+  private pick(title: Title) {
+    this.title = title;
+    const g = !this.game || this.game.over ? this.newGame() : this.game;
+    this.ended = false;
+    this.sent.version = -1;
+    this.ask(g.id);
+    this.setMode('play');
+  }
+
+  /** Picks out another game on the menu. */
+  private choose(by: number) {
+    const n = TITLES.length;
+    this.title = TITLES[(TITLES.indexOf(this.title) + by + n) % n];
+    this.dirty = true;
+  }
+
+  private open(mode: Mode) {
+    const board = h('canvas', { 'aria-label': 'Arcade' });
+    const name = h('span', {});
+    const tip = h('span.tip', {});
+    const games = h('button.btn', { type: 'button', title: 'Back to the games (M)' }, '☰ Games') as HTMLButtonElement;
+    const stop = h('button.btn', { type: 'button' }, '✕ Stop') as HTMLButtonElement;
     const call = h('div.cabinet-call.hidden', { role: 'status' });
-    const box = h(
-      'div.arcade.cabinet',
-      { role: 'dialog', 'aria-label': GAME },
-      h('div.arcade-screen', {}, board),
-      call,
-      h('div.arcade-bar', {}, h('span', {}, `🕹️ ${GAME}`), h('span.tip', {}, tip), stop),
-    );
+    const box = h('div.arcade.cabinet', { role: 'dialog', 'aria-label': 'Arcade' }, h('div.arcade-screen', {}, board), call, h('div.arcade-bar', {}, name, tip, games, stop));
 
     const fit = () => {
       const { width, height } = this.view.box();
@@ -209,14 +211,32 @@ export class Cabinet {
     };
     const onKey = (e: KeyboardEvent) => this.key(e, true);
     const onKeyUp = (e: KeyboardEvent) => this.key(e, false);
+    // The menu takes the mouse too: point at a game to pick it out, click to play it.
+    const spot = (e: MouseEvent) => (this.mode === 'menu' ? cardAt((e.offsetX * W) / board.clientWidth, (e.offsetY * H) / board.clientHeight) : null);
+    board.addEventListener('pointermove', (e) => {
+      const t = spot(e);
+      board.style.cursor = t ? 'pointer' : '';
+      if (t && t !== this.title) {
+        this.title = t;
+        this.dirty = true;
+      }
+    });
+    board.addEventListener('click', (e) => {
+      const t = spot(e);
+      if (t) this.pick(t);
+    });
+    games.addEventListener('click', () => {
+      games.blur();
+      this.setMode('menu');
+    });
+    stop.addEventListener('click', () => this.modal?.close());
     this.board = board;
+    this.bar = { name, tip, games, stop };
     this.call = call;
     fit();
     window.addEventListener('resize', fit);
-    if (mode === 'play') {
-      window.addEventListener('keydown', onKey, true);
-      window.addEventListener('keyup', onKeyUp, true);
-    }
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('keyup', onKeyUp, true);
     this.modal = openModal(box, {
       backdropCloses: false,
       onClose: () => {
@@ -227,42 +247,61 @@ export class Cabinet {
       },
     });
     this.modal.backdrop.classList.add('clear');
-    stop.addEventListener('click', () => this.modal?.close());
+    this.setMode(mode);
   }
 
-  /** Stepped away: your game waits, paused, with its score on the table so far. */
-  private closed() {
-    const was = this.mode;
-    this.mode = null;
-    this.modal = this.board = this.call = null;
-    this.waiting = null;
-    this.watching = '';
+  /** Switches what you're doing at the cabinet, up close; going from a game steps away from it. */
+  private setMode(mode: Mode) {
+    if (this.mode === 'play' && mode !== 'play') this.stepAway();
+    this.mode = mode;
+    this.watching = mode === 'watch' ? (store.cabinet.player?.name ?? '') : '';
     this.dirty = true;
-    if (was !== 'play') return;
+    const bar = this.bar;
+    if (!bar || !this.board) return;
+    const watched = store.cabinet.player?.title ?? this.title;
+    const name = mode === 'menu' ? 'Arcade' : GAME_NAMES[mode === 'watch' ? watched : this.title];
+    bar.name.textContent = `🕹️ ${name}`;
+    bar.tip.textContent = mode === 'menu' ? '↑ ↓ choose · Enter play' : mode === 'watch' ? `👀 Watching ${this.watching}` : CARTS[this.title].tip;
+    bar.games.classList.toggle('hidden', mode !== 'play');
+    bar.stop.textContent = mode === 'play' ? '✕ Stop playing' : mode === 'watch' ? '✕ Stop watching' : '✕ Walk away';
+    this.board.setAttribute('aria-label', mode === 'watch' ? `${this.watching} playing ${name}` : name);
+  }
+
+  /** You stepped away from your game (to the games, or from the cabinet): it waits, paused, with its score on the table so far. */
+  private stepAway() {
     const g = this.game;
     // A game you never got going isn't worth coming back to.
-    if (g && !g.pieces && !g.score) this.game = null;
+    if (g && !g.started) this.games.delete(this.title);
     else this.sendFrame();
     this.net.send({ t: 'cabinet.leave' });
     g?.pause(true);
+    this.waiting = null;
+    this.renderCall();
+  }
+
+  private closed() {
+    if (this.mode === 'play') this.stepAway();
+    this.mode = null;
+    this.modal = this.board = this.bar = this.call = null;
+    this.waiting = null;
+    this.watching = '';
+    this.dirty = true;
   }
 
   private key(e: KeyboardEvent, down: boolean) {
-    const k = KEYS[e.code];
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (this.mode === 'menu') return this.menuKey(e, down);
     const g = this.game;
-    if (!k || !g || e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = CARTS[this.title].keys[e.code] ?? COMMON_KEYS[e.code];
+    if (this.mode !== 'play' || !k || !g) return;
     e.preventDefault();
     e.stopPropagation();
-    if (!down) {
-      if (k === 'left') g.release(-1);
-      else if (k === 'right') g.release(1);
-      else if (k === 'down') g.softDrop(false);
-      return;
-    }
-    // Held keys slide and drop on their own time, not the keyboard's repeat.
+    if (!down) return g.input(k, false);
+    // Held keys slide, drop and fire on their own time, not the keyboard's repeat.
     if (e.repeat) return;
+    if (k === 'menu') return this.setMode('menu');
     if (g.over) {
-      if (k === 'go' || k === 'drop') {
+      if (k === 'go' || e.code === 'Space') {
         this.newGame();
         // A new game for the office to follow, and name.
         this.ask('');
@@ -274,14 +313,18 @@ export class Cabinet {
       if (k === 'pause' || k === 'go') this.resume();
       return;
     }
-    if (k === 'left') g.press(-1);
-    else if (k === 'right') g.press(1);
-    else if (k === 'down') g.softDrop(true);
-    else if (k === 'turn') g.rotate(1);
-    else if (k === 'back') g.rotate(-1);
-    else if (k === 'drop') g.hardDrop();
-    else if (k === 'hold') g.hold();
-    else if (k === 'pause') g.pause(true);
+    if (k === 'pause') g.pause(true);
+    else g.input(k, true);
+  }
+
+  private menuKey(e: KeyboardEvent, down: boolean) {
+    const k = MENU_KEYS[e.code];
+    if (!k) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (!down || (e.repeat && k === 'pick')) return;
+    if (k === 'pick') this.pick(this.title);
+    else this.choose(k === 'up' ? -1 : 1);
   }
 
   /** Who's at the cabinet changed. */
@@ -290,10 +333,8 @@ export class Cabinet {
     this.heard = store.cabinetFrame;
     if (this.mode === 'play') {
       // Someone else got there first: watch them instead.
-      if (p && p.id !== store.you) {
-        this.modal?.close();
-        this.open('watch');
-      } else if (!p) {
+      if (p && p.id !== store.you) this.setMode('watch');
+      else if (!p) {
         // The office forgot (a dropped connection): still here.
         this.ask(this.game?.id ?? '');
       } else if (this.game) {
@@ -305,6 +346,9 @@ export class Cabinet {
         this.asked = '';
         this.game.id = p.game;
       }
+    } else if (this.mode === 'menu' && p && p.id !== store.you) {
+      // Someone else started a game while you were choosing.
+      this.setMode('watch');
     } else if (this.mode === 'watch' && (!p || p.id === store.you || p.name !== this.watching)) {
       if (!p) toast(`${this.watching} stepped away from the arcade`);
       this.modal?.close();
@@ -312,15 +356,14 @@ export class Cabinet {
     this.dirty = true;
   }
 
-  /** Someone else's game moved on: hear it land, clear lines and end. */
+  /** Someone else's game moved on: hear it. */
   private onFrame() {
     const f = store.cabinetFrame;
     const was = this.heard;
     this.heard = f;
     this.dirty = true;
-    if (!f || !was) return;
-    if (f.lines > was.lines) this.opts.sound('clear', f.lines - was.lines);
-    else if (f.pieces > was.pieces) this.opts.sound('land');
+    if (!f || !was || f.title !== was.title) return;
+    cartOf(f).hear(was, f, this.opts.sound);
     if (f.state === 'over' && was.state !== 'over') this.opts.sound('over');
   }
 
@@ -348,45 +391,67 @@ export class Cabinet {
     el.replaceChildren(h('span', {}, `🙋 ${w.name} needs input${deskOf(w)}`), go, back);
   }
 
-  /** Nobody's game on the screen, just the high scores. */
+  /** Nobody's game on the cabinet in the office, just the high scores. */
   private idle(): boolean {
     const p = store.cabinet.player;
     return !(this.mode === 'play' && this.game) && !(p && p.id !== store.you && store.cabinetFrame);
   }
 
-  /** What the screen shows: your game, someone else's, or the high scores with nobody playing. */
-  private screen(t: number): ScreenView {
+  /** The game the screen shows, if one: yours, or someone else's. */
+  private screen(t: number): { frame: CabinetFrame; view: ScreenView } | null {
     const c = store.cabinet;
     const g = this.game;
     if (this.mode === 'play' && g) {
-      const rank = c.scores.findIndex((s) => s.game === g.id) + 1;
+      const scores = c.scores[this.title];
+      const rank = scores.findIndex((s) => s.game === g.id) + 1;
       return {
         frame: g.frame(),
-        player: store.profile.name,
-        scores: c.scores,
-        mine: g.id,
-        note: this.waiting ? `${this.waiting.name} needs you${deskOf(this.waiting)}` : 'P to carry on',
-        prompt: rank ? `🏆 #${rank} on the table! Enter: again` : 'Enter to play again',
-        t,
+        view: {
+          player: store.profile.name,
+          scores,
+          mine: g.id,
+          note: this.waiting ? `${this.waiting.name} needs you${deskOf(this.waiting)}` : 'P to carry on',
+          prompt: rank ? `🏆 #${rank} on the table! Enter: again` : 'Enter to play again',
+          t,
+        },
       };
     }
-    if (c.player && c.player.id !== store.you) {
-      return { frame: store.cabinetFrame, player: c.player.name, scores: c.scores, mine: c.player.game, note: 'Back in a moment', prompt: store.cabinetFrame ? undefined : `▶ ${c.player.name.toUpperCase()}`, t };
-    }
-    const left = this.leftAt !== null;
-    return { frame: null, scores: c.scores, mine: g?.id, prompt: left ? 'PRESS E TO CARRY ON' : 'PRESS E TO PLAY', t };
+    const f = store.cabinetFrame;
+    if (c.player && c.player.id !== store.you && f) return { frame: f, view: { player: c.player.name, scores: c.scores[f.title], mine: c.player.game, note: 'Back in a moment', t } };
+    return null;
   }
 
-  /** Draws the screen up close while you play or watch, and on the cabinet otherwise (the close one covers it). */
+  /** The cabinet's own screens: the menu up close, or what it shows the room with no game on. */
+  private menuView(t: number): MenuView {
+    const mine: MenuView['mine'] = {};
+    for (const [title, g] of this.games) mine[title] = g.id;
+    const p = store.cabinet.player;
+    const prompt = p && p.id !== store.you ? `▶ ${p.name.toUpperCase()}` : this.paused() ? 'PRESS E TO CARRY ON' : undefined;
+    return { scores: store.cabinet.scores, mine, prompt, t };
+  }
+
+  /** Draws the screen up close while you're at it, and on the cabinet otherwise (the close one covers it). */
   private paint(now: number) {
     this.dirty = false;
     if (this.game) this.painted = this.game.version;
-    const v = this.screen(now / 1000);
+    const t = now / 1000;
     const canvas = this.board ?? this.picture;
     const g = canvas.getContext('2d')!;
     g.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
-    paintScreen(g, v);
+    if (this.board && this.mode === 'menu') paintMenu(g, this.choiceView(t));
+    else {
+      const s = this.screen(t);
+      if (s) cartOf(s.frame).paint(g, s.frame, s.view);
+      else paintAttract(g, this.menuView(t));
+    }
+    scanlines(g);
     if (!this.board) this.texture.needsUpdate = true;
+  }
+
+  private choiceView(t: number): ChoiceView {
+    const paused: ChoiceView['paused'] = {};
+    for (const [title, g] of this.games) if (!g.over) paused[title] = g.score;
+    return { ...this.menuView(t), at: this.title, paused, prompt: undefined };
   }
 }
 
