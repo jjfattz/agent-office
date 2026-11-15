@@ -42,6 +42,8 @@ export function renderLimits() {
   if (!s.windows.length) return;
   const now = Date.now();
   const plan = s.plan ? s.plan.charAt(0).toUpperCase() + s.plan.slice(1) : '';
-  el.replaceChildren(h('h3', {}, 'Claude limits', plan ? h('span.plan', {}, plan) : null, panelHide('limits')), ...s.windows.flatMap((w) => windowRow(w, now)));
+  // Whose plan they are: the floor's provider account, when its Claude workers run on one.
+  const account = s.account ? h('div.row.muted', { title: `The Claude account this floor's workers run on` }, h('span.what', {}, `🪪 ${s.account}`)) : null;
+  el.replaceChildren(h('h3', {}, 'Claude limits', plan ? h('span.plan', {}, plan) : null, panelHide('limits')), ...(account ? [account] : []), ...s.windows.flatMap((w) => windowRow(w, now)));
   if (now - s.at > STALE_MS) el.append(h('div.row.muted', {}, `As of ${new Date(s.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`));
 }

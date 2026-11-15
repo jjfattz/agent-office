@@ -74,12 +74,15 @@ export interface PlanWindow {
 }
 
 /**
- * The Claude plan limits of the account the office's Claude workers run on, as Claude Code's
- * /usage shows them (see server/limits.ts). One account for the whole building.
+ * The Claude plan limits of the account the Claude workers someone hires where they are run on, as
+ * Claude Code's /usage shows them (see server/limits.ts): their own Claude, the floor's Claude
+ * provider account, or the office machine's own login (see server/whose-limits.ts).
  */
 export interface PlanLimits {
   /** 'pro', 'max', 'team', 'enterprise'…, when known. */
   plan?: string;
+  /** The floor's provider account they're of, by name, when they're one's. */
+  account?: string;
   /** The 5-hour session first, then the week, then per-model weeks. Empty until first read, or when there is no plan. */
   windows: PlanWindow[];
   /** When the numbers were read (ms since epoch); 0 before the first read. */

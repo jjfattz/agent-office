@@ -432,6 +432,8 @@ test('settings, accounts, sign-ins and the boards answer as before', async () =>
   a.send({ t: 'providerAccounts.use', provider: 'claude', id: work.id });
   assert.equal((await a.take('providerAccounts', (m) => !!m.view.floor.claude)).view.floor.claude, work.id);
   assert.equal(await told('🪪'), `🪪 Eve put ${office.floors()[0].def.name}’s Claude workers on Work`);
+  // The limits box under the workers is Work's now, on this floor.
+  assert.equal((await a.take('limits', (m) => !!m.state.account)).state.account, 'Work');
   // Moving workers already at their desks onto it: only ones that are there, onto one that's there.
   a.send({ t: 'providerAccounts.move', workerIds: ['nobody'], id: work.id });
   await warned('No such worker');
@@ -443,6 +445,7 @@ test('settings, accounts, sign-ins and the boards answer as before', async () =>
   await warned('Start signing in first');
   a.send({ t: 'providerAccounts.remove', id: work.id });
   assert.deepEqual((await a.take('providerAccounts', (m) => !m.view.accounts.length)).view, { accounts: [], floor: {} });
+  assert.equal((await a.take('limits')).state.account, undefined);
 
   a.send({ t: 'gh.merge', number: 0, method: 'squash', deleteBranch: false });
   a.send({ t: 'gh.close', kind: 'nope', number: 3 });
