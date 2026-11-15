@@ -144,6 +144,19 @@ export class ProviderAccounts {
   }
 
   /**
+   * The config folder a worker running `provider` on account `id` keeps its conversations in: the
+   * machine's own for none, and for a token, which runs on the machine's own settings. None once the
+   * account is gone.
+   */
+  folder(id: string | undefined, provider: AccountProvider): string | undefined {
+    const a = this.get(id);
+    if (id && a?.provider !== provider) return undefined;
+    if (a?.how === 'folder' && a.dir) return a.dir;
+    const own = this.base()[KINDS[provider].dirVar];
+    return own ? path.resolve(own) : KINDS[provider].home();
+  }
+
+  /**
    * A new account: a folder the office makes ('new'), a folder you already use (`dir`), or a token
    * on the machine's own settings. Returns it, or what's wrong.
    */

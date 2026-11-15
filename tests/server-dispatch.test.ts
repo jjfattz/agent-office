@@ -432,6 +432,11 @@ test('settings, accounts, sign-ins and the boards answer as before', async () =>
   a.send({ t: 'providerAccounts.use', provider: 'claude', id: work.id });
   assert.equal((await a.take('providerAccounts', (m) => !!m.view.floor.claude)).view.floor.claude, work.id);
   assert.equal(await told('🪪'), `🪪 Eve put ${office.floors()[0].def.name}’s Claude workers on Work`);
+  // Moving workers already at their desks onto it: only ones that are there, onto one that's there.
+  a.send({ t: 'providerAccounts.move', workerIds: ['nobody'], id: work.id });
+  await warned('No such worker');
+  a.send({ t: 'providerAccounts.move', workerIds: [], id: 'nope' });
+  await warned('No such account');
   a.send({ t: 'providerAccounts.signin', id: 'nope' });
   await warned('No such account');
   a.send({ t: 'providerAccounts.code', id: work.id, code: 'abc' });

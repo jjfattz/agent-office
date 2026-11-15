@@ -1,11 +1,14 @@
-// Provider accounts (see provider-accounts/): admins keep the office's logins, and pick which one the
-// floor they're on runs each provider on. Everyone on a floor is told its picks (providerAccountsView).
+// Provider accounts (see provider-accounts/): admins keep the office's logins, pick which one the
+// floor they're on runs each provider on, and move workers already at their desks from one to another.
+// Everyone on a floor is told its picks (providerAccountsView).
 import { isAccountProvider, type ProviderAccountsClientMsg } from '../../../shared/protocol.js';
 import type { Floor } from '../../floor.js';
 import type { Ctx } from '../../office/context.js';
 import type { Client } from '../../office/client.js';
 import { str } from '../../office/input.js';
 import { KINDS } from '../../provider-accounts/kinds.js';
+import { moveWorker } from '../../provider-accounts/move.js';
+import { workerOf } from './common.js';
 import type { HandlerMap } from './types.js';
 
 /** The office's logins are kept by admins (on the shared password, that's everyone). */
@@ -15,6 +18,10 @@ const admin = (ctx: Ctx, c: Client) => {
   return false;
 };
 const idOf = (v: unknown) => str(v, 64);
+/** "Ada", "Ada and Bo", "Ada, Bo and Cy". */
+const names = (all: string[]) => (all.length < 2 ? all.join('') : `${all.slice(0, -1).join(', ')} and ${all[all.length - 1]}`);
+/** The most workers one move takes. */
+const MOVE_MAX = 64;
 
 /** The accounts' names, and which of them this floor runs on. */
 export const providerAccountsView = (ctx: Ctx, floor: Floor | undefined) => ctx.providerAccounts.view(floor?.id);
@@ -52,6 +59,28 @@ export const providerAccountsHandlers = {
     const here = floor.workers.list().filter((w) => w.kind === 'agent' && w.provider === msg.provider).length;
     const keep = here ? ` (the ${here === 1 ? 'one' : here} already here keep${here === 1 ? 's' : ''} ${here === 1 ? 'its' : 'theirs'})` : '';
     ctx.toastFloor(floor, `🪪 ${c.peer.name} put ${floor.def.name}’s ${label} workers on ${on}${keep}`);
+  },
+  'providerAccounts.move'(ctx, c, msg) {
+    if (!admin(ctx, c)) return;
+    const id = msg.id === null ? null : idOf(msg.id);
+    const on = id ? ctx.providerAccounts.get(id)?.name : 'the machine’s own login';
+    if (!on) return ctx.warn(c, 'No such account');
+    const moved = new Map<Floor, string[]>();
+    for (const raw of Array.isArray(msg.workerIds) ? msg.workerIds.slice(0, MOVE_MAX) : []) {
+      const w = workerOf(ctx, raw);
+      if (!w) {
+        ctx.warn(c, 'No such worker');
+        continue;
+      }
+      const was = w.info.account ?? null;
+      const err = moveWorker(ctx.providerAccounts, ctx.signins, w.floor.workers, w.wid, id);
+      if (err) ctx.warn(c, err);
+      else if (was !== id) moved.set(w.floor, [...(moved.get(w.floor) ?? []), w.info.name]);
+    }
+    if (!moved.size) return;
+    for (const [floor, who] of moved) ctx.toastFloor(floor, `🪪 ${c.peer.name} moved ${names(who)} to ${on}, ${who.length === 1 ? 'its conversation' : 'conversations'} and all`);
+    // Which workers each account has is in its card.
+    ctx.sendTo(c, { t: 'providerAccounts.state', state: ctx.providerAccounts.state() });
   },
   'providerAccounts.signin'(ctx, c, msg) {
     if (!admin(ctx, c)) return;

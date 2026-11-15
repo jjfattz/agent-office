@@ -1,6 +1,7 @@
 // What the office knows about each provider whose logins it keeps apart (see ACCOUNT_PROVIDERS):
 // the env var its config folder goes in, the credentials a worker on another login mustn't get, a
-// token in place of a login, and how to ask who it's signed in as.
+// token in place of a login, how to ask who it's signed in as, and where it keeps a conversation.
+import { existsSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { AccountProvider } from '../../shared/protocol.js';
@@ -29,7 +30,21 @@ export interface AccountKind {
   signsIn: boolean;
   /** What to type in a shell on a floor that runs on it, to sign it in there. */
   shellLogin: string;
+  /** Conversation `id`'s files and folders in config folder `dir`, relative to it: what moving a worker to another account copies (see move.ts). */
+  conversation(dir: string, id: string): string[];
 }
+
+/** The names in folder `dir`, or none. */
+const ls = (dir: string): string[] => {
+  try {
+    return readdirSync(dir);
+  } catch {
+    return [];
+  }
+};
+
+/** Those of `rels`, relative to `dir`, that are there. */
+const there = (dir: string, rels: string[]) => rels.filter((r) => existsSync(path.join(dir, r)));
 
 export const KINDS: Record<AccountProvider, AccountKind> = {
   claude: {
@@ -46,6 +61,8 @@ export const KINDS: Record<AccountProvider, AccountKind> = {
     status: claudeStatus,
     signsIn: true,
     shellLogin: 'claude auth login',
+    // projects/<the folder it ran in>/<id>.jsonl, its subagents' in <id>/ beside it, and its checkpoints in file-history/<id>/.
+    conversation: (dir, id) => there(dir, [...ls(path.join(dir, 'projects')).flatMap((p) => [path.join('projects', p, `${id}.jsonl`), path.join('projects', p, id)]), path.join('file-history', id)]),
   },
   codex: {
     label: 'Codex',
@@ -62,6 +79,16 @@ export const KINDS: Record<AccountProvider, AccountKind> = {
     },
     signsIn: false,
     shellLogin: 'codex login',
+    // sessions/<year>/<month>/<day>/rollout-<when>-<id>.jsonl, or the same in archived_sessions/.
+    conversation(dir, id) {
+      const mine = (f: string) => f.startsWith('rollout-') && f.endsWith(`-${id}.jsonl`);
+      const found = ls(path.join(dir, 'archived_sessions'))
+        .filter(mine)
+        .map((f) => path.join('archived_sessions', f));
+      const days = ls(path.join(dir, 'sessions')).flatMap((y) => ls(path.join(dir, 'sessions', y)).flatMap((m) => ls(path.join(dir, 'sessions', y, m)).map((d) => path.join('sessions', y, m, d))));
+      for (const day of days) for (const f of ls(path.join(dir, day))) if (mine(f)) found.push(path.join(day, f));
+      return found;
+    },
   },
 };
 

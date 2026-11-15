@@ -1,5 +1,5 @@
 import './provider-accounts.css';
-import { ACCOUNT_PROVIDERS, PROVIDER_ACCOUNT_NAME_MAX, type AccountProvider, type ProviderAccountInfo } from '../../shared/protocol';
+import { ACCOUNT_PROVIDERS, PROVIDER_ACCOUNT_NAME_MAX, type AccountProvider, type ProviderAccountInfo, type ProviderAccountsState, type WorkerInfo } from '../../shared/protocol';
 import type { Net } from '../net';
 import { store } from '../state';
 import { h, openModal, type Modal } from './dom';
@@ -14,10 +14,14 @@ const LOGIN: Record<AccountProvider, { name: string; shell: string; folder: stri
 
 let open: Modal | null = null;
 
+/** "Ada", "Ada and Bo", "Ada, Bo and Cy", or past that, how many. */
+const namesOf = (ws: WorkerInfo[]) => (ws.length > 3 ? `${ws.length} workers` : ws.length < 2 ? (ws[0]?.name ?? '') : `${ws.slice(0, -1).map((w) => w.name).join(', ')} and ${ws[ws.length - 1].name}`);
+
 /**
  * 🪪 Provider accounts: more than one login per agent on the office's machine (a work Claude and a
- * personal one), and which one the floor you're on runs each provider on (see
- * server/provider-accounts/). Admins only: everyone else sees the floor's picks in its details.
+ * personal one), which one the floor you're on runs each provider on, and moving the workers already
+ * there from one to another (see server/provider-accounts/). Admins only: everyone else sees the
+ * floor's picks in its details.
  */
 export function openProviderAccounts(net: Net) {
   if (open) return;
@@ -52,22 +56,62 @@ export function openProviderAccounts(net: Net) {
   let renaming: string | null = null;
   const renameInput = h('input', { type: 'text', 'aria-label': 'New name', maxlength: PROVIDER_ACCOUNT_NAME_MAX, autocomplete: 'off' }) as HTMLInputElement;
 
+  /** What an account is called here: none is this machine's own login. */
+  const accountLabel = (s: ProviderAccountsState, id: string | null) => (id ? (s.accounts.find((a) => a.id === id)?.name ?? 'an account that’s gone') : 'this machine’s own login');
+  /** A pick of `provider`'s accounts, `own` naming this machine's own login. */
+  const accountSelect = (s: ProviderAccountsState, pr: AccountProvider, label: string, own: string, value: string | undefined) => {
+    const select = h('select', { 'aria-label': label }, h('option', { value: '' }, own), ...s.accounts.filter((o) => o.provider === pr).map((a) => h('option', { value: a.id }, a.name))) as HTMLSelectElement;
+    select.value = value ?? '';
+    return select;
+  };
+  /** The floor's agents running `provider`, which may be on another account than the floor's. */
+  const workersHere = (pr: AccountProvider) => [...store.workers.values()].filter((w) => w.kind === 'agent' && w.provider === pr);
+  /** What the workers' rows show, to redraw them only when that changes, not on every status. */
+  const workersKey = () => ACCOUNT_PROVIDERS.flatMap((pr) => workersHere(pr).map((w) => `${w.id}:${w.name}:${w.account ?? ''}`)).join('|');
+  let drawnWorkers = '';
+
+  /** Moves `ws` onto account `to` (none: this machine's own login), once you've said so. */
+  const move = (s: ProviderAccountsState, ws: WorkerInfo[], to: string | null) => {
+    const on = accountLabel(s, to);
+    const what = `${ws.length === 1 ? ws[0].name : 'Each'} restarts on ${on} and picks its conversation back up, carrying on with whatever it was in the middle of.`;
+    confirmDialog(`Move ${namesOf(ws)} to ${on}?`, what, 'Move', () => net.send({ t: 'providerAccounts.move', workerIds: ws.map((w) => w.id), id: to }));
+  };
+
+  /** The floor's `provider` workers, each with the account it runs on, and a button putting the rest on the floor's. */
+  const floorWorkers = (s: ProviderAccountsState, pr: AccountProvider) => {
+    const here = workersHere(pr);
+    if (!here.length) return [];
+    const pick = store.providerAccounts.floor[pr] ?? null;
+    const rows = here.map((w) => {
+      const select = accountSelect(s, pr, `${w.name}’s ${PROVIDER_LABEL[pr]} account`, 'This machine’s own login', w.account);
+      select.addEventListener('change', () => {
+        const to = select.value || null;
+        // It shows where the worker is until it's moved.
+        select.value = w.account ?? '';
+        move(s, [w], to);
+      });
+      return h('div.pa-worker', {}, h('span', {}, w.name), select);
+    });
+    const off = here.filter((w) => (w.account ?? null) !== pick);
+    const all = off.length ? h('div.signin-actions', {}, button(`Move ${namesOf(off)} to ${accountLabel(s, pick)} too`, () => move(s, off, pick), 'primary')) : null;
+    const list = h('div.pa-workers', { role: 'group', 'aria-label': `${PROVIDER_LABEL[pr]} workers here` }, ...rows);
+    return all ? [list, all] : [list];
+  };
+
   const renderFloor = () => {
     const s = store.providerAccountsState;
     const p = store.project;
+    drawnWorkers = workersKey();
     if (!p || !store.floor) return floorRows.replaceChildren(h('p.empty', {}, 'Go to a floor to pick the accounts its workers run on.'));
     const providers = ACCOUNT_PROVIDERS.filter((pr) => s?.accounts.some((a) => a.provider === pr));
-    if (!providers.length) return floorRows.replaceChildren(h('p.empty', {}, `${p.name}’s workers run on this machine’s own logins. Add an account below to run them on another.`));
+    if (!s || !providers.length) return floorRows.replaceChildren(h('p.empty', {}, `${p.name}’s workers run on this machine’s own logins. Add an account below to run them on another.`));
     floorRows.replaceChildren(
-      ...providers.map((pr) => {
-        const select = h('select', { 'aria-label': `${PROVIDER_LABEL[pr]} account for ${p.name}` }) as HTMLSelectElement;
-        select.append(h('option', { value: '' }, `This machine’s own login (${s?.own[pr] ?? ''})`));
-        for (const a of s?.accounts.filter((o) => o.provider === pr) ?? []) select.append(h('option', { value: a.id }, a.name));
-        select.value = store.providerAccounts.floor[pr] ?? '';
+      ...providers.flatMap((pr) => {
+        const select = accountSelect(s, pr, `${PROVIDER_LABEL[pr]} account for ${p.name}`, `This machine’s own login (${s.own[pr]})`, store.providerAccounts.floor[pr]);
         select.addEventListener('change', () => net.send({ t: 'providerAccounts.use', provider: pr, id: select.value || null }));
-        return h('div.pa-pick', {}, h('span', {}, `${PROVIDER_LABEL[pr]} on ${p.name}`), select);
+        return [h('div.pa-pick', {}, h('span', {}, `${PROVIDER_LABEL[pr]} on ${p.name}`), select), ...floorWorkers(s, pr)];
       }),
-      h('p.note', {}, 'Workers hired here from now on run on it, and so does a 🐚 shell here. Workers already at their desks keep the account they were hired on, so their conversations carry on.'),
+      h('p.note', {}, 'Workers hired here from now on run on it, and so does a 🐚 shell here. A worker already at its desk keeps its account until you move it: it restarts on the new one and carries on its conversation.'),
     );
   };
 
@@ -163,7 +207,13 @@ export function openProviderAccounts(net: Net) {
     if (typing instanceof HTMLInputElement && (typing === renameInput || [...codes.values()].includes(typing)) && typing.isConnected) typing.focus();
   };
 
-  const offs = [store.on('providerAccountsState', render), store.on('providerAccounts', render), store.on('project', render)];
+  const offs = [
+    store.on('providerAccountsState', render),
+    store.on('providerAccounts', render),
+    store.on('project', render),
+    // Not on every status a worker goes through: a pick that's open would close under you.
+    store.on('workers', () => workersKey() !== drawnWorkers && render()),
+  ];
   open = openModal(el, {
     onClose: () => {
       for (const off of offs) off();

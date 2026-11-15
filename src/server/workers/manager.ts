@@ -16,6 +16,7 @@ import { DSH_PROFILE_DEFAULT } from '../dsh.js';
 import { DropStore } from '../drops.js';
 import type { Capacity } from '../machine.js';
 import { PROVIDERS, providerAdapter, titleNoise, type LaunchPlan, type ProviderFloor } from '../providers/index.js';
+import { moveAccount, type Carry } from './account.js';
 import { launchAcp } from './acp.js';
 import { clockWork } from './clock.js';
 import { childEnv } from './env.js';
@@ -411,6 +412,11 @@ export class WorkerManager {
     return this.worktrees.syncAll();
   }
 
+  /** Puts a worker on another provider account, conversation and all, starting it over there if it's running (see account.ts). */
+  moveAccount(id: string, account: string | undefined, carry: Carry): string | undefined {
+    return moveAccount(this.ctx, id, account, carry);
+  }
+
   /** Puts a lost worker's worktree back and starts it again (see WorkerTrees.rebuild). */
   rebuild(id: string): Promise<{ rebuilt?: boolean; note?: string; error?: string }> {
     return this.worktrees.rebuild(id);
@@ -458,20 +464,10 @@ export class WorkerManager {
   /** Keystrokes from `by`'s browser. */
   write(id: string, data: string, by: string) {
     const w = this.workers.get(id);
-    if (!w) return;
-    if (w.dsh) {
-      // ACP has no terminal: the session buffers these into a line and submits it on Enter.
-      w.dsh.writeInput(data);
-      let changed = this.typed(w, by);
-      if (w.info.status === 'needs_input' && w.info.acked === false) {
-        w.info.acked = true;
-        changed = true;
-      }
-      if (changed) this.emitUpdate(w);
-      return;
-    }
-    if (!w.pty) return;
-    w.pty.write(data);
+    if (!w || !(w.dsh || w.pty)) return;
+    // ACP has no terminal: the session buffers these into a line and submits it on Enter.
+    if (w.dsh) w.dsh.writeInput(data);
+    else w.pty?.write(data);
     let changed = this.typed(w, by);
     if (w.info.status === 'needs_input' && w.info.acked === false) {
       w.info.acked = true;

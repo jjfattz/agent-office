@@ -6,11 +6,12 @@ import type { SignIns } from '../signins.js';
 import type { RunAs } from '../workers/types.js';
 import type { ProviderAccounts } from './index.js';
 
+/** `owner` runs `provider` on a sign-in of their own, which no provider account stands in for. */
+export const theirOwn = (signins: SignIns, owner: string | undefined, provider: AccountProvider) => provider === 'claude' && !!owner && signins.claudeKey(owner) !== undefined;
+
 export function floorRunAs(floor: string, signins: SignIns, accounts: ProviderAccounts): RunAs {
-  /** `owner` runs `provider` on a sign-in of their own, which no provider account stands in for. */
-  const theirOwn = (owner: string | undefined, provider: AccountProvider) => provider === 'claude' && !!owner && signins.claudeKey(owner) !== undefined;
   return {
-    account: (provider, owner) => (isAccountProvider(provider) && !theirOwn(owner, provider) ? accounts.pick(floor, provider) : undefined),
+    account: (provider, owner) => (isAccountProvider(provider) && !theirOwn(signins, owner, provider) ? accounts.pick(floor, provider) : undefined),
     claudeReady: (owner) => signins.claudeReady(owner),
     why: (which) => signins.why(which),
     apply({ owner, info }, env, dirs) {
@@ -22,7 +23,7 @@ export function floorRunAs(floor: string, signins: SignIns, accounts: ProviderAc
       }
       // An agent keeps the account it was hired on; a shell runs on whatever its floor's are now.
       if (info.account) return accounts.apply(info.account, env, dirs);
-      if (info.kind === 'shell') accounts.applyFloor(floor, env, dirs, (p) => theirOwn(owner, p));
+      if (info.kind === 'shell') accounts.applyFloor(floor, env, dirs, (p) => theirOwn(signins, owner, p));
       return undefined;
     },
   };
