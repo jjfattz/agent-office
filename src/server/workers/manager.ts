@@ -272,6 +272,7 @@ export class WorkerManager {
       provider: selectedProvider,
       model: takesModel(selectedProvider) ? model : undefined,
       effort: takesEffort(selectedProvider) ? effort : undefined,
+      account: kind === 'agent' ? this.runAs?.account(selectedProvider, owner) : undefined,
       deskId,
       name: kind === 'shell' ? `${name} 🐚` : name,
       color: kind === 'shell' ? '#8d99ae' : agent ? agent.color : COLORS[Math.floor(Math.random() * COLORS.length)],
@@ -687,13 +688,9 @@ export class WorkerManager {
     // A workspace isn't a repository, but it's inside this floor's checkout: git run in it must not
     // find that checkout (and switch its branch, say) instead of saying it's no repository.
     if (info.repos?.length) env.GIT_CEILING_DIRECTORIES = [path.dirname(cwd), env.GIT_CEILING_DIRECTORIES].filter(Boolean).join(path.delimiter);
-    if (w.owner && this.runAs) {
-      if (adapter?.signIn && !this.runAs.claudeReady(w.owner)) {
-        this.startFailed(w, `whoever hired ${info.name} (${info.createdBy}) isn't signed in to Claude — they can sign in under ☰ → 🔐 Your sign-ins, then press R here`);
-        return;
-      }
-      this.runAs.apply(w.owner, env, [this.dir, cwd]);
-    }
+    // Whose logins it runs on: whoever hired it, and the provider account it was hired on (see RunAs).
+    const refused = this.runAs?.apply(w, env, [this.dir, cwd]);
+    if (refused) return this.startFailed(w, refused);
     adapter?.usage?.locate?.(this.handleOf(w), cwd, env);
 
     if (adapter?.transport === 'acp') {
@@ -758,7 +755,9 @@ export class WorkerManager {
     }
     const adapter = providerAdapter(info.provider);
     const locate = adapter?.usage?.locate;
-    if (locate) locate(this.handleOf(w), this.cwd(info), childEnv());
+    const env = childEnv();
+    this.runAs?.apply(w, env, []);
+    if (locate) locate(this.handleOf(w), this.cwd(info), env);
     this.follow(w, adopted.pty, term, undefined);
     // A turn that ended while the office was down says so with its Stop hook, which retries until
     // the office is back. Claude's progress report, where it gives one, says a turn is still going.

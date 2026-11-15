@@ -72,6 +72,26 @@ OpenCode metrics come from assistant-message token/cost records exposed by its p
 
 DeepSeek Harness metrics come from ACP `usage_update`: tokens in context and the window's size, shown per worker and for the current desks, plus a session cost only when the harness reports one. The daily budget and historical ledger remain Claude-only.
 
+## Provider accounts: a work login and a personal one
+
+One machine can hold more than one Claude or Codex login, and each project can run on its own: a work Claude for the work repositories, a personal one for the rest. An admin (on the office password, that's you) keeps them in **☰ → 🪪 Provider accounts**.
+
+**Adding one.** Pick the provider, give it a name (*Work*, *Personal*) and say how it signs in:
+
+- **A new login, in a folder of its own.** The office makes it a config folder under `.agent-office/provider-accounts/<id>/`. Press **Sign in with Claude**: the office runs `claude auth login` there and hands you the page to open, and you paste back the code it shows. Or hire a worker on it and type `/login` in its terminal. It starts without your usual Claude settings, plugins and memory, since those live in the folder too.
+- **A folder you already use.** If you already keep a second login in a folder of its own (`CLAUDE_CONFIG_DIR=~/.claude-work claude`, or `CODEX_HOME=~/.codex-work codex`), give that folder: it's used as it is, settings and all, and removing the account never deletes it. `~/.claude` is Claude's usual login, so naming it makes an account of the machine's own.
+- **A token** (Claude only). Run `claude setup-token` anywhere you're signed in as that account and paste what it prints (or paste an Anthropic API key). It keeps the machine's own Claude settings and only changes who pays.
+
+Codex accounts are folders (`CODEX_HOME`): sign one in with `codex login` from a 🐚 shell on a floor that runs on it.
+
+**Picking one per project.** Under **This floor** in the same window, pick the account each provider runs on for the floor you're on, or **This machine's own login**. That's it: every floor keeps its own pick, so riding the elevator to another project is switching to its account, with nothing else to do. The floor's details (☰ → **🏢 Floor details**) say which account it's on, and so does every worker's line in the workers list and its terminal's title (*Claude Code · Opus 5.5 · 🪪 Work*).
+
+**What runs on it.** A worker runs on the account its floor had when it was hired, for good, whatever the floor picks later: its conversations are kept in that account's folder, so resuming it on another would start it over. Hire a new one to use the new account. A 🐚 shell has no conversation to keep, so it runs on whatever its floor's accounts are each time it starts, and `claude` or `codex` typed in it runs as them too. Tasks from the queue, meetings and board agents are hired like any other worker. Each account gets the office's hooks and MCP server like the machine's own, and folders the machine's own Claude already trusts are trusted for it too.
+
+**Keeping them apart.** A worker on an account gets none of the machine's own Claude or Codex credentials (`ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, `OPENAI_API_KEY` and the like are taken out of its environment), only its account's. With [accounts for people](../README.md#add-users), someone signed in to their own Claude in **🔐 Your sign-ins** keeps running their Claude workers on it: provider accounts stand in for the office machine's own login only. Two things still use the machine's own login: naming the workers' tasks (a few words from a small model), and the **⏳ Claude limits** meter.
+
+**Removing one.** An account can't be removed while a worker is on it (send them home first). Once it's gone, the floors that ran on it go back to the machine's own login. A folder the office made is signed out and deleted; one of yours is left as it was.
+
 ## The office's prompts
 
 Everything the office tells a worker by itself can be rewritten in ⚙️ Settings → **🤖 Workers** → **📝 Edit the prompts…**: what **🤖 Hand to a worker**, **🔍 Review**, **Fix up & merge**, **Fix conflicts & merge** and **✍️ Ask a worker** send from the boards, what a meeting about an issue or a review panel starts with, the note the queue adds to a worktree task, the three board agents' briefs, every part the meeting room hands out, and the instructions for the model that writes the signs over workers' heads. Each one lists its `{{placeholders}}` (the issue number, the PR's branch, the file a meeting waits for…), which the office fills in when it sends it, and warns when one the office counts on is missing. **↺ Default** puts the office's own wording back. Admins edit them; they're the same on every floor and kept in `.agent-office/prompts.json` with the Default worker.

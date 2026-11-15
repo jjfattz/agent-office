@@ -267,7 +267,8 @@ test('welcomes a browser and dispatches what it sends', async () => {
   assert.equal(ada?.name, 'Ada');
   assert.equal(ada?.color, '#ff8a5b');
   assert.equal(ada?.floor, floor.id);
-  assert.deepEqual(Object.keys(welcome).slice(-17), ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'decor', 'plan', 'services', 'dog', 'ball', 'cars', 'jail', 'jukebox', 'whiteboard', 'meeting', 'cabinet']);
+  assert.deepEqual(Object.keys(welcome).slice(-18), ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'decor', 'plan', 'services', 'dog', 'ball', 'cars', 'jail', 'jukebox', 'whiteboard', 'meeting', 'cabinet', 'providerAccounts']);
+  assert.deepEqual(welcome.providerAccounts, { accounts: [], floor: {} });
 
   a.send({ t: 'ping', at: 42 });
   const pong = await a.take('pong');
@@ -420,6 +421,23 @@ test('settings, accounts, sign-ins and the boards answer as before', async () =>
     a.send({ t, which: 'github' });
     await warned("On the shared office password, workers run on the office's own sign-ins");
   }
+
+  // Provider accounts: kept by admins (on the shared password, that's Eve), picked per floor.
+  a.send({ t: 'providerAccounts.add', provider: 'nope' as 'claude', name: 'X', how: 'new' });
+  await warned('The office can only keep Claude and Codex accounts apart');
+  a.send({ t: 'providerAccounts.add', provider: 'claude', name: 'Work', how: 'new' });
+  const work = (await a.take('providerAccounts.state', (m) => m.state.accounts.length === 1)).state.accounts[0];
+  assert.deepEqual([work.name, work.how, work.made], ['Work', 'folder', true]);
+  assert.deepEqual((await a.take('providerAccounts', (m) => m.view.accounts.length === 1)).view, { accounts: [{ id: work.id, provider: 'claude', name: 'Work' }], floor: {} });
+  a.send({ t: 'providerAccounts.use', provider: 'claude', id: work.id });
+  assert.equal((await a.take('providerAccounts', (m) => !!m.view.floor.claude)).view.floor.claude, work.id);
+  assert.equal(await told('🪪'), `🪪 Eve put ${office.floors()[0].def.name}’s Claude workers on Work`);
+  a.send({ t: 'providerAccounts.signin', id: 'nope' });
+  await warned('No such account');
+  a.send({ t: 'providerAccounts.code', id: work.id, code: 'abc' });
+  await warned('Start signing in first');
+  a.send({ t: 'providerAccounts.remove', id: work.id });
+  assert.deepEqual((await a.take('providerAccounts', (m) => !m.view.accounts.length)).view, { accounts: [], floor: {} });
 
   a.send({ t: 'gh.merge', number: 0, method: 'squash', deleteBranch: false });
   a.send({ t: 'gh.close', kind: 'nope', number: 3 });

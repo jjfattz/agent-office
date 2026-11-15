@@ -10,6 +10,10 @@ import { Worktrees } from '../src/server/worktrees.js';
 import type { AgentProvider, WorkerInfo } from '../src/shared/protocol.js';
 import type { PromptSource } from '../src/server/prompts.js';
 import { PROMPTS } from '../src/shared/prompts.js';
+import { ProviderAccounts } from '../src/server/provider-accounts/index.js';
+import { floorRunAs } from '../src/server/provider-accounts/run-as.js';
+import type { SignIns } from '../src/server/signins.js';
+import { childEnv } from '../src/server/workers.js';
 
 type Invocation = {
   kind: string;
@@ -25,6 +29,7 @@ type Invocation = {
     xdgConfig?: string;
     xdgData?: string;
     xdgState?: string;
+    claudeConfig?: string;
     path?: string;
   };
 };
@@ -110,6 +115,7 @@ const record = (extra = {}) => fs.appendFileSync(log, JSON.stringify({
     xdgConfig: process.env.XDG_CONFIG_HOME,
     xdgData: process.env.XDG_DATA_HOME,
     xdgState: process.env.XDG_STATE_HOME,
+    claudeConfig: process.env.CLAUDE_CONFIG_DIR,
     path: process.env.PATH,
   },
 }) + '\\n');
@@ -1701,4 +1707,50 @@ test("a worker whose worktree was deleted outside the office waits, marked lost,
   assert.equal(git(path.join(f.root, gone.worktree!.path), 'rev-parse', 'HEAD'), gone.worktree!.base);
   assert.equal(after.get(gone.id)?.lost, undefined);
   assert.deepEqual(toasts, []);
+});
+
+test("a Claude worker runs on its floor's provider account, and keeps it after the floor picks another and the office restarts", async (t) => {
+  const f = fixture();
+  isolateProviderEnvironment(f, t);
+  const previousLog = process.env.FAKE_AGENT_LOG;
+  process.env.FAKE_AGENT_LOG = f.log;
+  t.after(() => {
+    if (previousLog === undefined) delete process.env.FAKE_AGENT_LOG;
+    else process.env.FAKE_AGENT_LOG = previousLog;
+    f.close();
+  });
+  const officeConfig = process.env.CLAUDE_CONFIG_DIR;
+  const accounts = new ProviderAccounts(f.data, { claude: null, codex: null }, childEnv, { floorName: () => 'Test', workersOn: () => [], changed() {} });
+  const work = accounts.add('claude', 'Work', 'new');
+  if (typeof work === 'string') return assert.fail(work);
+  accounts.use('floor-1', 'claude', work.id);
+  const signins = { claudeKey: () => undefined, claudeReady: () => true, why: () => '', apply: (_id: string, env: Record<string, string>) => env } as unknown as SignIns;
+  const make = () => new WorkerManager(f.root, f.data, f.claude, [], { url: 'http://127.0.0.1:1', token: '' }, events([]), ledger(f.data), undefined, undefined, floorRunAs('floor-1', signins, accounts));
+  const runs = () => f.read().filter((r) => r.kind === 'claude' && r.args.includes('--settings'));
+
+  const before = make();
+  const hired = before.spawn('desk-1', 'test', 'on the work account');
+  if (typeof hired === 'string') return assert.fail(hired);
+  assert.equal(hired.account, work.id);
+  const first = (await waitFor(runs, (x) => x.length >= 1))[0];
+  assert.equal(first.env.claudeConfig, work.dir);
+
+  // The floor goes back to the machine's own login: a new hire is on it, the first worker isn't.
+  accounts.use('floor-1', 'claude', null);
+  const second = before.spawn('desk-2', 'test', 'on the office account');
+  if (typeof second === 'string') return assert.fail(second);
+  assert.equal(second.account, undefined);
+  const both = await waitFor(runs, (x) => x.length >= 2);
+  assert.equal(both[1].env.claudeConfig, officeConfig);
+  before.shutdown(true);
+  await new Promise((resolve) => setTimeout(resolve, 200));
+
+  const after = make();
+  t.after(() => after.shutdown());
+  assert.equal(after.get(hired.id)?.account, work.id);
+  assert.equal(after.get(second.id)?.account, undefined);
+  await after.start();
+  const again = (await waitFor(runs, (x) => x.length >= 4)).slice(2);
+  assert.equal(again.find((r) => r.env.workerId === hired.id)?.env.claudeConfig, work.dir);
+  assert.equal(again.find((r) => r.env.workerId === second.id)?.env.claudeConfig, officeConfig);
 });

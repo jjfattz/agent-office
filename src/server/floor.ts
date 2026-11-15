@@ -43,8 +43,8 @@ export interface FloorContext {
   capacity: Capacity;
   /** The office's prompts and the worker everyone starts on, as set in ⚙️ Settings. */
   prompts: PromptSource;
-  /** Workers hired by an account run on its own sign-ins (see signins.ts). */
-  runAs?: RunAs;
+  /** Whose logins this floor's workers run on: whoever hired them, and the floor's provider accounts (see RunAs). */
+  runAs?(floor: string): RunAs;
   /** How to run gh as an account: its own sign-in, the office's (undefined), or why it can't. */
   ghAs(owner: string | undefined): GhAs | undefined | string;
   /** To everyone on this floor. */
@@ -202,7 +202,7 @@ export class Floor {
       ctx.ledger,
       ctx.capacity,
       ctx.prompts,
-      ctx.runAs,
+      ctx.runAs?.(def.id),
       ctx.dshProfile,
     );
     this.workers.wing = () => this.plan.wing;

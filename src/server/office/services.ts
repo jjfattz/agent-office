@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { childEnv, resolveCommand } from '../workers.js';
 import { SignIns } from '../signins.js';
+import { ProviderAccounts } from '../provider-accounts/index.js';
 import { agentProviders, configuredProvider } from '../agents.js';
 import { Tailnet } from '../tailnet.js';
 import { Team } from '../team.js';
@@ -62,6 +63,19 @@ export function createServices(ctx: Ctx): BuildingServices {
   );
   // Accounts revoked from the terminal while the office was closed leave their sign-ins behind.
   if (!accounts.unreadableFile) signins.prune(new Set(accounts.state(new Set()).accounts.map((a) => a.id)));
+
+  // More than one login per provider on this machine (a work Claude and a personal one), and which
+  // one each floor's workers run on, in place of the machine's own (see provider-accounts/).
+  const providerAccounts = new ProviderAccounts(cfg.dataDir, { claude: claudeBin, codex: resolveCommand('codex') }, childEnv, {
+    floorName: (id) => floors.get(id)?.def.name,
+    workersOn: (id) => [...floors.values()].flatMap((f) => f.workers.list().filter((w) => w.account === id).map((w) => w.name)),
+    changed: () => {
+      for (const f of floors.values()) ctx.toFloor(f, { t: 'providerAccounts', view: providerAccounts.view(f.id) });
+      const admins = [...clients.values()].filter((c) => c.admin && !c.out);
+      const state = admins.length ? providerAccounts.state() : undefined;
+      for (const c of admins) ctx.sendTo(c, { t: 'providerAccounts.state', state: state! });
+    },
+  });
 
   // The Claude plan's 5-hour and weekly limits, for the meter under the workers: the office's own
   // plan, and each account's own once it runs on a Claude sign-in of its own.
@@ -125,7 +139,7 @@ export function createServices(ctx: Ctx): BuildingServices {
     });
   };
 
-  return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
+  return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, providerAccounts, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
 }
 
 /** What's made once the floors are open: the SSH team, the tailnet, workers' web servers, pictures and upgrades. */

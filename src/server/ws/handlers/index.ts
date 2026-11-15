@@ -14,6 +14,7 @@ import { jukeboxHandlers, jukeboxView } from './jukebox.js';
 import { meetingHandlers, meetingView } from './meetings.js';
 import { planHandlers, planView } from './plan.js';
 import { presenceHandlers } from './presence.js';
+import { providerAccountsHandlers, providerAccountsView } from './provider-accounts.js';
 import { queueHandlers, queueView } from './queue.js';
 import { rooftopHandlers } from './rooftop.js';
 import { servicesView, settingsHandlers } from './settings.js';
@@ -39,6 +40,7 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...meetingHandlers,
   ...planHandlers,
   ...presenceHandlers,
+  ...providerAccountsHandlers,
   ...queueHandlers,
   ...rooftopHandlers,
   ...settingsHandlers,
@@ -73,4 +75,5 @@ export const views: ViewPieces = {
   whiteboard: whiteboardView,
   meeting: meetingView,
   cabinet: cabinetView,
+  providerAccounts: providerAccountsView,
 };

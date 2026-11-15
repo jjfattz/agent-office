@@ -17,6 +17,7 @@ import { $ } from '../../ui/dom';
 import { toggleFloorMenu } from '../../ui/floormenu';
 import { openHelp } from '../../ui/hud';
 import { mountHud } from '../../ui/menu';
+import { openProviderAccounts } from '../../ui/provider-accounts';
 import { openServices } from '../../ui/services';
 import { openSettings, type SettingsPane } from '../../ui/settings';
 import { needsSigningIn, openSignIns } from '../../ui/signins';
@@ -92,6 +93,7 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
       { id: 'accounts', icon: '🔑', label: 'Accounts', section: 'Together', shown: () => store.me.admin, title: () => 'Invite people, see who has an account, revoke them', run: () => openAccounts(net) },
       { id: 'signins', icon: '🔐', label: 'Your sign-ins', section: 'Together', shown: () => !!store.me.account, tone: () => (needsSigningIn() ? 'danger' : undefined), status: needsSigningIn, chip: () => 'Sign in to Claude', title: () => 'The Claude plan and GitHub account your workers run on: your own', run: () => openSignIns(net) },
       { id: 'settings', icon: '⚙️', label: 'Settings', section: 'Office', run: showSettings },
+      { id: 'providerAccounts', icon: '🪪', label: 'Provider accounts', section: 'Office', shown: () => store.me.admin, title: () => 'More than one Claude or Codex login (work and personal, say), and which one this floor’s workers run on', run: () => openProviderAccounts(net) },
       { id: 'help', icon: '❓', label: 'Controls', section: 'Office', key: 'H', run: openHelp },
       { id: 'lite', icon: '📱', label: '2D view', section: 'Office', title: () => 'The workers, their terminals and the boards without the 3D: for a phone or a slow computer', run: () => location.assign('/lite') },
       {
