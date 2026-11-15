@@ -1,6 +1,6 @@
 // The shapes the workers' modules and the provider adapters (server/providers/) share.
 import type serialize from '@xterm/addon-serialize';
-import type { Run, WorkerInfo, WorkerStatus } from '../../shared/protocol.js';
+import type { AgentProvider, Run, WorkerInfo, WorkerStatus } from '../../shared/protocol.js';
 import type { DshSession } from '../dsh.js';
 import type { PromptSource } from '../prompts.js';
 import type { Pty } from '../ptys.js';
@@ -39,16 +39,19 @@ export interface OpenedPr {
 }
 
 /**
- * Runs a worker as the account that hired it, on that account's own Claude and GitHub sign-ins
- * (see signins.ts). Workers hired without an account run as the office, as they always have.
+ * Whose logins a floor's workers run on: the account that hired one, on that account's own Claude
+ * and GitHub sign-ins (see signins.ts), and in place of the office machine's own login, the provider
+ * account its floor picked (see provider-accounts/). A worker with neither runs as the office.
  */
 export interface RunAs {
+  /** The provider account a new worker running `provider`, hired by `owner`, runs on for good (WorkerInfo.account). */
+  account(provider: AgentProvider | undefined, owner: string | undefined): string | undefined;
   /** Whether the account has a Claude sign-in its workers can start on. */
   claudeReady(owner: string): boolean;
   /** What to tell the account when it hasn't. */
   why(which: 'claude'): string;
-  /** Puts the account's sign-ins in place of the office's in `env`; `dirs` are where the worker starts. */
-  apply(owner: string, env: Record<string, string>, dirs: string[]): Record<string, string>;
+  /** Puts the logins `w` runs on in place of the office's in `env`; `dirs` are where it starts. Says why it can't start, if it can't. */
+  apply(w: Pick<Worker, 'owner' | 'info'>, env: Record<string, string>, dirs: string[]): string | undefined;
 }
 
 export interface Worker {

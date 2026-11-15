@@ -12,6 +12,7 @@ import type { AgentProvider } from './agents.js';
 import type { GhIssue, GhPull, GhState } from './github.js';
 import type { MeetingState } from './meetings.js';
 import type { PeerInfo } from './presence.js';
+import type { ProviderAccountsView } from './provider-accounts.js';
 import type { QueueState } from './queue.js';
 import type { ServicesState } from './settings.js';
 import type { JailState, WorkerInfo } from './workers.js';
@@ -124,6 +125,8 @@ export interface FloorView {
   cars: CarState[];
   /** Workers sent home and locked up in the dungeon, on a map that has one. */
   jail: JailState;
+  /** The provider accounts, and which of them this floor's workers run on. */
+  providerAccounts: ProviderAccountsView;
 }
 
 export type FloorClientMsg =

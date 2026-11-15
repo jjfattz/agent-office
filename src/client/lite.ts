@@ -155,6 +155,7 @@ function workerCard(w: WorkerInfo): HTMLElement {
           : (w.task?.summary ?? w.activity);
   const sub = [
     w.kind === 'agent' ? `⚙️ ${providerLabel(w.provider, store.project)}${badge ? ` · ${badge}` : ''}` : '🐚 shell',
+    w.account && store.accountName(w.account) && `🪪 ${store.accountName(w.account)}`,
     desk && (desk.station ? `📌 ${desk.label}` : desk.label),
     w.worktree && `🌿 ${w.worktree.branch}`,
     w.pr && `🔀 PR #${w.pr.number}`,

@@ -35,6 +35,11 @@ export interface WorkerInfo {
   model?: string;
   /** Reasoning effort requested for this worker, when one was chosen. */
   effort?: AgentEffort;
+  /**
+   * The provider account it was hired on (see ProviderAccountsView), kept for good so its
+   * conversations carry on where they're kept. None: the office machine's own login.
+   */
+  account?: string;
   deskId: string;
   name: string;
   color: string;

@@ -14,7 +14,7 @@ import { routeAccountsMessage } from '../ui/accounts';
 import { openChangesFor, routeChangesMessage } from '../ui/changes';
 import { $, toast } from '../ui/dom';
 import { routeElevatorMessage } from '../ui/elevator';
-import { providerLabel } from '../ui/provider';
+import { PROVIDER_LABEL, providerLabel } from '../ui/provider';
 import { routePullMessage } from '../ui/pull';
 import { needsSigningIn, openSignIns } from '../ui/signins';
 import { routeTeamMessage } from '../ui/team';
@@ -196,11 +196,14 @@ export function installArrival(ctx: Ctx, core: CoreState, parts: ArrivalParts) {
     const n = store.floors.findIndex((f) => f.id === store.floor);
     $('project-meta').classList.remove('lobby');
     $('project-name').textContent = `🏢 ${p.name}`;
-    $('project-meta').textContent = [n >= 0 && `🛗 floor ${n + 1} of ${store.floors.length}`, p.branch && `⎇ ${p.branch}`, p.dir, `default: ${providerLabel(p.defaultProvider, p)}`].filter(Boolean).join(' · ');
+    // The provider accounts its workers run on, where they aren't the machine's own logins.
+    const accounts = Object.entries(store.providerAccounts.floor).map(([pr, id]) => `🪪 ${PROVIDER_LABEL[pr as keyof typeof PROVIDER_LABEL]}: ${store.accountName(id)}`);
+    $('project-meta').textContent = [n >= 0 && `🛗 floor ${n + 1} of ${store.floors.length}`, p.branch && `⎇ ${p.branch}`, p.dir, `default: ${providerLabel(p.defaultProvider, p)}`, ...accounts].filter(Boolean).join(' · ');
     ctx.world().setProjectName(p.name);
   }
   store.on('floors', renderProject);
   store.on('project', renderProject);
+  store.on('providerAccounts', renderProject);
 
   /** Where to put you back when the office lets you in: where you are now, or before this page was loaded, where you were last time. */
   function whereNow(): Spot | null {

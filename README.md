@@ -92,6 +92,8 @@ agent-office setup                          # the first-start walkthrough again 
 
 Every option is in [docs/configuration.md](docs/configuration.md). Choosing models and providers per worker is in [docs/agents.md](docs/agents.md).
 
+A work Claude for some projects and a personal one for the rest? Add both in **☰ → 🪪 Provider accounts** and pick one per floor: each project's workers run on its own, with nothing to switch when you change projects (see [Provider accounts](docs/agents.md#provider-accounts-a-work-login-and-a-personal-one)).
+
 To run it from a clone instead:
 
 ```bash

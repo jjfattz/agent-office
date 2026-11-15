@@ -35,10 +35,14 @@ export function modelBadge(provider: AgentProvider | undefined, model: string | 
   return parts.length ? parts.join(' · ') : undefined;
 }
 
-/** What a worker runs, in a line: "Claude Code · Opus 5.5 · High", or only "Codex" for one on its defaults that hasn't said. */
-export function engineLabel(w: Pick<WorkerInfo, 'provider' | 'model' | 'effort' | 'usage'>, project: ProjectInfo | null): string {
+/**
+ * What a worker runs, in a line: "Claude Code · Opus 5.5 · High", or only "Codex" for one on its
+ * defaults that hasn't said, with the provider account it runs on, when it isn't the machine's own.
+ */
+export function engineLabel(w: Pick<WorkerInfo, 'provider' | 'model' | 'effort' | 'usage' | 'account'>, project: ProjectInfo | null): string {
   const badge = modelBadge(w.provider, w.model, w.effort, w.usage?.model);
-  return badge ? `${providerLabel(w.provider, project)} · ${badge}` : providerLabel(w.provider, project);
+  const account = store.accountName(w.account);
+  return [providerLabel(w.provider, project), badge, account && `🪪 ${account}`].filter(Boolean).join(' · ');
 }
 
 /** Providers the server says this project can start. */
