@@ -24,8 +24,10 @@ interface Column<T> {
 
 const byUpdated = (a: { updatedAt: string }, b: { updatedAt: string }) => b.updatedAt.localeCompare(a.updatedAt);
 
-function githubErrorHint(error: string): string {
+/** What to try next, or nothing when the error already says it (gh being fine, a sign-in hint would mislead). */
+function githubErrorHint(error: string): string | null {
   if (/^Unknown JSON field:/i.test(error)) return 'The server is running an older GitHub CLI than this feature expected; update `gh` if the board still cannot load.';
+  if (/^Issues are turned off for /.test(error)) return null;
   return 'The server runs `gh` in the project directory — make sure it is installed and authenticated (gh auth login).';
 }
 
@@ -256,7 +258,8 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
     const caret = active instanceof HTMLInputElement ? ([active.selectionStart, active.selectionEnd] as const) : null;
     body.replaceChildren();
     if (st.error && !st.items.length) {
-      body.append(h('div.board-error', {}, `Couldn't load from GitHub: ${st.error}`, h('br'), h('small', {}, githubErrorHint(st.error))));
+      const hint = githubErrorHint(st.error);
+      body.append(h('div.board-error', {}, `Couldn't load from GitHub: ${st.error}`, ...(hint ? [h('br'), h('small', {}, hint)] : [])));
       return;
     }
     const all = boardLabels(st.items);

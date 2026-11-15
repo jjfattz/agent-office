@@ -16,6 +16,9 @@ export function friendlyGhError(raw: string): string {
   if (/no git remotes found|none of the git remotes/i.test(text)) return 'This project has no GitHub remote yet. Push it to GitHub (git remote add origin <url>) to fill the boards.';
   if (/not a git repository/i.test(text)) return "This folder isn't a git repository";
   if (/auth login|not logged in|authentication/i.test(text)) return "gh isn't signed in to GitHub on the office's machine — run `gh auth login` there";
+  // GitHub turns issues off on every new fork, so a fork's issues board lands here first.
+  const noIssues = /the '([^']+)' repository has disabled issues/i.exec(text);
+  if (noIssues) return `Issues are turned off for ${noIssues[1]} on GitHub (a new fork starts with them off). Turn them on under the repository's Settings → General → Features → Issues, or run \`gh repo edit ${noIssues[1]} --enable-issues\`.`;
   if (/could not resolve to a repository|not found/i.test(text)) return "gh can't find this repository on GitHub (check the remote and access)";
   return lines.slice(-2).join(' ') || raw;
 }
