@@ -43,7 +43,7 @@ export interface Core {
   clients: Map<string, Client>;
   /** Kept on disk, so a restart doesn't wipe it. */
   chat: ChatLog;
-  /** The arcade's high scores: one table for the whole building, on every floor's cabinet. */
+  /** The arcade's high scores: a table a game for the whole building, on every floor's cabinet. */
   highScores: HighScores;
   arcade: Arcade;
   /** What the office is called where it has no project of its own to go by (webhooks, invites). */

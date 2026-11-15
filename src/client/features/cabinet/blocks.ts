@@ -1,13 +1,13 @@
-import { CLEAR_POINTS, GAME, WELL_COLS, WELL_ROWS, levelFor, scoreText, type CabinetFrame, type HighScore, type PlayState } from '../../../shared/cabinet';
+import { scoreText, type PlayState } from '../../../shared/cabinet';
+import { CLEAR_POINTS, WELL_COLS, WELL_ROWS, levelFor, type BlocksFrame } from '../../../shared/games/blockfall';
+import type { CabinetGame, Cartridge, ScreenView } from './cart';
+import { LIGHTS, NEON, W, backdrop, banner, label, line, playerAndBest, table, value } from './paint';
 
 /**
- * BLOCKFALL, the game on the arcade cabinet (ui.ts): falling blocks with the usual rotation
- * and wall kicks, a bag of all seven pieces at a time, hold, a ghost where the piece will land, and a
- * painter that draws the whole screen in fixed 800×600 units from a CabinetFrame, so the player's
- * screen, the cabinet in the office and everyone watching show the same picture.
+ * BLOCKFALL, a game on the arcade cabinet (ui.ts): falling blocks with the usual rotation and wall
+ * kicks, a bag of all seven pieces at a time, hold, a ghost where the piece will land, and a painter
+ * that draws the whole screen (see paint.ts) from a BlocksFrame.
  */
-export const W = 800;
-export const H = 600;
 
 const COLS = WELL_COLS;
 /** Two rows above the top of the well, where the pieces come in. */
@@ -77,7 +77,7 @@ function gravity(level: number): number {
   return Math.pow(0.8 - (level - 1) * 0.007, level - 1);
 }
 
-export class Blocks {
+export class Blocks implements CabinetGame {
   /** Row by row from the top, hidden rows first: 0 empty, else the color of the piece that left it. */
   private well = new Uint8Array(COLS * ROWS);
   private piece!: Piece;
@@ -114,6 +114,27 @@ export class Blocks {
 
   get over(): boolean {
     return this.state === 'over';
+  }
+
+  get started(): boolean {
+    return this.pieces > 0 || this.score > 0;
+  }
+
+  /** A key for it (see KEYS) went down or came back up. */
+  input(action: string, down: boolean) {
+    if (!down) {
+      if (action === 'left') this.release(-1);
+      else if (action === 'right') this.release(1);
+      else if (action === 'down') this.softDrop(false);
+      return;
+    }
+    if (action === 'left') this.press(-1);
+    else if (action === 'right') this.press(1);
+    else if (action === 'down') this.softDrop(true);
+    else if (action === 'turn') this.rotate(1);
+    else if (action === 'back') this.rotate(-1);
+    else if (action === 'drop') this.hardDrop();
+    else if (action === 'hold') this.hold();
   }
 
   /** Left (-1) or right (1) pressed: a step now, then sliding while it's held. */
@@ -213,7 +234,7 @@ export class Blocks {
   }
 
   /** The screen as it is now: the well with the piece in it and its ghost below. */
-  frame(): CabinetFrame {
+  frame(): BlocksFrame {
     const cells = this.well.slice(HIDDEN * COLS);
     if (this.state !== 'over') {
       let drop = 0;
@@ -221,7 +242,7 @@ export class Blocks {
       for (const [x, y] of this.at(this.piece, 0, drop)) if (y >= HIDDEN && !cells[(y - HIDDEN) * COLS + x]) cells[(y - HIDDEN) * COLS + x] = GHOST;
       for (const [x, y] of this.at(this.piece)) if (y >= HIDDEN) cells[(y - HIDDEN) * COLS + x] = this.piece.kind;
     }
-    return { cells: cells.join(''), next: this.queue[0], hold: this.held, score: this.score, lines: this.lines, level: this.level, pieces: this.pieces, state: this.state };
+    return { title: 'blockfall', cells: cells.join(''), next: this.queue[0], hold: this.held, score: this.score, lines: this.lines, level: this.level, pieces: this.pieces, state: this.state };
   }
 
   /** The next piece from the bag, a fresh shuffled bag of all seven when it's empty. */
@@ -302,48 +323,15 @@ export class Blocks {
   }
 }
 
-/** Everything the screen shows. */
-export interface ScreenView {
-  /** The game on it, or null for the high scores with nobody playing. */
-  frame: CabinetFrame | null;
-  /** Who's playing. */
-  player?: string;
-  scores: readonly HighScore[];
-  /** A game to pick out on the table: your own. */
-  mine?: string;
-  /** Said over a paused game: why it's paused. */
-  note?: string;
-  /** What to press, under a game that's over (or over the high scores). */
-  prompt?: string;
-  /** Seconds, for the blinking. */
-  t: number;
-}
-
-const FONT = "Nunito, ui-rounded, 'SF Pro Rounded', system-ui, sans-serif";
 const CELL = 27;
 const X0 = (W - COLS * CELL) / 2;
 const Y0 = 36;
-const INK = '#0b1320';
-const TEXT = '#f1ede4';
-const DIM = '#8d99ae';
-const NEON = '#ff5ecb';
+const WELL = { x: X0, y: Y0, w: COLS * CELL, h: WELL_ROWS * CELL };
 
 /** Draws the whole screen. */
-export function paintScreen(g: CanvasRenderingContext2D, v: ScreenView) {
-  const bg = g.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, '#1b1d3a');
-  bg.addColorStop(1, INK);
-  g.fillStyle = bg;
-  g.fillRect(0, 0, W, H);
+function paint(g: CanvasRenderingContext2D, f: BlocksFrame, v: ScreenView) {
+  backdrop(g);
   g.textBaseline = 'middle';
-  if (v.frame) paintGame(g, v.frame, v);
-  else paintAttract(g, v);
-  // Scan lines, like the tube it would have had.
-  g.fillStyle = 'rgba(0, 0, 0, 0.12)';
-  for (let y = 0; y < H; y += 4) g.fillRect(0, y, W, 1.5);
-}
-
-function paintGame(g: CanvasRenderingContext2D, f: CabinetFrame, v: ScreenView) {
   // The well, in a glowing frame.
   g.fillStyle = '#070b14';
   g.fillRect(X0, Y0, COLS * CELL, WELL_ROWS * CELL);
@@ -377,19 +365,7 @@ function paintGame(g: CanvasRenderingContext2D, f: CabinetFrame, v: ScreenView) 
   value(g, String(f.lines), lx, 312, 28);
   label(g, 'LEVEL', lx, 362);
   value(g, String(f.level), lx, 392, 28);
-  if (v.player) {
-    g.textAlign = 'center';
-    g.fillStyle = '#ffd166';
-    g.font = `900 20px ${FONT}`;
-    g.fillText(`▶ ${fit(g, v.player.toUpperCase(), 190)}`, lx, 470);
-  }
-  const best = v.scores[0];
-  if (best) {
-    g.textAlign = 'center';
-    g.fillStyle = DIM;
-    g.font = `800 16px ${FONT}`;
-    g.fillText(`HI ${scoreText(Math.max(best.score, f.score))}`, lx, 502);
-  }
+  playerAndBest(g, lx, v.player, v.scores[0] && Math.max(v.scores[0].score, f.score), 190);
   label(g, 'NEXT', rx, 62);
   preview(g, f.next, rx, 112);
   label(g, 'HIGH SCORES', rx, 196);
@@ -397,64 +373,10 @@ function paintGame(g: CanvasRenderingContext2D, f: CabinetFrame, v: ScreenView) 
   else value(g, 'Be the first!', rx, 228, 18);
 
   if (f.state === 'paused') {
-    banner(g, 'PAUSED', v.note ?? 'P to carry on', '#4f86f7');
+    banner(g, WELL, 'PAUSED', v.note ?? 'P to carry on', '#4f86f7');
   } else if (f.state === 'over') {
-    banner(g, 'GAME OVER', v.prompt ?? scoreText(f.score), '#e63946');
+    banner(g, WELL, 'GAME OVER', v.prompt ?? scoreText(f.score), '#e63946');
   }
-}
-
-/** Nobody's playing: the title, the high scores and a blinking "press E". */
-function paintAttract(g: CanvasRenderingContext2D, v: ScreenView) {
-  g.textAlign = 'center';
-  g.font = `900 76px ${FONT}`;
-  // Each letter in a piece's color, glowing.
-  const letters = [...GAME];
-  const widths = letters.map((ch) => g.measureText(ch).width);
-  let x = W / 2 - widths.reduce((a, b) => a + b, 0) / 2;
-  letters.forEach((ch, i) => {
-    g.fillStyle = COLORS[(i % 7) + 1];
-    g.shadowColor = g.fillStyle;
-    g.shadowBlur = 18;
-    g.fillText(ch, x + widths[i] / 2, 74);
-    x += widths[i];
-  });
-  g.shadowBlur = 0;
-  label(g, '🏆 HIGH SCORES', W / 2, 142);
-  if (v.scores.length) table(g, v.scores, W / 2 - 250, 500, 182, 35, 24, v.mine);
-  else {
-    g.fillStyle = DIM;
-    g.font = `800 22px ${FONT}`;
-    g.fillText('No scores yet. Be the first!', W / 2, 300);
-  }
-  if (Math.floor(v.t * 1.6) % 2 === 0) {
-    g.fillStyle = '#ffd166';
-    g.font = `900 30px ${FONT}`;
-    g.fillText(v.prompt ?? 'PRESS E TO PLAY', W / 2, 562);
-  }
-}
-
-/** The high-score table: place, name and score, `width` wide from `x`, a row every `step`, in `size` px. */
-function table(g: CanvasRenderingContext2D, scores: readonly HighScore[], x: number, width: number, y: number, step: number, size: number, mine?: string) {
-  scores.forEach((s, i) => {
-    const cy = y + i * step;
-    if (s.game === mine) {
-      g.fillStyle = 'rgba(255, 209, 102, 0.22)';
-      g.beginPath();
-      g.roundRect(x - 8, cy - step / 2 + 2, width + 16, step - 4, 8);
-      g.fill();
-    }
-    g.font = `900 ${size}px ${FONT}`;
-    const score = scoreText(s.score);
-    const place = size * 1.6;
-    g.textAlign = 'left';
-    g.fillStyle = i === 0 ? '#ffd166' : DIM;
-    g.fillText(String(i + 1), x, cy);
-    g.fillStyle = s.color;
-    g.fillText(fit(g, s.name, width - place - g.measureText(score).width - size), x + place, cy);
-    g.textAlign = 'right';
-    g.fillStyle = TEXT;
-    g.fillText(score, x + width, cy);
-  });
 }
 
 /** A block: its color, lit on the top and left, shaded on the bottom and right. */
@@ -494,47 +416,45 @@ function preview(g: CanvasRenderingContext2D, kind: number, cx: number, cy: numb
   for (const [x, y] of cells) block(g, ox + x * size, oy + y * size, size, COLORS[kind]);
 }
 
-/** Big words across the well, and a line under them. */
-function banner(g: CanvasRenderingContext2D, title: string, sub: string, color: string) {
-  g.fillStyle = 'rgba(7, 11, 20, 0.72)';
-  g.fillRect(X0, Y0, COLS * CELL, WELL_ROWS * CELL);
-  g.fillStyle = color;
-  g.beginPath();
-  g.roundRect(X0 - 30, H / 2 - 62, COLS * CELL + 60, 112, 16);
-  g.fill();
-  g.textAlign = 'center';
-  g.fillStyle = '#ffffff';
-  g.font = `900 44px ${FONT}`;
-  g.fillText(title, W / 2, H / 2 - 22);
-  g.font = `800 18px ${FONT}`;
-  g.fillText(fit(g, sub, COLS * CELL + 40), W / 2, H / 2 + 22);
-}
-
-function label(g: CanvasRenderingContext2D, text: string, x: number, y: number) {
-  g.textAlign = 'center';
-  g.fillStyle = DIM;
-  g.font = `900 16px ${FONT}`;
-  g.fillText(text, x, y);
-}
-
-function value(g: CanvasRenderingContext2D, text: string, x: number, y: number, size: number) {
-  g.textAlign = 'center';
-  g.fillStyle = TEXT;
-  g.font = `900 ${size}px ${FONT}`;
-  g.fillText(fit(g, text, 200), x, y);
-}
-
-function line(g: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number) {
-  g.beginPath();
-  g.moveTo(x0, y0);
-  g.lineTo(x1, y1);
-  g.stroke();
-}
-
-/** `text`, cut short with … to fit in `width` in the current font. */
-function fit(g: CanvasRenderingContext2D, text: string, width: number): string {
-  if (g.measureText(text).width <= width) return text;
-  let s = text;
-  while (s.length > 1 && g.measureText(`${s}…`).width > width) s = s.slice(0, -1);
-  return `${s}…`;
-}
+/** BLOCKFALL as the cabinet plays it (see cart.ts). */
+export const blockfall: Cartridge<BlocksFrame> = {
+  title: 'blockfall',
+  blurb: 'Turn and drop the falling blocks to clear lines.',
+  colors: COLORS.slice(1),
+  keys: {
+    ArrowLeft: 'left',
+    KeyA: 'left',
+    ArrowRight: 'right',
+    KeyD: 'right',
+    ArrowDown: 'down',
+    KeyS: 'down',
+    ArrowUp: 'turn',
+    KeyW: 'turn',
+    KeyX: 'turn',
+    KeyZ: 'back',
+    Space: 'drop',
+    KeyC: 'hold',
+    ShiftLeft: 'hold',
+    ShiftRight: 'hold',
+  },
+  tip: '← → move · ↑ turn · ↓ faster · Space drop · C hold · P pause',
+  frameMs: 90,
+  start(sound) {
+    const g = new Blocks();
+    g.onLand = (lines) => sound(lines ? 'clear' : 'land', lines);
+    return g;
+  },
+  paint,
+  hear(was, f, sound) {
+    if (f.lines > was.lines) sound('clear', f.lines - was.lines);
+    else if (f.pieces > was.pieces) sound('land');
+  },
+  icon(g, x, y, size) {
+    // A T on its way down into the gap it fits.
+    const c = size / 4;
+    const at = (cells: [number, number][], color: string) => cells.forEach(([cx, cy]) => block(g, x + (cx - 2) * c, y + (cy - 2) * c, c, color));
+    at([[1, 0], [2, 0], [3, 0], [2, 1]], LIGHTS[2]);
+    at([[0, 2], [0, 3], [1, 3]], LIGHTS[0]);
+    at([[3, 2], [3, 3], [2, 3]], LIGHTS[6]);
+  },
+};

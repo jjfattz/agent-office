@@ -1,10 +1,14 @@
 import type { AudioCore } from '../../sound/core';
 import { CABINET_AT } from '../../sound/places';
+import type { ArcadeSound } from './cart';
 
 // ---- The arcade -------------------------------------------------------------------------------
 
-/** The arcade cabinet's chip bleeps: a piece landing, lines clearing (a longer run up for more at once), the game ending. */
-export function arcade(a: AudioCore, kind: 'land' | 'clear' | 'over', lines = 1) {
+/**
+ * The arcade cabinet's chip bleeps: a piece landing, lines clearing (a longer run up for more at once),
+ * a shot, a bug popping or taking a hit, your ship blowing up, a wave coming in, and the game ending.
+ */
+export function arcade(a: AudioCore, kind: ArcadeSound, lines = 1) {
   const ctx = a.ctx;
   if (!ctx) return;
   a.count(`arcade.${kind}`);
@@ -13,5 +17,10 @@ export function arcade(a: AudioCore, kind: 'land' | 'clear' | 'over', lines = 1)
   const t0 = ctx.currentTime + 0.02;
   if (kind === 'land') a.blip(out, t0, 160, 0.55, 0.07, 0.1, 'square');
   else if (kind === 'clear') [523, 659, 784, 1047, 1319].slice(0, lines + 1).forEach((f, i) => a.blip(out, t0 + i * 0.07, f, 1.02, 0.1, 0.09, 'square'));
+  else if (kind === 'shot') a.blip(out, t0, 1500, 0.4, 0.07, 0.035, 'square');
+  else if (kind === 'pop') [700, 260].forEach((f, i) => a.blip(out, t0 + i * 0.04, f, 0.4, 0.09, 0.07, 'sawtooth'));
+  else if (kind === 'hurt') a.blip(out, t0, 880, 1.25, 0.06, 0.06, 'square');
+  else if (kind === 'boom') [330, 220, 147, 98].forEach((f, i) => a.blip(out, t0 + i * 0.09, f, 0.6, 0.16, 0.12, 'sawtooth'));
+  else if (kind === 'wave') [392, 523, 659, 784].forEach((f, i) => a.blip(out, t0 + i * 0.08, f, 1.01, 0.09, 0.07, 'triangle'));
   else [392, 330, 262, 196].forEach((f, i) => a.blip(out, t0 + i * 0.18, f, 0.97, 0.17, 0.14, 'triangle'));
 }

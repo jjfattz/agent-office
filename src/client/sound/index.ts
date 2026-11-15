@@ -17,6 +17,7 @@ import type { GongWhy } from '../../shared/protocol';
 import { birdsong, Fridge, nightCrickets, startWind } from './ambience';
 import { ding } from './alerts';
 import { arcade } from '../features/cabinet/sound';
+import type { ArcadeSound } from '../features/cabinet/cart';
 import { ball, type BallSound } from '../features/basketball/sound';
 import { Dj, hiccup, pour } from '../features/bar/sound';
 import { carDoor, crash, honk, Motors, type Engine } from '../features/cars/sound';
@@ -217,7 +218,7 @@ export class OfficeSound {
     ball(this.a, kind, at, speed);
   }
 
-  arcade(kind: 'land' | 'clear' | 'over', lines = 1) {
+  arcade(kind: ArcadeSound, lines = 1) {
     arcade(this.a, kind, lines);
   }
 
