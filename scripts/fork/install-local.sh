@@ -272,8 +272,9 @@ install() {
   if [ -f "$BUILD/src/scripts/fork/install-local.sh" ]; then put_self "$BUILD/src/scripts/fork/install-local.sh"
   elif [ ! -f "$SELF" ]; then put_self "$SCRIPT"; fi
 
-  running="$(pgrep -f -- "$INSTALL_DIR/versions/v[^/]*/bin/agent-office.js" 2>/dev/null | head -n 1 || true)"
-  if [ -n "$running" ] && ! pgrep -f -- "$INSTALL_DIR/versions/$tag/bin/agent-office.js" >/dev/null 2>&1; then
+  # -a: run from a worker's terminal, the office is an ancestor, which macOS's pgrep leaves out otherwise.
+  running="$(pgrep -a -f -- "$INSTALL_DIR/versions/v[^/]*/bin/agent-office.js" 2>/dev/null | head -n 1 || true)"
+  if [ -n "$running" ] && ! pgrep -a -f -- "$INSTALL_DIR/versions/$tag/bin/agent-office.js" >/dev/null 2>&1; then
     step "Installed $tag. The office running now is an older version: Ctrl+C it and run agent-office to switch."
     notify "$tag is installed. Restart the office (Ctrl+C, then agent-office) to run it."
   else
@@ -282,10 +283,11 @@ install() {
   fi
 }
 
-# The PATH the launchd agent gets: launchd's own has no node, npm or gh.
+# The PATH the launchd agent gets: launchd's own has no node, npm or gh, nor the agent CLIs
+# install.sh looks for.
 agent_path() {
   local out="" dir tool
-  for tool in node npm git gh; do
+  for tool in node npm git gh claude codex opencode dsh; do
     have "$tool" || continue
     dir="$(dirname "$(command -v "$tool")")"
     case ":$out:" in *":$dir:"*) ;; *) out="${out:+$out:}$dir" ;; esac
