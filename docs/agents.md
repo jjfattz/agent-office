@@ -8,7 +8,7 @@ Every harness takes both a **Model** and an **Effort**, each optional: leave one
 
 | Harness | Model | Effort |
 | --- | --- | --- |
-| Claude Code | Fable 5.1, Opus 5.5, Sonnet 5.5 or Haiku 4.5 (`--model`) | `--effort` |
+| Claude Code | Fable 5.2, Opus 5.5, Sonnet 5.5 or Haiku 5.5 (`--model`) | `--effort` |
 | OpenCode | a `provider/model`, typed or picked from the suggestions `opencode models` gives (`--model`) | the model's variant |
 | Codex | one of the models `codex debug models` lists (`--model`) | `-c model_reasoning_effort` |
 | Grok | one of the models `grok models` lists (`--model`) | `--effort` |
@@ -26,7 +26,7 @@ For OpenCode, the **Model** field selects the initial model for a new worker or 
 
 Pi keeps its own login, settings, packages, and extensions. The office adds a CLI-loaded extension to report session, working, tool, waiting-for-input, and completion events; it does not edit your Pi configuration. Each worker's sessions live under `.agent-office/pi-sessions/<worker-id>`, and **R** resumes that worker's session. The optional **Model** field accepts a model name or `provider/model`; **Thinking** offers low, medium, high, xhigh, and max. Leave either on Default to use Pi settings or configured `--agent-args` (including `--thinking off` or `minimal`). Cost and token metrics remain in Pi's terminal and are not included in the office's Claude budget.
 
-For Claude Code, the **Model** and **Effort** fields pick `--model` (`fable`, `opus`, `sonnet` or `haiku`, listed by the model each alias stands for: Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 4.5) and `--effort` (low, medium, high, extra high or max) for that worker or queue task, overriding whatever `--agent-args` set office-wide. Leave either on **Default** to use the office's configured value. The choice stays with a worker across resumes and with a queued task when retried, and shows up next to the worker in the Workers panel and on its task card so you can tell at a glance who's on what — and the per-worker cost there reflects the actual model used.
+For Claude Code, the **Model** and **Effort** fields pick `--model` (`fable`, `opus`, `sonnet` or `haiku`, listed by the model each alias stands for: Fable 5.2, Opus 5.5, Sonnet 5.5, Haiku 5.5) and `--effort` (low, medium, high, extra high or max) for that worker or queue task, overriding whatever `--agent-args` set office-wide. Leave either on **Default** to use the office's configured value. Claude Code picks the newest model in each family itself, and it has no command that lists them, so this short list is the office's own and isn't read from Claude Code the way the OpenCode, Codex, Grok and Cursor lists are: when a new Claude model comes out, its alias may run it before the office's label catches up, and a worker's card shows the exact model once it has spoken. The choice stays with a worker across resumes and with a queued task when retried, and shows up next to the worker in the Workers panel and on its task card so you can tell at a glance who's on what — and the per-worker cost there reflects the actual model used.
 
 In an open OpenCode terminal, **Models** opens the native model picker using the default `Ctrl+X M` shortcut. Select a model there to change the active worker without restarting it or losing a draft. If you customized that binding, use your configured shortcut or `/models` inside the terminal. Resuming a saved session lets OpenCode restore its current model instead of forcing the initial Office selection again.
 

@@ -32,13 +32,17 @@ export function addUsage(a: Usage, b: Usage, sign = 1): Usage {
 
 const isZero = (u: Usage) => !u.input && !u.output && !u.cacheWrite && !u.cacheRead && !u.cost && !u.calls;
 
+type Rates = [number, number, number];
+
 /**
  * USD per million tokens — [input, output, cache read] — from the Claude pricing page, checked
- * 2026-09-26. A 5-minute cache write costs 1.25x input, a 1-hour write 2x. First match wins, so
+ * 2026-11-15. A 5-minute cache write costs 1.25x input, a 1-hour write 2x. First match wins, so
  * newer generations come before the family they belong to. A model not listed gets Opus rates:
- * a budget warning that comes early beats one that comes late.
+ * a budget warning that comes early beats one that comes late. A model whose long prompts cost
+ * more says from how many prompt tokens (input, cache writes and reads together), and what then.
  */
-const PRICES: [RegExp, [number, number, number]][] = [
+const PRICES: [RegExp, Rates, { above: number; rates: Rates }?][] = [
+  [/fable-5-2|mythos-5-2/, [8, 40, 0.2]],
   [/fable-5-1|mythos-5-1/, [10, 50, 0.25]],
   [/fable|mythos/, [10, 50, 1]],
   [/opus-5-5/, [4, 20, 0.2]],
@@ -46,16 +50,21 @@ const PRICES: [RegExp, [number, number, number]][] = [
   [/opus/, [15, 75, 1.5]],
   [/sonnet-5/, [2, 10, 0.2]],
   [/sonnet/, [3, 15, 0.3]],
+  [/haiku-5-5/, [0.1, 0.5, 0.01], { above: 100_000, rates: [0.5, 2.5, 0.05] }],
   [/haiku-4/, [1, 5, 0.1]],
   [/haiku-3-5/, [0.8, 4, 0.08]],
   [/haiku/, [0.25, 1.25, 0.03]],
 ];
-const OPUS: [number, number, number] = [5, 25, 0.5];
+const OPUS: Rates = [5, 25, 0.5];
 const WEB_SEARCH_USD = 0.01;
 
-export function priceOf(model: string): [number, number, number] {
+/** What `model` charges for a message whose prompt was `promptTokens` long. */
+export function priceOf(model: string, promptTokens = 0): Rates {
   const m = model.toLowerCase();
-  return PRICES.find(([re]) => re.test(m))?.[1] ?? OPUS;
+  const found = PRICES.find(([re]) => re.test(m));
+  if (!found) return OPUS;
+  const [, rates, long] = found;
+  return long && promptTokens > long.above ? long.rates : rates;
 }
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
@@ -67,7 +76,7 @@ export function usageOfMessage(model: string, u: any): Usage {
   const cacheWrite = num(u?.cache_creation_input_tokens);
   const hour = Math.min(cacheWrite, num(u?.cache_creation?.ephemeral_1h_input_tokens));
   const cacheRead = num(u?.cache_read_input_tokens);
-  const [pin, pout, pread] = priceOf(model);
+  const [pin, pout, pread] = priceOf(model, input + cacheWrite + cacheRead);
   const cost = (input * pin + output * pout + (cacheWrite - hour) * pin * 1.25 + hour * pin * 2 + cacheRead * pread) / 1e6 + num(u?.server_tool_use?.web_search_requests) * WEB_SEARCH_USD;
   return { input, output, cacheWrite, cacheRead, cost, calls: 1 };
 }

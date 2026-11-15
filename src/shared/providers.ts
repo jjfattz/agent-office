@@ -21,15 +21,16 @@ export function isClaudeModel(value: unknown): value is ClaudeModel {
 
 /**
  * The model each alias stands for in Claude Code today, for the windows to say which one a worker
- * gets ("Opus 5.5", not "Opus"). Claude Code resolves the alias itself, to its own latest: a new
- * model generation means new names here. Once a worker has spoken, its card goes by the model its
- * session reports instead (see claudeModelName).
+ * gets ("Opus 5.5", not "Opus"). Claude Code resolves the alias itself, to its own latest, and has
+ * no command that lists its models the way the other CLIs do, so these are written down by hand: a
+ * new model generation means new names here (checked against Claude Code 2.1.325). Once a worker
+ * has spoken, its card goes by the model its session reports instead (see claudeModelName).
  */
 export const CLAUDE_MODEL_NAMES: Record<ClaudeModel, string> = {
-  fable: 'Fable 5.1',
+  fable: 'Fable 5.2',
   opus: 'Opus 5.5',
   sonnet: 'Sonnet 5.5',
-  haiku: 'Haiku 4.5',
+  haiku: 'Haiku 5.5',
 };
 
 /**

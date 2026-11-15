@@ -145,7 +145,9 @@ test('Claude models go by the name of the model, not only its family', () => {
   assert.deepEqual(PROVIDER_META.claude.models?.fixed?.map((m) => m.name), CLAUDE_MODELS.map((m) => CLAUDE_MODEL_NAMES[m]));
   // And so does the id a session reports.
   assert.equal(claudeModelName('claude-opus-5-5'), 'Opus 5.5');
+  assert.equal(claudeModelName('claude-fable-5-2'), 'Fable 5.2');
   assert.equal(claudeModelName('claude-fable-5-1'), 'Fable 5.1');
+  assert.equal(claudeModelName('claude-haiku-5-5'), 'Haiku 5.5');
   assert.equal(claudeModelName('claude-haiku-4-5-20251001'), 'Haiku 4.5');
   assert.equal(claudeModelName('claude-sonnet-5'), 'Sonnet 5');
   assert.equal(claudeModelName('claude-sonnet-4-20250514'), 'Sonnet 4');
