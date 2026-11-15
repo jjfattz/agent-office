@@ -51,6 +51,8 @@ It's `npm run dev` with its data and floors in `~/.local/share/agent-office/sand
 
 Pull requests go to the fork: `gh pr create --repo jjfattz/agent-office`. The checkout's `gh` default is the fork too (`gh repo set-default jjfattz/agent-office`), since a fresh fork's default is the repository it was forked from.
 
+That default is also where the issues board reads from, and GitHub turns issues off on a new fork. Until they're on, the board says *Issues are turned off for jjfattz/agent-office*. Turn them on with `gh repo edit jjfattz/agent-office --enable-issues`, or under the repository's **Settings → General → Features → Issues**.
+
 To bring in what's new upstream, merge it on a branch of its own and open a pull request:
 
 ```bash

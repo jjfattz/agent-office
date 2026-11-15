@@ -80,6 +80,13 @@ test('gh JSON field errors keep the field that failed', () => {
   );
 });
 
+test('a repository with issues turned off says how to turn them on', () => {
+  assert.equal(
+    friendlyGhError("the 'octo/fork' repository has disabled issues"),
+    "Issues are turned off for octo/fork on GitHub (a new fork starts with them off). Turn them on under the repository's Settings → General → Features → Issues, or run `gh repo edit octo/fork --enable-issues`.",
+  );
+});
+
 test('pull request listing works when older gh versions reject optional fields', async () => {
   const unsupported = new Set(['url', 'headRefOid', 'updatedAt', 'statusCheckRollup', 'closingIssuesReferences']);
   const calls: string[] = [];
