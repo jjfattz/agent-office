@@ -66,7 +66,7 @@ export function claudeLogin(bin: string, env: Record<string, string>, cwd: strin
   p.onData((d) => {
     out = (out + d).slice(-50_000);
     if (!url) {
-      url = /https:\/\/\S*oauth\/authorize\?\S+/.exec(plain(out))?.[0];
+      url = loginUrl(out);
       if (url) on.url(url);
     } else if (sentAt >= 0 && /error|invalid|expired|failed/i.test(plain(out.slice(sentAt)))) {
       // Still running after complaining: the code didn't take, and it waits for another.
@@ -80,6 +80,16 @@ export function claudeLogin(bin: string, env: Record<string, string>, cwd: strin
     on.exit(exitCode === 0, lastWords(out));
   });
   return flow;
+}
+
+/**
+ * The sign-in page `claude auth login` printed so far, once all of it is there. A terminal hands its
+ * output over a kilobyte at a time and the link is longer than that, so it can come in two pieces:
+ * the first piece alone is the page with the end of its `state` cut off, which Claude's sign-in
+ * turns away ("Invalid request format"). The link is whole once something comes after it.
+ */
+export function loginUrl(out: string): string | undefined {
+  return /https:\/\/\S*oauth\/authorize\?\S+(?=\s)/.exec(plain(out))?.[0];
 }
 
 /** The code from Claude's sign-in page, as it's typed back in; undefined when it doesn't look like one. */
