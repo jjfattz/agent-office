@@ -10,6 +10,7 @@ import { Services } from '../services.js';
 import { ImageProxy } from '../decor.js';
 import { Ledger } from '../usage.js';
 import { PlanLimitsReader } from '../limits.js';
+import { WhoseLimits } from '../whose-limits.js';
 import { Webhook } from '../webhook.js';
 import { Machine } from '../machine.js';
 import type { Floor } from '../floor.js';
@@ -20,7 +21,6 @@ import { OfficePrompts } from '../prompts.js';
 import { LeaveOnMerge } from '../leave-on-merge.js';
 import type { ServiceInfo, ServicesState } from '../../shared/protocol.js';
 import type { BuildingServices, Ctx, LateServices } from './context.js';
-import type { Client } from './client.js';
 
 /** What the whole building shares, made before any floor opens: the sky, ⚙️ Settings, spend, sign-ins, limits. */
 export function createServices(ctx: Ctx): BuildingServices {
@@ -59,6 +59,8 @@ export function createServices(ctx: Ctx): BuildingServices {
     (id) => accounts.get(id)?.role === 'admin',
     (id) => {
       for (const c of clients.values()) if (c.accountId === id && !c.out) ctx.sendTo(c, { t: 'signins', state: signins.state(id) });
+      // Signing in to a Claude of their own puts the plan they see on it.
+      limits.showAll();
     },
   );
   // Accounts revoked from the terminal while the office was closed leave their sign-ins behind.
@@ -74,41 +76,21 @@ export function createServices(ctx: Ctx): BuildingServices {
       const admins = [...clients.values()].filter((c) => c.admin && !c.out);
       const state = admins.length ? providerAccounts.state() : undefined;
       for (const c of admins) ctx.sendTo(c, { t: 'providerAccounts.state', state: state! });
+      limits.showAll();
     },
   });
 
-  // The Claude plan's 5-hour and weekly limits, for the meter under the workers: the office's own
-  // plan, and each account's own once it runs on a Claude sign-in of its own.
-  const limits = new PlanLimitsReader(
-    claudeBin,
-    childEnv(),
-    () => [...clients.values()].some((c) => limitsOf(c) === limits),
-    (state) => {
-      for (const c of clients.values()) if (limitsOf(c) === limits) ctx.sendTo(c, { t: 'limits', state });
-    },
-  );
-  const accountLimits = new Map<string, { key: string; reader: PlanLimitsReader }>();
-  /** Whose plan `c` sees: their own, on an account with its own Claude sign-in; else the office's. */
-  const limitsOf = (c: Client): PlanLimitsReader => {
-    const id = c.accountId;
-    const key = id && signins.claudeKey(id);
-    if (!id || !key) return limits;
-    let a = accountLimits.get(id);
-    if (a?.key !== key) {
-      a?.reader.close();
-      const reader = new PlanLimitsReader(
-        claudeBin,
-        signins.apply(id, childEnv(), [], 'claude'),
-        () => [...clients.values()].some((o) => o.accountId === id),
-        (state) => {
-          for (const o of clients.values()) if (o.accountId === id) ctx.sendTo(o, { t: 'limits', state });
-        },
-      );
-      a = { key, reader };
-      accountLimits.set(id, a);
-    }
-    return a.reader;
-  };
+  // The Claude plan's 5-hour and weekly limits, for the meter under the workers: of the plan the
+  // Claude workers each person would hire where they are run on, so it follows them between floors.
+  const limits = new WhoseLimits({
+    read: (env, wanted, onChange) => new PlanLimitsReader(claudeBin, env, wanted, onChange),
+    base: childEnv,
+    signins,
+    accounts: providerAccounts,
+    floorOf: (c) => ctx.floorOf(c)?.id,
+    clients: () => [...clients.values()].filter((c) => !c.out),
+    send: (c, state) => ctx.sendTo(c, { t: 'limits', state }),
+  });
 
   // Slack / Discord pings for workers that need input or finish (set from ⚙️ Settings or --webhook).
   const webhook = new Webhook(cfg.dataDir, (workerId) => (workerId && ctx.workerFloor(workerId)?.def.name) || ctx.officeName, (state) => ctx.broadcast({ t: 'notify', state }));
@@ -139,7 +121,7 @@ export function createServices(ctx: Ctx): BuildingServices {
     });
   };
 
-  return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, providerAccounts, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
+  return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, providerAccounts, limits, webhook, machine, pumpQueues };
 }
 
 /** What's made once the floors are open: the SSH team, the tailnet, workers' web servers, pictures and upgrades. */

@@ -14,7 +14,7 @@ import type { Upgrader } from '../upgrade.js';
 import type { Services } from '../services.js';
 import type { ImageProxy } from '../decor.js';
 import type { Ledger } from '../usage.js';
-import type { PlanLimitsReader } from '../limits.js';
+import type { WhoseLimits } from '../whose-limits.js';
 import type { Webhook } from '../webhook.js';
 import type { Machine } from '../machine.js';
 import type { Building, FloorDef } from '../building.js';
@@ -66,14 +66,10 @@ export interface BuildingServices {
   signins: SignIns;
   /** More than one login per provider, and which one each floor's workers run on (see provider-accounts/). */
   providerAccounts: ProviderAccounts;
-  /** The office's own Claude plan limits. */
-  limits: PlanLimitsReader;
-  /** Each account's own, once it runs on a Claude sign-in of its own. */
-  accountLimits: Map<string, { key: string; reader: PlanLimitsReader }>;
+  /** The Claude plan limits each person sees: of their own Claude, their floor's account, or the office's own. */
+  limits: WhoseLimits;
   webhook: Webhook;
   machine: Machine;
-  /** Whose plan `c` sees: their own, on an account with its own Claude sign-in; else the office's. */
-  limitsOf(c: Client): PlanLimitsReader;
   /** Queues everywhere may be waiting for room under the worker limit: let them look again. */
   pumpQueues(except?: Floor): void;
 }

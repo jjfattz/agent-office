@@ -19,7 +19,7 @@ import { mapNews } from './handlers/settings.js';
  */
 export function onConnection(ctx: Ctx, ws: WebSocket, url: URL, session: Session) {
   const { cfg, accounts, clients, chat, building, floors, maps, team, upgrader, ledger, webhook, machine, sky, themes, prompts, leaveOnMerge, signins } = ctx;
-  const { sendTo, broadcast, floorInfos, floorsChanged, arrivalFloor, meOf, accountsChanged, limitsOf } = ctx;
+  const { sendTo, broadcast, floorInfos, floorsChanged, arrivalFloor, meOf, accountsChanged, limits } = ctx;
   const id = randomBytes(5).toString('hex');
   // Back on the floor they were on before a reload, a restart or closing the tab, else the first floor.
   const wanted = url.searchParams.get('floor');
@@ -74,7 +74,7 @@ export function onConnection(ctx: Ctx, ws: WebSocket, url: URL, session: Session
     version: upgrader.version,
     upgrade: upgrader.state,
     usage: ledger.state(),
-    limits: limitsOf(client).state,
+    limits: limits.shown(client),
     me,
     notify: webhook.state(),
     machine: machine.state(),
@@ -94,7 +94,6 @@ export function onConnection(ctx: Ctx, ws: WebSocket, url: URL, session: Session
     // Anyone whose process ended since (exited, or failed to resume) gets up as you walk in.
     floor.workers.wakeAll();
   }
-  limitsOf(client).refresh();
   if (account) {
     sendTo(client, { t: 'signins', state: signins.state(account.id) });
     void signins.look(account.id);
