@@ -66,6 +66,11 @@ export type ProviderAccountsClientMsg =
   | { t: 'providerAccounts.remove'; id: string }
   /** What the floor you're on runs `provider` on from now on: an account, or the machine's own login (null). */
   | { t: 'providerAccounts.use'; provider: AccountProvider; id: string | null }
+  /**
+   * Moves workers already at their desks onto account `id` (or the machine's own login, null): their
+   * conversations are copied along, and a running one starts over there carrying on.
+   */
+  | { t: 'providerAccounts.move'; workerIds: string[]; id: string | null }
   /** Sign a folder account in from the office: it runs the login and hands back the page to open. */
   | { t: 'providerAccounts.signin'; id: string }
   /** The code the sign-in page gave you. */
