@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { newTracker, restoreTracker, scanTracker, trackerUsage } from '../src/server/usage.js';
+import { newTracker, priceOf, restoreTracker, scanTracker, trackerUsage, usageOfMessage } from '../src/server/usage.js';
 
 const assistant = (id: string, model: string, more: Record<string, unknown> = {}) =>
   JSON.stringify({ type: 'assistant', timestamp: new Date(Date.UTC(2026, 9, 1, 12, 0, Number(id))).toISOString(), ...more, message: { id: `msg_${id}`, model, usage: { input_tokens: 10, output_tokens: 5 } } });
@@ -39,4 +39,19 @@ test('a Claude session\'s usage names the model its own latest message ran on', 
   const restored = restoreTracker(JSON.parse(JSON.stringify(tracker)));
   assert.equal(trackerUsage(restored).model, 'claude-sonnet-5-5');
   assert.equal(restoreTracker({ ...tracker, model: 'not a model\u0007' }).model, undefined);
+});
+
+test('each Claude model is priced at its own generation\'s rates', () => {
+  assert.deepEqual(priceOf('claude-fable-5-2'), [8, 40, 0.2]);
+  assert.deepEqual(priceOf('claude-fable-5-1'), [10, 50, 0.25]);
+  assert.deepEqual(priceOf('claude-opus-5-5'), [4, 20, 0.2]);
+  assert.deepEqual(priceOf('claude-haiku-5-5'), [0.1, 0.5, 0.01]);
+  assert.deepEqual(priceOf('claude-haiku-4-5-20251001'), [1, 5, 0.1]);
+  assert.deepEqual(priceOf('something-new'), [5, 25, 0.5]);
+
+  // Haiku 5.5 costs five times as much once the prompt, cache included, passes 100K tokens.
+  const cost = (u: object) => usageOfMessage('claude-haiku-5-5', u).cost;
+  assert.ok(Math.abs(cost({ input_tokens: 1_000_000, output_tokens: 1_000_000 }) - 3) < 1e-9);
+  assert.ok(Math.abs(cost({ input_tokens: 50_000, cache_read_input_tokens: 50_000, output_tokens: 1_000 }) - (5_000 + 500 + 500) / 1e6) < 1e-12);
+  assert.ok(Math.abs(cost({ input_tokens: 50_000, cache_read_input_tokens: 50_001, output_tokens: 1_000 }) - (25_000 + 50_001 * 0.05 + 2_500) / 1e6) < 1e-12);
 });
