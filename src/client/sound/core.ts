@@ -42,7 +42,7 @@ export class AudioCore {
   ambience!: GainNode;
   /** Worker dings, which you still want to hear from another tab. */
   alerts!: GainNode;
-  /** The office's own hum (the room and the fridge), left behind going up on the roof… */
+  /** The office's own hum (the fridge), left behind going up on the roof… */
   indoors!: GainNode;
   /** …where there's wind, and the city far below. */
   outside!: GainNode;

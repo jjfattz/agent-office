@@ -14,7 +14,7 @@
  * (features/golf/sound.ts, features/dog/sound.ts and so on), and this class only hands them the core.
  */
 import type { GongWhy } from '../../shared/protocol';
-import { birdsong, Fridge, nightCrickets, startRoomTone, startWind } from './ambience';
+import { birdsong, Fridge, nightCrickets, startWind } from './ambience';
 import { ding } from './alerts';
 import { arcade } from '../features/cabinet/sound';
 import { ball, type BallSound } from '../features/basketball/sound';
@@ -71,7 +71,6 @@ export class OfficeSound {
     this.music.applyMusicVolume();
     this.music.applyJukebox();
     this.a.applyVisibility();
-    startRoomTone(this.a);
     this.fridge.startFridge();
     startWind(this.a);
     this.a.applyOutdoors();
