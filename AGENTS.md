@@ -1,6 +1,7 @@
 # agent-office
 
 - Ship every code change as a PR branched from freshly fetched `origin/main`, and end with the PR URL instead of stopping at a local commit or asking first.
+- This is the `jjfattz/agent-office` fork: open PRs there (`gh pr create --repo jjfattz/agent-office`), never on upstream `AgentSystemLabs/agent-office`, and try changes with `scripts/fork/sandbox.sh`, not `npm run dev`, which shares the working office's data and port (see `docs/fork.md`).
 - The main checkout is shared with other live sessions and board agents, so do branch work in a worktree and never stash, reset or commit anyone else's changes there.
 - Verify with `npm run typecheck`, `npm test` and `npm run build`, plus a headless-browser screenshot for visual changes, rather than slow manual playthroughs.
 - When a change affects how people run, deploy or use the office, update `README.md` and the matching `docs/*.md` page in the same PR.

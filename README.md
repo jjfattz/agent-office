@@ -394,6 +394,8 @@ npm test
 
 Server edits restart the server, not the workers. After changing `ptyhost.ts`, bump `PTY_PROTOCOL` in `ptys.ts` so the next server replaces the PTY host.
 
+This fork's own office runs its `main`: `scripts/fork/install-local.sh --watch` builds, tests and installs it as `agent-office` each time `main` changes, and `scripts/fork/sandbox.sh` is `npm run dev` without the working office's data or port. Both are in [docs/fork.md](docs/fork.md).
+
 [docs/code-layout.md](docs/code-layout.md) says where the code lives, and where a new feature's pieces go.
 
 The rules for coding agents working on this repository are in [`AGENTS.md`](AGENTS.md), which Codex, OpenCode and most other agent CLIs read. `CLAUDE.md` only imports it for Claude Code, so new rules go in `AGENTS.md`.
@@ -415,6 +417,7 @@ Every change to the app that lands on `main` is published as a GitHub release by
 - [Your own server](docs/self-hosting.md): the one-line setup for any Ubuntu or Debian server, or by hand behind Caddy or nginx
 - [Azure reference](docs/azure.md): picking a VM size, pausing, and everything `deploy/azure.sh` does
 - [How it works](docs/how-it-works.md): the architecture, and security notes
+- [This fork](docs/fork.md): running the fork's `main` as your office, the sandbox for trying changes, and merging upstream
 - [Code layout](docs/code-layout.md): where the code lives, adding a feature or an agent provider, and the size guard
 
 ## License
