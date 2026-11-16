@@ -2,40 +2,44 @@
 
 Back to the [README](../README.md).
 
-This repository is [jjfattz/agent-office](https://github.com/jjfattz/agent-office), a fork of [AgentSystemLabs/agent-office](https://github.com/AgentSystemLabs/agent-office) that goes its own way. The office you work in runs the fork's own `main`, rebuilt each time a change lands on it, and changes are tried in a sandbox before that, so neither ever touches the floors, workers and projects in `~/agent-office`. Everything for it is in [`scripts/fork/`](../scripts/fork).
+This repository is [jjfattz/agent-office](https://github.com/jjfattz/agent-office), a fork of [AgentSystemLabs/agent-office](https://github.com/AgentSystemLabs/agent-office) that goes its own way. The office you work in runs the fork's own `main`, updated each time you start it, and changes are tried in a sandbox before that, so neither ever touches the floors, workers and projects in `~/agent-office`. Everything for it is in [`scripts/fork/`](../scripts/fork).
 
 ## The `agent-office` command runs the fork
 
 ```bash
 scripts/fork/install-local.sh            # build the fork's main and install it as agent-office
-scripts/fork/install-local.sh --watch    # and again whenever main changes (checks every 5 minutes)
 ```
 
-It replaces the release the upstream install line put in `~/.local/share/agent-office` and `~/.local/bin/agent-office`. Each time, it:
+Run it once. It replaces the release the upstream install line put in `~/.local/share/agent-office` and `~/.local/bin/agent-office`, and from then on `agent-office` keeps itself up to date as it starts, so restarting the office is how you update it. Nothing runs in the background between starts.
 
-1. Fetches the fork from GitHub into a clone of its own (`~/.local/share/agent-office/fork/source.git`). It builds what's pushed, never a working tree, so nobody's uncommitted work and no worker's half-done branch ends up in the office.
-2. Checks the commit out in a throwaway worktree and runs `npm ci` (which builds it), `npm run typecheck` and `npm test`.
+Each time `agent-office` starts the office, it first:
+
+1. Fetches the fork from GitHub into a clone of its own (`~/.local/share/agent-office/fork/source.git`). It builds what's pushed, never a working tree, so nobody's uncommitted work and no worker's half-done branch ends up in the office. When `main` hasn't moved since the last install, that's all, and the office starts right away.
+2. Checks the new commit out in a throwaway worktree and runs `npm ci` (which builds it), `npm run typecheck` and `npm test`. That takes about a minute.
 3. Packs it the way [`release.yml`](../.github/workflows/release.yml) packs a release, as `v<major>.<minor>.<commits>-fork.g<sha>`, and installs it with that commit's `install.sh`, which builds the new version off to the side.
-4. Points `~/.local/bin/agent-office` at it.
+4. Points `~/.local/bin/agent-office` at it, and starts it.
 
-A build or a test that fails installs nothing and leaves the `agent-office` you have as it was. The watcher doesn't try that commit again, and the next one gets its own try; run the script by hand to retry a failed commit.
+Running `scripts/fork/install-local.sh` by hand does all of that right away, except start the office. An office that's already running keeps running its version. To switch, press Ctrl+C where it runs and start `agent-office` again. Workers carry on through the restart in their terminal host, and their conversations resume. The office's data is the same `~/agent-office` it always was. `install.sh` removes the versions nothing runs from any more, never one an office or a worker still uses.
 
-The office that's running keeps running its version: installing never stops or restarts it. To switch, press Ctrl+C where it runs and start `agent-office` again. Workers carry on through the restart in their terminal host, and their conversations resume. The office's data is the same `~/agent-office` it always was. `install.sh` removes the versions nothing runs from any more, never one an office or a worker still uses.
+A start never fails because of an update. When a build or a test fails, or GitHub can't be reached (the fetch gives up after 30 seconds), the office starts the version that's installed. A commit that failed isn't tried again on its own: each start says so, and the full log is in `~/.local/share/agent-office/fork/failed.log`. Run the script by hand to retry it, or push a fix. Pressing Ctrl+C while it builds stops there, without starting the office or marking that commit failed.
+
+`AGENT_OFFICE_NO_UPDATE=1 agent-office` starts what's installed without looking for updates. `agent-office prune`, `accounts`, `setup`, `tunnel` and `--help` never look, since they don't start the office.
 
 Options:
 
 | Option | What it does |
 | --- | --- |
-| `--ref <branch or sha>` | build that instead of `main` (it must be pushed) |
-| `--skip-tests` | skip the typecheck and the tests |
+| `--ref <branch or sha>` | build that instead of `main` (it must be pushed), and have `agent-office` follow it as it starts |
+| `--skip-tests` | skip the typecheck and the tests, now and as `agent-office` starts |
 | `--if-changed` | do nothing when that commit is already installed, or already failed |
-| `--watch [minutes]` | install a launchd agent (`~/Library/LaunchAgents/local.agent-office.fork-install.plist`) that runs `--if-changed` every few minutes, 5 unless you say. A new build shows a macOS notification |
-| `--unwatch` | remove the launchd agent; what's installed stays |
-| `--status` | what's installed, from which commit, and whether it's watching |
+| `--status` | what's installed, from which commit, and whether `agent-office` looks for updates |
+| `--unwatch` | take down the launchd agent that older versions of this script set up with `--watch`, which built `main` every five minutes |
 
-The watcher runs `~/.local/share/agent-office/fork/install-local.sh`, the copy of the script that came with the installed build, and logs to `~/.local/share/agent-office/fork/watch.log`. It runs with the `node`, `npm`, `git` and `gh` it found when you ran `--watch`; after switching Node versions (nvm), run `--watch` again. On Linux there's no launchd: run it from cron (`--watch` prints the line).
+That launchd agent (`~/Library/LaunchAgents/local.agent-office.fork-install.plist`) isn't needed any more, and the first start of `agent-office` after this change removes it, as does running the script by hand. On Linux, take out the cron line that ran the script, if you added one.
 
-To go back to upstream's newest release instead, run upstream's install line (in the [README](../README.md#run-locally)), and `--unwatch` so the fork doesn't come back five minutes later.
+As it starts, `agent-office` runs `~/.local/share/agent-office/fork/install-local.sh`, the copy of the script that came with the installed build, with the `node`, `npm` and `git` on your `PATH` then.
+
+To go back to upstream's newest release instead, run upstream's install line (in the [README](../README.md#run-locally)). It puts its own `agent-office` command back, which doesn't look at the fork.
 
 ## Trying a change in a sandbox
 
@@ -63,4 +67,4 @@ git push -u origin sync-upstream
 gh pr create --repo jjfattz/agent-office --title "Merge upstream" --body "What's new upstream"
 ```
 
-Merge that pull request with **Create a merge commit**, not squash: a squashed sync loses track of what came from upstream, and the next sync conflicts on all of it again. Once it's on `main`, the watcher installs it like any other change.
+Merge that pull request with **Create a merge commit**, not squash: a squashed sync loses track of what came from upstream, and the next sync conflicts on all of it again. Once it's on `main`, the next start of `agent-office` installs it like any other change.
