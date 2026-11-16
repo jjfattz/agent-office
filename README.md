@@ -410,6 +410,7 @@ Every change to the app that lands on `main` is published as a GitHub release by
 - [Agents](docs/agents.md): Claude Code, Codex and OpenCode, models and effort, and the office's prompts
 - [Configuration](docs/configuration.md): every command-line option, and where the office keeps its data
 - [Maps](docs/maps.md): the castle, the space station, and making a map of your own
+- [The arcade](docs/arcade.md): the cabinet's four games and their keys, honest high scores, adding a game, and the games we could add next
 - [Workers' servers on your own computer](docs/tunnel.md): `agent-office tunnel`, which opens every worker's web server on your computer by itself
 - [AWS reference](docs/aws.md): Tailscale, service tunnels, upgrades, and everything `deploy/aws.sh` does
 - [Railway reference](docs/railway.md): what `deploy/railway.sh` sets up, and what the volume keeps

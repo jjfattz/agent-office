@@ -4,7 +4,7 @@ import type { CabinetFrame, HighScore, PlayState, Title } from '../../../shared/
 // games.ts, that starts your games, says which keys they take, and paints anyone's frames of it.
 
 /** What the cabinet makes a noise about (see sound.ts); `n` is how many lines cleared at once, or the brick that broke. */
-export type ArcadeSound = 'land' | 'clear' | 'over' | 'shot' | 'pop' | 'hurt' | 'boom' | 'wave' | 'bounce' | 'brick' | 'power';
+export type ArcadeSound = 'land' | 'clear' | 'over' | 'shot' | 'pop' | 'hurt' | 'boom' | 'wave' | 'bounce' | 'brick' | 'power' | 'crumb' | 'meow';
 
 /** One of your games on the cabinet. */
 export interface CabinetGame {

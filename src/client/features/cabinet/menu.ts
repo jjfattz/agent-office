@@ -23,18 +23,18 @@ export interface ChoiceView extends MenuView {
 }
 
 const TOP = 116;
-const GAP = 16;
+const GAP = 12;
 const CARD_X = 30;
 const CARD_W = 420;
 /** The cards share the room between the title and the line blinking along the bottom. */
-const CARD_H = Math.min(170, (410 - (TITLES.length - 1) * GAP) / TITLES.length);
-const ICON = Math.min(112, CARD_H - 30);
-/** Down a card: its name, the first line of its blurb, and how you or the building are doing at it. */
-const NAME_Y = Math.round(CARD_H * 0.25);
-const BLURB_Y = Math.round(CARD_H * 0.47);
-const BEST_Y = CARD_H - 22;
-/** Where the picked game's table goes. */
+const CARD_H = Math.min(150, (410 - (TITLES.length - 1) * GAP) / TITLES.length);
+const ICON = Math.min(112, CARD_H - 22);
+/** Down a card: its name, and how you or the building are doing at it. */
+const NAME_Y = Math.round(CARD_H * 0.36);
+const BEST_Y = Math.round(CARD_H * 0.72);
+/** Where the picked game's name, what it is and its high scores go, and how wide. */
 const TABLE_X = 625;
+const TABLE_W = 290;
 /** Each game's high scores are up this long, in turn, while nobody's at the cabinet. */
 export const ATTRACT_EACH = 6;
 
@@ -46,17 +46,22 @@ export function cardAt(x: number, y: number): Title | null {
   return i < 0 ? null : TITLES[i];
 }
 
-/** The menu: a card for each game, and the high scores of the one picked out. */
+/** The menu: a card for each game, and the one picked out: what it is, and its high scores. */
 export function paintMenu(g: CanvasRenderingContext2D, v: ChoiceView) {
   backdrop(g);
   g.textBaseline = 'middle';
   lights(g, 'ARCADE', W / 2, 62, 64);
   TITLES.forEach((title, i) => card(g, title, cardY(i), v));
-  label(g, '🏆 HIGH SCORES', TABLE_X, TOP + 8);
-  lights(g, GAME_NAMES[v.at], TABLE_X, TOP + 42, 26, CARTS[v.at].colors);
+  const cart = CARTS[v.at];
+  lights(g, GAME_NAMES[v.at], TABLE_X, TOP + 16, 30, cart.colors);
+  g.textAlign = 'center';
+  g.fillStyle = TEXT;
+  g.font = `800 15px ${FONT}`;
+  wrap(g, cart.blurb, TABLE_W).forEach((text, i) => g.fillText(text, TABLE_X, TOP + 54 + i * 20));
+  label(g, '🏆 HIGH SCORES', TABLE_X, TOP + 112);
   const scores = v.scores[v.at];
-  if (scores.length) table(g, scores, TABLE_X - 145, 290, TOP + 84, 32, 18, v.mine[v.at]);
-  else none(g, TABLE_X, TOP + 150);
+  if (scores.length) table(g, scores, TABLE_X - TABLE_W / 2, TABLE_W, TOP + 146, 30, 17, v.mine[v.at]);
+  else none(g, TABLE_X, TOP + 190);
   blink(g, v.prompt ?? '↑ ↓ CHOOSE · ENTER TO PLAY', v.t, 26);
 }
 
@@ -86,7 +91,7 @@ export function paintAttract(g: CanvasRenderingContext2D, v: MenuView) {
   blink(g, v.prompt ?? 'PRESS E TO PLAY', v.t, 30);
 }
 
-/** A game's card on the menu: its picture, its name in lights, what it is, and how you or the building are doing at it. */
+/** A game's card on the menu: its picture, its name in lights, and how you or the building are doing at it. */
 function card(g: CanvasRenderingContext2D, title: Title, y: number, v: ChoiceView) {
   const on = title === v.at;
   const cart = CARTS[title];
@@ -113,12 +118,9 @@ function card(g: CanvasRenderingContext2D, title: Title, y: number, v: ChoiceVie
   cart.icon(g, x + 18 + ICON / 2, iy + ICON / 2, ICON * 0.7);
   const tx = x + ICON + 36;
   const tw = CARD_W - ICON - 54;
-  lights(g, GAME_NAMES[title], tx, y + NAME_Y, CARD_H < 150 ? 28 : 32, cart.colors, true);
+  lights(g, GAME_NAMES[title], tx, y + NAME_Y, CARD_H < 120 ? 28 : 32, cart.colors, true);
   g.globalAlpha = 1;
   g.textAlign = 'left';
-  g.fillStyle = on ? TEXT : DIM;
-  g.font = `800 15px ${FONT}`;
-  wrap(g, cart.blurb, tw).forEach((text, i) => g.fillText(text, tx, y + BLURB_Y + i * 19));
   const paused = v.paused[title];
   const best = v.scores[title][0];
   g.font = `900 15px ${FONT}`;
