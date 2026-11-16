@@ -35,7 +35,7 @@ Options:
 | `--status` | what's installed, from which commit, and whether `agent-office` looks for updates |
 | `--unwatch` | take down the launchd agent that older versions of this script set up with `--watch`, which built `main` every five minutes |
 
-That launchd agent (`~/Library/LaunchAgents/local.agent-office.fork-install.plist`) isn't needed any more, and the first start of `agent-office` after this change removes it, as does running the script by hand. On Linux, take out the cron line that ran the script, if you added one.
+That launchd agent (`~/Library/LaunchAgents/local.agent-office.fork-install.plist`) isn't needed any more. The first start of an `agent-office` that looks for updates removes it, and so does running the script by hand. On Linux, take out the cron line that ran the script, if you added one.
 
 As it starts, `agent-office` runs `~/.local/share/agent-office/fork/install-local.sh`, the copy of the script that came with the installed build, with the `node`, `npm` and `git` on your `PATH` then.
 

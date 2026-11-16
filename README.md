@@ -67,7 +67,7 @@ On Windows, in PowerShell:
 irm https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/install.ps1 | iex
 ```
 
-This puts an `agent-office` command on your PATH, so next time just run `agent-office`. Run the install line again to update. The installer's settings (a particular release, install without starting) are listed at the top of [`install.sh`](install.sh) and [`install.ps1`](install.ps1).
+This puts an `agent-office` command on your PATH, so next time just run `agent-office`. Run the install line again to update. To run this fork's own `main` instead, install it with `scripts/fork/install-local.sh`: that `agent-office` updates itself each time it starts ([docs/fork.md](docs/fork.md)). The installer's settings (a particular release, install without starting) are listed at the top of [`install.sh`](install.sh) and [`install.ps1`](install.ps1).
 
 The first time it starts, it walks you through setting up, right in the terminal:
 
