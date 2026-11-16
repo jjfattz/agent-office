@@ -32,8 +32,6 @@ export interface Followed {
   stepOffset: number;
   room: Room;
   wing: number;
-  rig: ((dt: number) => void) | null;
-  riding: boolean;
   colliders: Collider[];
   street: number;
 }
@@ -60,12 +58,10 @@ export function aimCamera(camera: THREE.PerspectiveCamera, p: Followed, bob: num
   // And under the loft, its roof or the garage ceiling.
   const m = 0.4;
   const R = p.room;
-  // On the ladder or a pole you can be down in a shaft under the floor, but you're still indoors.
-  const rigged = !!p.rig && !p.riding;
   const under = p.pos.x > R.minX && p.pos.x < R.maxX && p.pos.z > R.minZ && p.pos.z < R.maxZ;
   // In the office's back office, between its walls, and out through where the north wall was into the room.
   const back = !R.enclosed && p.pos.y > -SLAB - 0.5 && inWing(p.pos.x, p.pos.z, p.wing);
-  const indoors = ((rigged || p.pos.y > -SLAB - 0.5) && under) || back;
+  const indoors = (p.pos.y > -SLAB - 0.5 && under) || back;
   // Down in a room under the floor (the castle's dungeon): the camera keeps inside that.
   const V = R.vault;
   if (V && p.pos.y < V.top - 0.5 && p.pos.x > V.minX && p.pos.x < V.maxX && p.pos.z > V.minZ && p.pos.z < V.maxZ) {
@@ -78,13 +74,13 @@ export function aimCamera(camera: THREE.PerspectiveCamera, p: Followed, bob: num
     cam.x = THREE.MathUtils.clamp(cam.x, R.minX + m, R.maxX - m);
     cam.z = THREE.MathUtils.clamp(cam.z, R.minZ + m, R.maxZ - m);
   }
-  const floorY = rigged ? 0 : Math.max(groundAt(p.colliders, p.pos.x, p.pos.z, p.pos.y), p.street);
+  const floorY = Math.max(groundAt(p.colliders, p.pos.x, p.pos.z, p.pos.y), p.street);
   const roof = ceilingAt(p.colliders, cam.x, cam.z, floorY) - 0.3;
   cam.y = THREE.MathUtils.clamp(cam.y, floorY + 0.6, Math.max(floorY + 0.6, Math.min(floorY + 3.5, roof)));
   // Down on the street, stay under the garage ceiling so its edge never cuts across the view; in the
   // garage, on this side of its back and west walls too (the elevator comes down in the back one).
   const garage = p.street - STREET_Y - SLAB;
-  if (!R.enclosed && p.pos.y < garage - 1 && !rigged) {
+  if (!R.enclosed && p.pos.y < garage - 1) {
     cam.y = Math.min(cam.y, Math.max(floorY + 0.6, garage - 0.3));
     if (under) {
       cam.x = Math.max(cam.x, R.minX + m);
