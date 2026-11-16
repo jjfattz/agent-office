@@ -396,7 +396,7 @@ npm test
 
 Server edits restart the server, not the workers. After changing `ptyhost.ts`, bump `PTY_PROTOCOL` in `ptys.ts` so the next server replaces the PTY host.
 
-This fork's own office runs its `main`: `scripts/fork/install-local.sh --watch` builds, tests and installs it as `agent-office` each time `main` changes, and `scripts/fork/sandbox.sh` is `npm run dev` without the working office's data or port. Both are in [docs/fork.md](docs/fork.md).
+This fork's own office runs its `main`: `scripts/fork/install-local.sh` builds, tests and installs it as `agent-office`, which then looks for a newer `main` each time it starts and installs that first, and `scripts/fork/sandbox.sh` is `npm run dev` without the working office's data or port. Both are in [docs/fork.md](docs/fork.md).
 
 [docs/code-layout.md](docs/code-layout.md) says where the code lives, and where a new feature's pieces go.
 
