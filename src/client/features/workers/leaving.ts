@@ -141,8 +141,8 @@ const pick = <T>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length
  * shuts, hops down off its chair, and walks out of the building with the box (see wayHome): out the
  * exit door, down the steps and off along the sidewalk, where it's gone. Only the bottom floor has
  * an exit door, so from the floors above it goes out onto the balcony instead, climbs up on the
- * railing and jumps, and its parachute brings it down onto the lot out front, box and all. It walks
- * out without a sound: only the thump of landing under its parachute is heard.
+ * railing and jumps, and its parachute brings it down onto the lot out front, box and all. Its feet
+ * make no sound, walking or landing.
  */
 export class Departures {
   private leavers: Leaver[] = [];
@@ -152,8 +152,6 @@ export class Departures {
     private parent: THREE.Object3D,
     /** The top of whatever is underfoot at (x, z) for feet at `y`: the floor, a step, the street. */
     private ground: (x: number, z: number, y: number) => number,
-    /** It has come down under its parachute at (x, y, z), with a thump. */
-    private thump: (x: number, y: number, z: number) => void,
     /** It has got up from `deskId`, so the seat is free to see. */
     private onUp: (deskId: string) => void,
     /** The way out of the building, on the map you're on (see Ways.home). */
@@ -377,10 +375,9 @@ export class Departures {
       if (Math.hypot(dx, dz) > 1e-4) l.heading = Math.atan2(dx, dz);
       turn(l.heading, 3);
       if (pos.y > c.land.y) return true;
-      // Down, with a thump.
+      // Down.
       pos.y = c.land.y;
       root.rotation.x = 0;
-      this.thump(pos.x, pos.y, pos.z);
       c.phase = 'down';
       c.t = 0;
       return true;
@@ -427,7 +424,6 @@ interface Arriver {
   /** Seconds before it steps out of the elevator (they come out one after another), then seconds walking. */
   t: number;
   heading: number;
-  stepIn: number;
   /** Where the hop up onto its chair starts, once it's beside it. */
   from?: THREE.Vector3;
   hop: number;
@@ -452,7 +448,6 @@ export class Arrivals {
     private parent: THREE.Object3D,
     /** The top of whatever is underfoot at (x, z) for feet at `y`. */
     private ground: (x: number, z: number, y: number) => number,
-    private footstep: (x: number, y: number, z: number) => void,
     /** The way in, on the map you're on (see Ways.in). */
     private ways: () => Ways,
   ) {}
@@ -469,7 +464,7 @@ export class Arrivals {
     model.root.rotation.set(0, 0, 0);
     model.root.scale.setScalar(desk.seatAnchor.getWorldScale(new THREE.Vector3()).x);
     model.root.visible = delay <= 0;
-    this.walkers.push({ model, desk, way, next: 1, t: -delay, heading: 0, stepIn: 0, hop: 0 });
+    this.walkers.push({ model, desk, way, next: 1, t: -delay, heading: 0, hop: 0 });
   }
 
   /** Stops walking `model` in: it was sent home before it sat down, or it's gone. */
@@ -537,13 +532,7 @@ export class Arrivals {
     pos.y += (g - pos.y) * Math.min(1, dt * 14);
     root.rotation.y += wrap(w.heading - root.rotation.y) * Math.min(1, dt * 8);
     w.model.walking = w.next < w.way.length;
-    if (w.model.walking) {
-      w.stepIn -= dt;
-      if (w.stepIn <= 0) {
-        w.stepIn += Math.PI / 9;
-        this.footstep(pos.x, pos.y, pos.z);
-      }
-    } else w.from = pos.clone();
+    if (!w.model.walking) w.from = pos.clone();
     return true;
   }
 

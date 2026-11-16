@@ -37,7 +37,6 @@ interface Courtier {
   hop: number;
   from: THREE.Vector3;
   heading: number;
-  stepIn: number;
   /** m/s, before its age slows it down. */
   pace: number;
 }
@@ -57,7 +56,6 @@ export class Court {
     private nav: NavGrid,
     /** The top of whatever is underfoot at (x, z) for feet at `y`. */
     private ground: (x: number, z: number, y: number) => number,
-    private footstep: (x: number, y: number, z: number) => void,
   ) {
     this.interactables = plan.lineup.map((s) => ({ kind: 'desk', x: s.x, z: s.z, radius: 1.3, off: true }));
   }
@@ -67,7 +65,7 @@ export class Court {
    * undefined: it's in its seat already.
    */
   add(id: string, model: Worker, desk: DeskView, from?: Pt) {
-    const c: Courtier = { id, model, desk, goal: { seat: true }, state: 'seated', way: [], next: 0, hop: 0, from: new THREE.Vector3(), heading: 0, stepIn: 0, pace: WALK };
+    const c: Courtier = { id, model, desk, goal: { seat: true }, state: 'seated', way: [], next: 0, hop: 0, from: new THREE.Vector3(), heading: 0, pace: WALK };
     this.people.set(id, c);
     if (!from) return;
     // Out into the hall where it comes in, then off to its seat at a run.
@@ -252,20 +250,16 @@ export class Court {
       c.model.walking = c.next < c.way.length;
       // Its feet go as fast as it does: quicker running, slower shuffling.
       c.model.gait = c.pace / WALK;
-      if (c.model.walking) {
-        c.stepIn -= dt;
-        if (c.stepIn <= 0) {
-          c.stepIn += Math.PI / (9 * c.model.pace * c.model.gait);
-          this.footstep(pos.x, pos.y, pos.z);
+      if (!c.model.walking) {
+        if ('seat' in c.goal) {
+          // Beside its seat: up onto it.
+          c.state = 'up';
+          c.hop = 0;
+          c.from.copy(pos);
+        } else {
+          c.state = 'stand';
+          this.freeSpots();
         }
-      } else if ('seat' in c.goal) {
-        // Beside its seat: up onto it.
-        c.state = 'up';
-        c.hop = 0;
-        c.from.copy(pos);
-      } else {
-        c.state = 'stand';
-        this.freeSpots();
       }
     }
     // Up and down the dais steps as it goes, and facing the way it's walking, or the throne once it's in line.

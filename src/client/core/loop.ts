@@ -34,8 +34,6 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
 
   let lastSent = { x: 0, y: 0, z: 0, rotY: 0, moving: false, at: 0 };
   let spotSavedAt = 0;
-  /** How fast you were falling, so landing a jump thumps but stepping down a stair doesn't. */
-  let fallV = 0;
   const lookDir = new THREE.Vector3();
   const headPos = new THREE.Vector3();
   /** Frames coming too slowly for the 3D to be any fun: the 2D view is offered. */
@@ -94,18 +92,12 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
     ctx.view.update();
   }
 
-  /** What you hear, from where you are, and the thump of landing a jump. Walking about, your feet make no sound. */
+  /** What you hear, from where you are. Nobody's feet make a sound, yours included. */
   function listen() {
     const { player, camera, sound } = ctx;
     // Your ears are in your head, facing wherever the camera looks.
     camera.getWorldDirection(lookDir);
     sound.update({ x: player.pos.x, y: player.pos.y + EYE_HEIGHT, z: player.pos.z, fx: lookDir.x, fz: lookDir.z });
-    if (!player.grounded) fallV = Math.min(fallV, player.vy);
-    else {
-      // A hop lands at about 6 m/s, a drop from the loft at 10.
-      if (fallV < -4) sound.land(player.pos, Math.min(1, (-fallV - 4) / 7));
-      fallV = 0;
-    }
   }
 
   /** Where you are: to everyone else a few times a second, and to come back to every second. */

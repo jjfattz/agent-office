@@ -6,7 +6,7 @@ export interface Buffers {
   keys: AudioBuffer[];
   spaces: AudioBuffer[];
   mouse: AudioBuffer;
-  /** Soft thuds. Footsteps have their own samples (see feet.ts). */
+  /** Soft thuds. */
   steps: AudioBuffer[];
   rustle: AudioBuffer;
   /** A raindrop hitting the glass. */
@@ -22,7 +22,7 @@ export function makeBuffers(ctx: BaseAudioContext): Buffers {
     keys: [0, 1, 2, 3, 4, 5].map(() => keyClick(ctx, { body: rand(190, 300), bright: rand(0.7, 1), release: rand(0.06, 0.09), decay: 95, len: 0.12 })),
     spaces: [0, 1].map(() => keyClick(ctx, { body: rand(105, 130), bright: 0.55, release: rand(0.09, 0.12), decay: 55, len: 0.2 })),
     mouse: keyClick(ctx, { body: 900, bright: 1, release: 0.07, decay: 400, len: 0.1 }),
-    steps: [0, 1, 2].map(() => footstep(ctx)),
+    steps: [0, 1, 2].map(() => softThud(ctx)),
     rustle: rustle(ctx),
     drop: sample(ctx, 0.06, (t) => (Math.sin(2 * Math.PI * 2400 * t * (1 - t * 5)) * 0.6 + (Math.random() * 2 - 1) * 0.4) * Math.exp(-t * 110), 0.9),
     brown: loopable(ctx, 6, brownNoise()),
@@ -107,8 +107,8 @@ function keyClick(ctx: BaseAudioContext, o: { body: number; bright: number; rele
   );
 }
 
-/** A muffled thud and a little scuff: something soft landing (a ball, a dart, a page), and the weight under a jump's landing. */
-function footstep(ctx: BaseAudioContext): AudioBuffer {
+/** A muffled thud and a little scuff: something soft landing (a ball, a dart, a page). */
+function softThud(ctx: BaseAudioContext): AudioBuffer {
   let low = 0;
   let prev = 0;
   const scuffAt = rand(0.025, 0.045);

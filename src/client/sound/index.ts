@@ -1,8 +1,8 @@
 /**
  * Office sounds, synthesized with Web Audio so there are no audio files to ship: the room's air and a
- * humming fridge, workers typing while they work, footsteps, the coffee machine, birds outside the
- * windows by day and crickets at night, rain and thunder, the odd rustle, the gong, the dog
- * barking, and the dings when a worker needs you. And the lounge jukebox, whose tunes are in music.ts,
+ * humming fridge, workers typing while they work, the coffee machine, birds outside the windows by
+ * day and crickets at night, rain and thunder, the odd rustle, the gong, the dog barking, and the
+ * dings when a worker needs you. And the lounge jukebox, whose tunes are in music.ts,
  * and up on the roof, the wind, the city far below and the DJ's drum and bass (../dnb.ts).
  *
  * Everything goes through one master gain that Settings turns down or mutes. Voice chat doesn't, and
@@ -10,7 +10,7 @@
  *
  * OfficeSound is all the rest of the office sees. What every sound shares (the context, the buses,
  * where your ears are, what runs every frame) is AudioCore in core.ts; each sound is a recipe in a
- * file of its own, beside this one (weather.ts, steps.ts and so on) or in its feature's folder
+ * file of its own, beside this one (weather.ts, paper.ts and so on) or in its feature's folder
  * (features/golf/sound.ts, features/dog/sound.ts and so on), and this class only hands them the core.
  */
 import type { GongWhy } from '../../shared/protocol';
@@ -30,7 +30,7 @@ import { gong } from '../features/gong/sound';
 import { Jukebox, type JukeboxPlay } from '../features/jukebox/sound';
 import { needsYou } from '../features/needsyou/sound';
 import type { Pos } from './places';
-import { Footsteps, pageTurn, paper } from './steps';
+import { pageTurn, paper } from './paper';
 import { toss, type TossSound } from '../features/bargames/sound';
 import { fidgeting, Typing } from './typing';
 import { Rain, thunder } from './weather';
@@ -40,7 +40,6 @@ export class OfficeSound {
   private readonly music = new Jukebox(this.a, (text) => this.onMusicError?.(text));
   private readonly dj = new Dj(this.a);
   private readonly typing = new Typing(this.a);
-  private readonly feet = new Footsteps(this.a);
   private readonly motors = new Motors(this.a);
   private readonly fridge = new Fridge(this.a);
   private readonly rain = new Rain(this.a);
@@ -131,7 +130,7 @@ export class OfficeSound {
     this.a.setOutdoors(on);
   }
 
-  // ---- Workers, footsteps and paper (typing.ts, steps.ts) ---------------------------------------
+  // ---- Workers and paper (typing.ts, paper.ts) ---------------------------------------------------
 
   /** The worker at desk (x, z) types while `on`. */
   setTyping(id: string, x: number, z: number, on: boolean) {
@@ -142,22 +141,12 @@ export class OfficeSound {
     this.typing.removeTypist(id);
   }
 
-  /** Landing a jump, `hard` from 0 (a hop) to 1 (off the loft). */
-  land(feet: Pos, hard = 0.5) {
-    this.feet.land(feet, hard);
-  }
-
   paper() {
     paper(this.a);
   }
 
   pageTurn() {
     pageTurn(this.a);
-  }
-
-  /** Someone else's footstep, on the office floor unless `y` says where else. */
-  stepAt(x: number, z: number, y = 0, pace = 0) {
-    this.feet.stepAt({ x, y, z }, pace);
   }
 
   // ---- The dungeon and the airlock (features/workers) ----------------------------------------------

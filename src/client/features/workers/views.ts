@@ -68,11 +68,10 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
   const workerViews = new Map<string, WorkerView>();
   /** Workers a `worker.remove` is taking out of the store right now. They walk out of the building; a worker that's gone because you changed floors just vanishes. */
   const sentHome = new Set<string>();
-  // Workers sent home, packing up and walking out with a box of their things (quietly: only a parachute's landing thumps).
+  // Workers sent home, packing up and walking out with a box of their things.
   const departures = new Departures(
     scene,
     groundHere,
-    (x, y, z) => sound.stepAt(x, z, y),
     () => arrangeSeats(),
     () => ctx.world().ways,
   );
@@ -99,7 +98,6 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
   const arrivals = new Arrivals(
     scene,
     groundHere,
-    (x, y, z) => sound.stepAt(x, z, y),
     () => ctx.world().ways,
   );
   /** Set while a floor's workers arrive with it (a welcome, an elevator ride): they're in their seats already. */
