@@ -1,9 +1,39 @@
-import { hatch } from '../climbing/sound';
 import type { AudioCore } from '../../sound/core';
 import { biquad, envelope, pick, rand } from '../../sound/dsp';
 
 // The castle's dungeon: its cell doors, and whoever's thrown down on the straw. And the station's
 // airlock: its doors, its alarm, and the air going out of it with someone.
+
+/** Old hinges swinging open: a rough, wavering squeak, from where they are. */
+function creak(a: AudioCore, at: { x: number; y: number; z: number }) {
+  const ctx = a.ctx;
+  if (!ctx) return;
+  a.count('creak');
+  const out = a.panner(at, 2, 1.1);
+  out.connect(a.ambience);
+  const t0 = ctx.currentTime + 0.01;
+  const o = ctx.createOscillator();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(420, t0);
+  o.frequency.linearRampToValueAtTime(640, t0 + 0.18);
+  o.frequency.linearRampToValueAtTime(380, t0 + 0.36);
+  const wobble = ctx.createOscillator();
+  wobble.frequency.value = 23;
+  const depth = ctx.createGain();
+  depth.gain.value = 40;
+  wobble.connect(depth).connect(o.frequency);
+  const g = ctx.createGain();
+  envelope(g.gain, t0, [
+    [0.04, 0.05],
+    [0.3, 0.04],
+    [0.4, 0],
+  ]);
+  o.connect(biquad(ctx, 'bandpass', 1400, 2.5)).connect(g).connect(out);
+  for (const n of [o, wobble]) {
+    n.start(t0);
+    n.stop(t0 + 0.45);
+  }
+}
 
 /**
  * A cell door in the dungeon: its hinges groaning open, or slamming shut on someone with a clang of
@@ -12,7 +42,7 @@ import { biquad, envelope, pick, rand } from '../../sound/dsp';
 export function cellDoor(a: AudioCore, at: { x: number; y: number; z: number }, open: boolean) {
   const ctx = a.ctx;
   if (!ctx) return;
-  if (open) return hatch(a, at, true);
+  if (open) return creak(a, at);
   a.count('cellDoor');
   const out = a.panner(at, 3, 1);
   out.connect(a.ambience);

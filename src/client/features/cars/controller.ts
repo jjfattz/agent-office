@@ -80,7 +80,6 @@ export class Driver {
       p.camYaw = v.pose.rotY + Math.PI;
     }
     p.rig = (dt) => this.step(dt);
-    p.riding = true;
     this.sit(0);
   }
 
@@ -137,7 +136,6 @@ export class Driver {
     }
     const p = this.player;
     p.rig = null;
-    p.riding = false;
     if (this.camWas) {
       p.camDist = this.camWas.dist;
       p.camPitch = this.camWas.pitch;

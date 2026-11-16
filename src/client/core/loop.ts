@@ -79,10 +79,7 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
     me.root.position.copy(player.pos);
     me.root.position.y += player.stepOffset;
     me.root.rotation.y = player.facing;
-    // Holding on to the ladder or a pole (see ctx.view).
-    const grip = ctx.view.grip();
-    me.setGrip(grip);
-    me.update(dt, t, (player.moving && player.grounded) || (grip === 'ladder' && player.moving), !player.grounded && !grip && !ctx.activities.any('hidesHands'), player.effects.speed);
+    me.update(dt, t, player.moving && player.grounded, !player.grounded && !ctx.activities.any('hidesHands'), player.effects.speed);
     me.setVoiceLevel(voice.inVoice ? voice.localLevel : 0);
     const firstPerson = player.view === 'first';
     // In first person you are the camera; in third, hide yourself when it's zoomed in right behind your head.
@@ -93,9 +90,9 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
     (firstBody ??= new FirstPersonBody(me.rig)).set(ownBody, camera);
     me.root.visible = ownBody || ctx.activities.any('takesCamera') || (!firstPerson && camera.position.distanceTo(headPos.set(player.pos.x, player.pos.y + 1.3, player.pos.z)) > 1.5);
     // In a car, your hands are on the wheel, out of sight.
-    if (firstPerson && !ctx.activities.any('hidesHands')) hands.update(dt, t, { yaw: player.camYaw, pitch: player.lookPitch, walkPhase: player.walkPhase, walking: player.moving && player.grounded, airborne: !player.grounded, jitter: player.effects.jitter, grip });
-    // What you're doing widens the view (down a pole) or narrows it (at the oche or the line), and once
-    // it's set, may take it over (the telescope) or streak its edges (down a pole): see ctx.view.
+    if (firstPerson && !ctx.activities.any('hidesHands')) hands.update(dt, t, { yaw: player.camYaw, pitch: player.lookPitch, walkPhase: player.walkPhase, walking: player.moving && player.grounded, airborne: !player.grounded, jitter: player.effects.jitter });
+    // What you're doing narrows the view (at the oche or the line), and once it's set, may take it
+    // over (the telescope): see ctx.view.
     const fov = ctx.view.fov(FOV);
     if (Math.abs(camera.fov - fov) > 0.05) {
       camera.fov += (fov - camera.fov) * Math.min(1, dt * 8);
@@ -153,10 +150,7 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
     const court = parts.worlds.court();
     if (!core.upTop) {
       ctx.world().update(t, dt, [player.pos, ...[...remotes.values()].map((r) => r.person.root.position), ...departures.positions(), ...sendoffs.positions(), ...arrivals.positions(), ...(court?.positions() ?? [])]);
-      if (ctx.inOffice()) {
-        office.stack.update(dt, [{ x: player.pos.x, y: player.pos.y, z: player.pos.z, grip: ctx.view.grip() }, ...[...remotes.values()].map((r) => ({ x: r.person.root.position.x, y: r.person.root.position.y, z: r.person.root.position.z, grip: r.grip }))], camera.position);
-        office.jukebox.update(t, dt, sound.beat());
-      }
+      if (ctx.inOffice()) office.jukebox.update(t, dt, sound.beat());
     }
     ctx.smoke.update(dt, camera);
     ctx.confetti.update(dt);
