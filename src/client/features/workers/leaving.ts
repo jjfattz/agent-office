@@ -116,8 +116,6 @@ interface Leaver {
   seat: THREE.Vector3;
   /** The way it's walking (rotation around y; 0 is +z). */
   heading: number;
-  /** Seconds until its next footstep. */
-  stepIn: number;
   /** The desk chair it got up from, spinning after it (null for a bean bag, or once someone new sits there). */
   chair: THREE.Object3D | null;
   spin: number;
@@ -143,7 +141,8 @@ const pick = <T>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length
  * shuts, hops down off its chair, and walks out of the building with the box (see wayHome): out the
  * exit door, down the steps and off along the sidewalk, where it's gone. Only the bottom floor has
  * an exit door, so from the floors above it goes out onto the balcony instead, climbs up on the
- * railing and jumps, and its parachute brings it down onto the lot out front, box and all.
+ * railing and jumps, and its parachute brings it down onto the lot out front, box and all. It walks
+ * out without a sound: only the thump of landing under its parachute is heard.
  */
 export class Departures {
   private leavers: Leaver[] = [];
@@ -153,7 +152,8 @@ export class Departures {
     private parent: THREE.Object3D,
     /** The top of whatever is underfoot at (x, z) for feet at `y`: the floor, a step, the street. */
     private ground: (x: number, z: number, y: number) => number,
-    private footstep: (x: number, y: number, z: number) => void,
+    /** It has come down under its parachute at (x, y, z), with a thump. */
+    private thump: (x: number, y: number, z: number) => void,
     /** It has got up from `deskId`, so the seat is free to see. */
     private onUp: (deskId: string) => void,
     /** The way out of the building, on the map you're on (see Ways.home). */
@@ -181,7 +181,7 @@ export class Departures {
     const chair = desk.def.beanbag || from ? null : desk.chair;
     const { way, chute: up } = this.ways().home(desk.def, from);
     const chute: Chute | null = up ? { phase: 'walk', t: 0, color: pick(CANOPIES), canopy: null, from: new THREE.Vector3(), vel: new THREE.Vector3(), land: new THREE.Vector3(), angle: 0, radius: 0, height: 1 } : null;
-    this.leavers.push({ model, deskId: desk.def.id, way, next: 0, t: from ? PACK + HOP : 0, seat, heading: model.root.rotation.y, stepIn: 0, chair, spin: 0, scale, gone: 0, chute });
+    this.leavers.push({ model, deskId: desk.def.id, way, next: 0, t: from ? PACK + HOP : 0, seat, heading: model.root.rotation.y, chair, spin: 0, scale, gone: 0, chute });
     this.laptops.push({ laptop, deskId: desk.def.id, gone: 0 });
   }
 
@@ -286,11 +286,6 @@ export class Departures {
     root.rotation.y += wrap(l.heading - root.rotation.y) * Math.min(1, dt * 8);
     if (l.next < l.way.length) {
       l.model.walking = true;
-      l.stepIn -= dt;
-      if (l.stepIn <= 0) {
-        l.stepIn += Math.PI / 9;
-        this.footstep(pos.x, pos.y, pos.z);
-      }
       return true;
     }
     if (c?.phase === 'walk') {
@@ -385,7 +380,7 @@ export class Departures {
       // Down, with a thump.
       pos.y = c.land.y;
       root.rotation.x = 0;
-      this.footstep(pos.x, pos.y, pos.z);
+      this.thump(pos.x, pos.y, pos.z);
       c.phase = 'down';
       c.t = 0;
       return true;

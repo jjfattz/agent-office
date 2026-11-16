@@ -17,9 +17,8 @@ import type { Laptop } from './laptop';
 export const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 export const pick = <T>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length)];
 
-/** What a sendoff is heard by: footsteps, a cell's door, someone landing on the straw, and the airlock (its doors, its alarm, and the air going out of it). */
+/** What a sendoff is heard by: a cell's door, someone landing on the straw, and the airlock (its doors, its alarm, and the air going out of it). Nobody's footsteps: the worker and its escort walk without a sound. */
 export interface SendoffSounds {
-  step(x: number, y: number, z: number): void;
   door(at: THREE.Vector3, open: boolean): void;
   thud(at: THREE.Vector3): void;
   airlock(at: THREE.Vector3, what: 'door' | 'alarm' | 'blow'): void;
@@ -40,7 +39,6 @@ export interface Walk {
   way: Pt[];
   next: number;
   heading: number;
-  stepIn: number;
 }
 
 export interface Guard extends Walk {

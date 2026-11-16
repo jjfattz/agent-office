@@ -142,11 +142,6 @@ export class OfficeSound {
     this.typing.removeTypist(id);
   }
 
-  /** One of your own footsteps, with your feet at `feet`: `pace` is 0 at a walk, 1 at a run. */
-  step(feet: Pos, pace = 0) {
-    this.feet.step(feet, pace);
-  }
-
   /** Landing a jump, `hard` from 0 (a hop) to 1 (off the loft). */
   land(feet: Pos, hard = 0.5) {
     this.feet.land(feet, hard);

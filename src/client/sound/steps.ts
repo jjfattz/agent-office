@@ -5,7 +5,7 @@ import { biquad, envelope, pick, rand } from './dsp';
 import { footfalls, type Footfalls, type Ground } from './feet';
 import type { Pos } from './places';
 
-// Footsteps, yours and everyone else's, and paper: an issue card, a page of a book.
+// Footsteps (other people's: yours make no sound, but landing a jump does) and paper: an issue card, a page of a book.
 
 /** How loud a footfall on each kind of ground plays, so a step is about as loud to the ear on all of them. */
 const LEVEL: Record<Ground, number> = { wood: 0.34, concrete: 0.31, grass: 0.22, stone: 0.31 };
@@ -27,29 +27,18 @@ export function groundAt(a: AudioCore, feet: Pos): Ground {
 }
 
 /**
- * Everyone's footsteps. A step is a heel and then the ball of the foot (see feet.ts), never the same
- * pair twice running, on whatever the ground is there; at a run the two land almost together, harder
- * and brighter.
+ * Other people's footsteps, and you landing a jump. A step is a heel and then the ball of the foot
+ * (see feet.ts), never the same pair twice running, on whatever the ground is there; at a run the two
+ * land almost together, harder and brighter.
  */
 export class Footsteps {
   private readonly made = new Map<Ground, Footfalls>();
   /** The sample each list gave last, so the next one's another. */
   private readonly last = new Map<AudioBuffer[], AudioBuffer>();
-  /** Which of your feet is coming down: -1 your left, 1 your right. */
-  private foot = 1;
   /** The way out to the room for each of your feet (see side). */
   private readonly sides = new Map<number, AudioNode>();
 
   constructor(private readonly a: AudioCore) {}
-
-  /** One of your own footsteps, with your feet at `feet`. `pace` is 0 at a walk, 1 at a run. */
-  step(feet: Pos, pace = 0) {
-    if (!this.a.ctx) return;
-    this.foot = -this.foot;
-    // Your left foot a little to your left, and a touch lower than your right: no two shoes sound the same.
-    this.fall(groundAt(this.a, feet), pace, 1, { dest: this.side(this.foot * 0.14) }, this.a.ctx.currentTime, 1 + this.foot * 0.015);
-    this.a.count('step');
-  }
 
   /** Landing a jump on both feet, `hard` from 0 (a hop) to 1 (off the loft). */
   land(feet: Pos, hard = 0.5) {
@@ -58,6 +47,7 @@ export class Footsteps {
     const ground = groundAt(this.a, feet);
     const now = ctx.currentTime;
     const gap = rand(0.012, 0.03);
+    // Your left foot a little to your left, and a touch lower than your right: no two shoes sound the same.
     this.fall(ground, 0.4, 0.9 + hard * 0.6, { dest: this.side(-0.14) }, now, 0.88);
     this.fall(ground, 0.4, 0.9 + hard * 0.6, { dest: this.side(0.14) }, now + gap, 0.84);
     // Your weight coming down on them.
