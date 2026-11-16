@@ -239,5 +239,5 @@ test('each game has its own high-score table, saved together, and the old file i
   assert.deepEqual(again.all(), table.all());
   // A table for a game the cabinet doesn't have is left out.
   writeFileSync(path.join(dir, 'arcade.json'), JSON.stringify({ pong: [{ game: 'game00000003', name: 'Eve', color: '#4f86f7', score: 5, level: 1, at: 1 }] }));
-  assert.deepEqual(new HighScores(dir).all(), { blockfall: [], bugswarm: [], brickbust: [] });
+  assert.deepEqual(new HighScores(dir).all(), { blockfall: [], bugswarm: [], brickbust: [], dustbot: [] });
 });
