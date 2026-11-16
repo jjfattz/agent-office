@@ -60,7 +60,7 @@ export function createWorlds(ctx: Ctx) {
       scene.add(w.group);
       noOutline(w.group);
       const ground = (x: number, z: number, y: number) => Math.max(groundAt(w.colliders, x, z, y), w.dungeon?.plan.floor ?? 0);
-      b = { plan: p, world: w, court: new Court(w.group, p, w.nav, ground, (x, y, z) => ctx.sound.stepAt(x, z, y)), idle: idleAgentsIn(w) };
+      b = { plan: p, world: w, court: new Court(w.group, p, w.nav, ground), idle: idleAgentsIn(w) };
       built.set(p.id, b);
     }
     return b;

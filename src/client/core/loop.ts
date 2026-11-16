@@ -14,9 +14,6 @@ import type { Frame } from './registry';
 import { FOV } from './scene';
 import { FirstPersonBody } from '../world/character/person-first';
 
-/** Covering less ground than this (m/s) since your last footstep, your feet make no sound: a walk is 4.6. */
-const QUIET_FEET = 1.2;
-
 export interface LoopDeps {
   /** Offers the 2D view (/lite), where the 3D is hard going (see main.ts). */
   offer2d(why: 'slow'): void;
@@ -37,12 +34,6 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
 
   let lastSent = { x: 0, y: 0, z: 0, rotY: 0, moving: false, at: 0 };
   let spotSavedAt = 0;
-  /** Which half-stride your walk is on, so each one plays a footstep. */
-  let stride = 0;
-  /** Where you were last frame, and how far and how long you've walked since your last footstep. */
-  const walked = { x: 0, z: 0, far: 0, time: 0 };
-  /** How fast you were falling, so landing a jump thumps but stepping down a stair doesn't. */
-  let fallV = 0;
   const lookDir = new THREE.Vector3();
   const headPos = new THREE.Vector3();
   /** Frames coming too slowly for the 3D to be any fun: the 2D view is offered. */
@@ -101,30 +92,12 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
     ctx.view.update();
   }
 
-  /** What you hear, from where you are, and your footsteps. */
-  function listen({ dt }: Frame) {
+  /** What you hear, from where you are. Nobody's feet make a sound, yours included. */
+  function listen() {
     const { player, camera, sound } = ctx;
     // Your ears are in your head, facing wherever the camera looks.
     camera.getWorldDirection(lookDir);
     sound.update({ x: player.pos.x, y: player.pos.y + EYE_HEIGHT, z: player.pos.z, fx: lookDir.x, fz: lookDir.z });
-    const walking = player.moving && player.grounded;
-    walked.far = walking ? walked.far + Math.hypot(player.pos.x - walked.x, player.pos.z - walked.z) : 0;
-    walked.time = walking ? walked.time + dt : 0;
-    walked.x = player.pos.x;
-    walked.z = player.pos.z;
-    const s = Math.floor(player.walkPhase / Math.PI);
-    if (s !== stride) {
-      stride = s;
-      // Only for ground you've covered: walking into a wall, your feet go nowhere and make no sound.
-      if (walking && walked.far > walked.time * QUIET_FEET) sound.step(player.pos, player.running ? 1 : 0);
-      walked.far = walked.time = 0;
-    }
-    if (!player.grounded) fallV = Math.min(fallV, player.vy);
-    else {
-      // A hop lands at about 6 m/s, a drop from the loft at 10.
-      if (fallV < -4) sound.land(player.pos, Math.min(1, (-fallV - 4) / 7));
-      fallV = 0;
-    }
   }
 
   /** Where you are: to everyone else a few times a second, and to come back to every second. */

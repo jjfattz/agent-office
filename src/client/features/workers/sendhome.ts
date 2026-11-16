@@ -92,7 +92,7 @@ export class Sendoffs {
       begun: false,
       t: 0,
       state: from ? 'stand' : 'seated',
-      walk: { root: model.root, way: [], next: 0, heading: model.root.rotation.y, stepIn: 0 },
+      walk: { root: model.root, way: [], next: 0, heading: model.root.rotation.y },
       speed: WALK,
       hop: { from: pos.clone(), t: 0 },
       chair: from || desk.def.beanbag ? null : desk.chair,
@@ -421,7 +421,7 @@ export class Sendoffs {
     if (arrived) s.state = 'stand';
   }
 
-  /** A step along `m.way` at `speed`, up and down stairs as the ground goes, with footsteps: true once it's at the end. */
+  /** A step along `m.way` at `speed`, up and down stairs as the ground goes: true once it's at the end. */
   private along(m: Walk, speed: number, dt: number): boolean {
     const pos = m.root.position;
     let move = speed * dt;
@@ -445,15 +445,7 @@ export class Sendoffs {
     const g = this.ground(pos.x, pos.z, pos.y + FEET + 0.35) - FEET;
     pos.y += (g - pos.y) * Math.min(1, dt * 14);
     m.root.rotation.y += wrap(m.heading - m.root.rotation.y) * Math.min(1, dt * 8);
-    const walking = m.next < m.way.length;
-    if (walking) {
-      m.stepIn -= dt;
-      if (m.stepIn <= 0) {
-        m.stepIn += 0.9 / Math.max(1, speed);
-        this.sounds.step(pos.x, pos.y, pos.z);
-      }
-    }
-    return !walking;
+    return m.next >= m.way.length;
   }
 
   // ---- The escorts ------------------------------------------------------------------------------
@@ -495,13 +487,6 @@ export class Sendoffs {
         const p = s.model.root.position;
         if (Math.hypot(p.x - pos.x, p.z - pos.z) > 0.05) g.heading = Math.atan2(p.x - pos.x, p.z - pos.z);
       }
-      if (moving) {
-        g.stepIn -= dt;
-        if (g.stepIn <= 0) {
-          g.stepIn += 0.35;
-          this.sounds.step(pos.x, pos.y, pos.z);
-        }
-      }
     }
     g.root.rotation.y += wrap(g.heading - g.root.rotation.y) * Math.min(1, dt * 8);
     if (g.root.visible) g.person.update(dt, t, moving, false, moving ? Math.max(0.8, g.speed / GUARD_WALK) : 1);
@@ -516,7 +501,7 @@ export class Sendoffs {
     if (!g && this.guards.length < GUARDS) {
       const person = w.escort.make();
       w.group.add(person.root);
-      g = { person, root: person.root, posted: false, mode: 'idle', speed: GUARD_WALK, way: [], next: 0, heading: w.escort.post.rotY, stepIn: 0 };
+      g = { person, root: person.root, posted: false, mode: 'idle', speed: GUARD_WALK, way: [], next: 0, heading: w.escort.post.rotY };
       this.guards.push(g);
     }
     if (!g) return null;
@@ -554,7 +539,7 @@ export class Sendoffs {
     this.guardsOf = w;
     const e = w.escort;
     if (!e) return;
-    const g: Guard = { person: e.guard, root: e.guard.root, posted: true, mode: 'idle', speed: GUARD_WALK, way: [], next: 0, heading: e.post.rotY, stepIn: 0 };
+    const g: Guard = { person: e.guard, root: e.guard.root, posted: true, mode: 'idle', speed: GUARD_WALK, way: [], next: 0, heading: e.post.rotY };
     g.root.position.set(e.post.x, e.post.y, e.post.z);
     g.root.rotation.y = e.post.rotY;
     this.guards.push(g);

@@ -20,9 +20,6 @@ import { whereabouts } from '../../ui/whereabouts';
 import { Person } from '../../world/character';
 import { disposeSprite, textSprite } from '../../world/toon';
 
-/** Going faster than this (m/s), someone's running: a walk is 4.6 and a run 7.5 (see player/index.ts). */
-const RUN_SPEED = 6;
-
 export interface RemotePeer {
   person: Person;
   target: THREE.Vector3;
@@ -31,15 +28,11 @@ export interface RemotePeer {
   label: string;
   look: PeerInfo['look'];
   bubble?: { sprite: THREE.Sprite; until: number };
-  /** Seconds walked since their last footstep. */
-  stepT: number;
-  /** How fast they're going (m/s), evened out: at a run, their feet say so. */
-  speed: number;
 }
 
 /** Registers what follows the people in the office (store 'peers' and 'cars'), their ticks, and chat and peer.act. */
 export function installPeers(ctx: Ctx, parts: Pick<Parts, 'puff' | 'worlds' | 'cars' | 'walking' | 'talk' | 'hud'>) {
-  const { scene, voice, sound, player } = ctx;
+  const { scene, voice, player } = ctx;
   const { plan } = parts.worlds;
   const remotes = new Map<string, RemotePeer>();
   const editProfile = () => parts.hud.editProfile();
@@ -57,7 +50,7 @@ export function installPeers(ctx: Ctx, parts: Pick<Parts, 'puff' | 'worlds' | 'c
         person.root.position.set(peer.x, peer.y, peer.z);
         scene.add(person.root);
         noOutline(person.root);
-        r = { person, target: new THREE.Vector3(peer.x, peer.y, peer.z), rotY: peer.rotY, moving: false, label: '', look: { ...peer.look }, stepT: 0, speed: 0 };
+        r = { person, target: new THREE.Vector3(peer.x, peer.y, peer.z), rotY: peer.rotY, moving: false, label: '', look: { ...peer.look } };
         remotes.set(id, r);
       }
       const label = `${peer.name}|${peer.voice ? (peer.muted ? 'm' : 'v') : '-'}|${peer.color}`;
@@ -105,8 +98,6 @@ export function installPeers(ctx: Ctx, parts: Pick<Parts, 'puff' | 'worlds' | 'c
       const at = sat ?? p;
       r.target.set(at.x, at.y, at.z);
       const pos = r.person.root.position;
-      const fromX = pos.x;
-      const fromZ = pos.z;
       if (ride) {
         pos.copy(r.target);
         r.person.root.rotation.y = ride.rotY;
@@ -121,15 +112,6 @@ export function installPeers(ctx: Ctx, parts: Pick<Parts, 'puff' | 'worlds' | 'c
       const airborne = !sat && p.y > ground + 0.05;
       const walking = !sat && p.moving && !airborne;
       r.person.update(dt, t, walking, airborne && Math.abs(pos.y - r.target.y) > 0.01);
-      // Their walk cycle takes a step every π/11 seconds, and every π/14 at a run, as yours does.
-      if (dt > 0) r.speed += (Math.min(RUN_SPEED * 2, Math.hypot(pos.x - fromX, pos.z - fromZ) / dt) - r.speed) * Math.min(1, dt * 5);
-      const running = r.speed > RUN_SPEED;
-      const stride = Math.PI / (running ? 14 : 11);
-      r.stepT = walking ? r.stepT + dt : 0.2;
-      if (r.stepT >= stride) {
-        r.stepT -= stride;
-        sound.stepAt(pos.x, pos.z, pos.y, running ? 1 : 0);
-      }
       r.person.setVoiceLevel(p.voice && !p.muted ? voice.levelOf(id) : 0);
       r.person.emojiLift = r.bubble ? 0.45 : 0;
       if (r.bubble && now > r.bubble.until) {

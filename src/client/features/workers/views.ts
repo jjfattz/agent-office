@@ -72,7 +72,6 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
   const departures = new Departures(
     scene,
     groundHere,
-    (x, y, z) => sound.stepAt(x, z, y),
     () => arrangeSeats(),
     () => ctx.world().ways,
   );
@@ -89,7 +88,7 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
   const sendoffs = new Sendoffs(
     scene,
     groundHere,
-    { step: (x, y, z) => sound.stepAt(x, z, y), door: (at, open) => sound.cellDoor(at, open), thud: (at) => sound.thud(at), airlock: (at, what) => sound.airlock(at, what) },
+    { door: (at, open) => sound.cellDoor(at, open), thud: (at) => sound.thud(at), airlock: (at, what) => sound.airlock(at, what) },
     () => arrangeSeats(),
     () => ctx.world(),
     jail,
@@ -99,7 +98,6 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
   const arrivals = new Arrivals(
     scene,
     groundHere,
-    (x, y, z) => sound.stepAt(x, z, y),
     () => ctx.world().ways,
   );
   /** Set while a floor's workers arrive with it (a welcome, an elevator ride): they're in their seats already. */
