@@ -26,8 +26,13 @@ const TOP = 116;
 const GAP = 16;
 const CARD_X = 30;
 const CARD_W = 420;
-const CARD_H = Math.min(170, (440 - (TITLES.length - 1) * GAP) / TITLES.length);
+/** The cards share the room between the title and the line blinking along the bottom. */
+const CARD_H = Math.min(170, (410 - (TITLES.length - 1) * GAP) / TITLES.length);
 const ICON = Math.min(112, CARD_H - 30);
+/** Down a card: its name, the first line of its blurb, and how you or the building are doing at it. */
+const NAME_Y = Math.round(CARD_H * 0.25);
+const BLURB_Y = Math.round(CARD_H * 0.47);
+const BEST_Y = CARD_H - 22;
 /** Where the picked game's table goes. */
 const TABLE_X = 625;
 /** Each game's high scores are up this long, in turn, while nobody's at the cabinet. */
@@ -108,21 +113,21 @@ function card(g: CanvasRenderingContext2D, title: Title, y: number, v: ChoiceVie
   cart.icon(g, x + 18 + ICON / 2, iy + ICON / 2, ICON * 0.7);
   const tx = x + ICON + 36;
   const tw = CARD_W - ICON - 54;
-  lights(g, GAME_NAMES[title], tx, y + 40, 32, cart.colors, true);
+  lights(g, GAME_NAMES[title], tx, y + NAME_Y, CARD_H < 150 ? 28 : 32, cart.colors, true);
   g.globalAlpha = 1;
   g.textAlign = 'left';
   g.fillStyle = on ? TEXT : DIM;
   g.font = `800 15px ${FONT}`;
-  wrap(g, cart.blurb, tw).forEach((text, i) => g.fillText(text, tx, y + 78 + i * 20));
+  wrap(g, cart.blurb, tw).forEach((text, i) => g.fillText(text, tx, y + BLURB_Y + i * 19));
   const paused = v.paused[title];
   const best = v.scores[title][0];
   g.font = `900 15px ${FONT}`;
   if (paused !== undefined) {
     g.fillStyle = GOLD;
-    g.fillText(fit(g, `⏸ YOURS, PAUSED AT ${scoreText(paused)}`, tw), tx, y + CARD_H - 30);
+    g.fillText(fit(g, `⏸ YOURS, PAUSED AT ${scoreText(paused)}`, tw), tx, y + BEST_Y);
   } else {
     g.fillStyle = best ? TEXT : DIM;
-    g.fillText(fit(g, best ? `🏆 ${scoreText(best.score)} · ${best.name}` : 'No scores yet', tw), tx, y + CARD_H - 30);
+    g.fillText(fit(g, best ? `🏆 ${scoreText(best.score)} · ${best.name}` : 'No scores yet', tw), tx, y + BEST_Y);
   }
 }
 

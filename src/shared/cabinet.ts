@@ -7,25 +7,26 @@
 // office follows it), and one in client/features/cabinet/ (playing and drawing it); TITLES, GAME_NAMES
 // and CHECKS here, REFEREES there and CARTS in the client are the lists it joins.
 import { checkBlocksFrame, type BlocksFrame } from './games/blockfall.js';
+import { checkBrickFrame, type BrickFrame } from './games/brickbust.js';
 import { checkSwarmFrame, type SwarmFrame } from './games/bugswarm.js';
 import { SCORE_MAX, int } from './games/common.js';
 
 export type { PlayState } from './games/common.js';
 
 /** The games on the cabinet, in the order its menu lists them. */
-export const TITLES = ['blockfall', 'bugswarm'] as const;
+export const TITLES = ['blockfall', 'bugswarm', 'brickbust'] as const;
 export type Title = (typeof TITLES)[number];
 /** Each game's name, as it's up in lights. */
-export const GAME_NAMES: Readonly<Record<Title, string>> = { blockfall: 'BLOCKFALL', bugswarm: 'BUGSWARM' };
+export const GAME_NAMES: Readonly<Record<Title, string>> = { blockfall: 'BLOCKFALL', bugswarm: 'BUGSWARM', brickbust: 'BRICKBUST' };
 
 export const isTitle = (v: unknown): v is Title => (TITLES as readonly unknown[]).includes(v);
 
 /** One picture of the cabinet's screen while someone plays: whichever game it is, by its `title`. */
-export type CabinetFrame = BlocksFrame | SwarmFrame;
+export type CabinetFrame = BlocksFrame | SwarmFrame | BrickFrame;
 /** The frame of game `T`. */
 export type FrameOf<T extends Title> = Extract<CabinetFrame, { title: T }>;
 
-const CHECKS: { readonly [T in Title]: (f: Record<string, unknown>) => FrameOf<T> | null } = { blockfall: checkBlocksFrame, bugswarm: checkSwarmFrame };
+const CHECKS: { readonly [T in Title]: (f: Record<string, unknown>) => FrameOf<T> | null } = { blockfall: checkBlocksFrame, bugswarm: checkSwarmFrame, brickbust: checkBrickFrame };
 
 /** How many games each high-score table keeps. */
 export const SCORES_KEPT = 10;

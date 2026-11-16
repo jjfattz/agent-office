@@ -6,7 +6,8 @@ import type { ArcadeSound } from './cart';
 
 /**
  * The arcade cabinet's chip bleeps: a piece landing, lines clearing (a longer run up for more at once),
- * a shot, a bug popping or taking a hit, your ship blowing up, a wave coming in, and the game ending.
+ * a shot, a bug popping or taking a hit, your ship blowing up, a wave coming in, the ball off the
+ * paddle, a brick breaking (higher for the bricks worth more), a pill caught, and the game ending.
  */
 export function arcade(a: AudioCore, kind: ArcadeSound, lines = 1) {
   const ctx = a.ctx;
@@ -21,6 +22,9 @@ export function arcade(a: AudioCore, kind: ArcadeSound, lines = 1) {
   else if (kind === 'pop') [700, 260].forEach((f, i) => a.blip(out, t0 + i * 0.04, f, 0.4, 0.09, 0.07, 'sawtooth'));
   else if (kind === 'hurt') a.blip(out, t0, 880, 1.25, 0.06, 0.06, 'square');
   else if (kind === 'boom') [330, 220, 147, 98].forEach((f, i) => a.blip(out, t0 + i * 0.09, f, 0.6, 0.16, 0.12, 'sawtooth'));
+  else if (kind === 'bounce') a.blip(out, t0, 330, 1.5, 0.06, 0.07, 'square');
+  else if (kind === 'brick') a.blip(out, t0, [440, 494, 523, 587, 659, 740, 880, 880][Math.max(0, Math.min(7, lines - 1))], 1.03, 0.08, 0.06, 'square');
+  else if (kind === 'power') [523, 784, 1047].forEach((f, i) => a.blip(out, t0 + i * 0.05, f, 1.02, 0.07, 0.07, 'triangle'));
   else if (kind === 'wave') [392, 523, 659, 784].forEach((f, i) => a.blip(out, t0 + i * 0.08, f, 1.01, 0.09, 0.07, 'triangle'));
   else [392, 330, 262, 196].forEach((f, i) => a.blip(out, t0 + i * 0.18, f, 0.97, 0.17, 0.14, 'triangle'));
 }
