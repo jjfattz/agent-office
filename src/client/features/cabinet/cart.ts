@@ -3,8 +3,8 @@ import type { CabinetFrame, HighScore, PlayState, Title } from '../../../shared/
 // What a game on the arcade cabinet is to the cabinet (ui.ts): a cartridge for each, listed in
 // games.ts, that starts your games, says which keys they take, and paints anyone's frames of it.
 
-/** What the cabinet makes a noise about (see sound.ts); `n` is how many lines cleared at once. */
-export type ArcadeSound = 'land' | 'clear' | 'over' | 'shot' | 'pop' | 'hurt' | 'boom' | 'wave';
+/** What the cabinet makes a noise about (see sound.ts); `n` is how many lines cleared at once, or the brick that broke. */
+export type ArcadeSound = 'land' | 'clear' | 'over' | 'shot' | 'pop' | 'hurt' | 'boom' | 'wave' | 'bounce' | 'brick' | 'power';
 
 /** One of your games on the cabinet. */
 export interface CabinetGame {
