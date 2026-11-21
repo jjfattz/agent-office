@@ -38,6 +38,7 @@ export const routes: readonly Route[] = [
   serviceRoutes.forwards,
   githubRoutes.github,
   retroRoutes.shelf,
+  retroRoutes.identify,
   retroRoutes.rom,
   pageRoutes.office,
   pageRoutes.lite,

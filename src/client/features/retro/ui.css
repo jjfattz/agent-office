@@ -44,6 +44,9 @@
 /* A game's picture: its own pixels, or its console's colors with its name. */
 .retro .art { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 8px; background: #000; }
 .retro .art img { display: block; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+/* A game's box is shown whole, and smooth (it's a photo, not the game's pixels). */
+.retro .art.box { background: radial-gradient(circle at 50% 40%, #24345c, #0e1626); }
+.retro .art.box img { object-fit: contain; image-rendering: auto; padding: 4px; }
 .retro .art .blank { display: flex; flex-direction: column; justify-content: center; gap: 4px; height: 100%; padding: 8px; color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, .45); background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, .08) 0 8px, transparent 8px 16px) !important; }
 .retro .art .blank b { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; opacity: .85; }
 .retro .art .blank span { font-size: 14px; font-weight: 900; line-height: 1.15; overflow-wrap: anywhere; }
@@ -93,11 +96,13 @@
 
 /* ---- Adding games --------------------------------------------------------------------------- */
 .modal.retro-addgames { width: min(580px, 100%); }
-.retro-drop { display: flex !important; flex-direction: column; align-items: center; gap: 2px; margin: 12px 0 !important; padding: 18px; border: 3px dashed var(--ink); border-radius: 14px; background: var(--paper-2); cursor: pointer; text-align: center; }
-.retro-drop span { font-size: 12px; color: var(--muted); }
-.retro-drop.over, .retro-drop:hover { border-color: var(--accent); }
-.retro-files { margin: 0; padding: 0; list-style: none; }
+.retro-drop { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 12px 0; padding: 16px; border: 3px dashed var(--ink); border-radius: 14px; background: var(--paper-2); text-align: center; }
+.retro-drop .retro-buttons { justify-content: center; margin: 0; }
+.retro-drop span { font-size: 12px; font-weight: 700; color: var(--muted); }
+.retro-drop.over { border-color: var(--accent); }
+.retro-rest { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 8px 10px; border-radius: 12px; background: var(--warn); font-size: 13px; font-weight: 800; }
+.retro-rest select, .retro-files select { flex: none; font: inherit; font-size: 13px; padding: 3px 6px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; }
+.retro-files { max-height: min(40vh, 360px); overflow-y: auto; margin: 0; padding: 0; list-style: none; }
 .retro-files li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 2px dashed var(--paper-2); font-size: 13px; font-weight: 700; }
 .retro-files .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .retro-files .size { flex: none; color: var(--muted); font-size: 12px; }
-.retro-files select { flex: none; font: inherit; font-size: 13px; padding: 3px 6px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; }

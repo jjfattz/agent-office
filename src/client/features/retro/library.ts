@@ -16,10 +16,11 @@ export interface LibraryEvents {
   add(): void;
 }
 
-/** What the side lists: every game, the ones you played last, a console's, or the ones that came from somewhere else. */
-type Shelf = 'all' | 'recent' | 'shelf' | 'mine' | RetroSystem;
+/** What the side lists: every game, the ones you played last, a console's, or the ones from one place. */
+type Shelf = 'all' | 'recent' | Game['source'] | RetroSystem;
 
-const SOURCE_TAG = { catalog: '', shelf: '📁 Office', mine: '💾 Yours' } as const;
+/** Where a game is from, on its card. */
+const SOURCE_TAG = { catalog: '🎁', shelf: '📁', mine: '💾' } as const;
 
 export class Library {
   readonly el: HTMLElement;
@@ -64,7 +65,11 @@ export class Library {
     this.resumes = resumes;
     this.recent = recent;
     this.playing = playing;
+    // The same game stays picked out (it's a new copy of it, with more said about it).
+    const was = this.selected?.key;
+    this.selected = games.find((g) => g.key === was) ?? null;
     if (this.shelf === 'recent' && !this.recentGames().length) this.shelf = 'all';
+    if ((this.shelf === 'shelf' || this.shelf === 'mine') && !games.some((g) => g.source === this.shelf)) this.shelf = 'all';
     this.renderSide();
     this.render();
   }
@@ -108,6 +113,7 @@ export class Library {
     const recent = this.recentGames().length;
     const shelf = count((g) => g.source === 'shelf');
     const mine = count((g) => g.source === 'mine');
+    const homebrew = count((g) => g.source === 'catalog');
     const consoles = SYSTEM_IDS.map((id) => [id, count((g) => g.system === id)] as const).filter(([, n]) => n > 0);
     this.side.replaceChildren(
       ...present(
@@ -116,9 +122,10 @@ export class Library {
         recent ? item('recent', '⏱ Played lately', recent) : null,
         h('h3', {}, 'Consoles'),
         ...consoles.map(([id, n]) => item(id, RETRO_SYSTEMS[id].name, n)),
-        shelf || mine ? h('h3', {}, 'Added') : null,
+        h('h3', {}, 'Collections'),
         shelf ? item('shelf', '📁 Office shelf', shelf) : null,
         mine ? item('mine', '💾 This browser', mine) : null,
+        homebrew ? item('catalog', '🎁 Homebrew', homebrew) : null,
       ),
     );
   }
@@ -126,11 +133,11 @@ export class Library {
   /** The games the side and the search pick out. */
   private pick(): Game[] {
     const q = this.search.value.trim().toLowerCase();
-    if (q) return this.games.filter((g) => [g.title, g.by, g.genre, RETRO_SYSTEMS[g.system].name].some((s) => s?.toLowerCase().includes(q)));
+    if (q) return this.games.filter((g) => [g.title, g.file, g.by, g.publisher, g.genre, RETRO_SYSTEMS[g.system].name].some((s) => s?.toLowerCase().includes(q)));
     const s = this.shelf;
     if (s === 'all') return this.games;
     if (s === 'recent') return this.recentGames();
-    if (s === 'shelf' || s === 'mine') return this.games.filter((g) => g.source === s);
+    if (s === 'shelf' || s === 'mine' || s === 'catalog') return this.games.filter((g) => g.source === s);
     return this.games.filter((g) => g.system === s);
   }
 
@@ -147,11 +154,11 @@ export class Library {
   private card(g: Game): HTMLElement {
     const resume = this.resumes.get(g.key);
     const tag = this.playing?.key === g.key ? '⏸ Paused' : resume ? '▶ Continue' : '';
-    const sub = g.source === 'catalog' ? [g.by, g.year].filter(Boolean).join(' · ') : `${RETRO_SYSTEMS[g.system].name} · ${SOURCE_TAG[g.source]}`;
+    const sub = `${SOURCE_TAG[g.source]} ${[g.source === 'catalog' ? g.by : (g.publisher ?? g.by), g.year].filter(Boolean).join(' · ') || g.file}`;
     const el = h(
       'button.retro-card',
       { type: 'button', role: 'option', title: g.title, 'data-key': g.key },
-      h('div.art', {}, ...present(art(g), tag ? h('span.badge', {}, tag) : null, g.source === 'catalog' ? h('span.sys', {}, RETRO_SYSTEMS[g.system].name) : null)),
+      h(`div.art${g.boxart ? '.box' : ''}`, {}, ...present(art(g), tag ? h('span.badge', {}, tag) : null, h('span.sys', {}, RETRO_SYSTEMS[g.system].name))),
       h('div.name', {}, g.title),
       h('div.sub', {}, sub),
     );
@@ -209,17 +216,21 @@ export class Library {
       button('▶ Continue', '.primary', () => this.events.play(g, 'resume'));
       button('↺ Start over', '', () => this.events.play(g, 'new'));
     } else button('▶ Play', '.primary', () => this.events.play(g, 'new'));
-    const facts = [sys.name, g.year, g.genre, g.players && g.players > 1 ? `${g.players} players` : g.players ? '1 player' : ''].filter(Boolean).join(' · ');
+    const facts = [sys.name, g.region, g.year, g.genre, g.players && g.players > 1 ? `${g.players} players` : g.players ? '1 player' : ''].filter(Boolean).join(' · ');
+    const by = g.by && g.publisher && g.publisher !== g.by ? `by ${g.by} · published by ${g.publisher}` : g.by ? `by ${g.by}` : g.publisher ? `by ${g.publisher}` : '';
     const savesEl = h('div.retro-saves');
     this.info.replaceChildren(
       ...present(
-        h('div.art.big', {}, art(g)),
+        h(`div.art.big${g.boxart ? '.box' : ''}`, {}, art(g)),
         h('h2', {}, g.title),
         h('div.facts', {}, facts),
-        g.by ? h('div.by', {}, `by ${g.by}`) : null,
+        by ? h('div.by', {}, by) : null,
         g.blurb ? h('p', {}, g.blurb) : null,
         g.source === 'shelf' ? h('p.note', {}, `On the office's shelf: ${g.file}`) : null,
         g.source === 'mine' ? h('p.note', {}, `Added in this browser: ${g.file}`) : null,
+        g.source === 'catalog' ? h('p.note', {}, '🎁 Homebrew: it comes with the computer.') : null,
+        g.known === 'name' ? h('p.note', {}, 'Recognized by its file name, so this could be another version of it.') : null,
+        g.source !== 'catalog' && !g.known ? h('p.note', {}, 'Not in libretro’s list of games, so it goes by its file name.') : null,
         resume && !playing ? h('p.note', {}, `You left it ${timeAgo(resume.at)}.`) : null,
         h('div.retro-buttons', {}, ...buttons),
         savesEl,
@@ -255,13 +266,18 @@ export class Library {
   }
 }
 
-/** A game's picture, or its console's colors and its name when it has none. */
+/** A game's picture (the first of its pictures that's there), or its console's colors and its name when it has none. */
 export function art(g: Game): HTMLElement {
   const sys = RETRO_SYSTEMS[g.system];
   const blank = () => h('div.blank', { style: `background-color:${sys.color}` }, h('b', {}, sys.name), h('span', {}, g.title));
-  if (!g.art) return blank();
-  const img = h('img', { src: g.art, alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer', draggable: 'false' });
-  img.addEventListener('error', () => img.replaceWith(blank()));
+  const urls = g.art ?? [];
+  if (!urls.length) return blank();
+  let at = 0;
+  const img = h('img', { src: urls[0], alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer', draggable: 'false' });
+  img.addEventListener('error', () => {
+    if (++at < urls.length) img.src = urls[at];
+    else img.replaceWith(blank());
+  });
   return img;
 }
 
