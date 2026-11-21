@@ -443,7 +443,7 @@ export interface SeatDef {
   out: number;
   /** It faces the lounge TV: sitting down there puts whatever's being shared up on your screen. */
   tv?: boolean;
-  /** It faces the boss's monitor: E there, sitting down, plays Minesweeper on it. */
+  /** It faces the boss's monitor: E there, sitting down, plays retro games on it (see features/retro). */
   game?: boolean;
   /** Up on the rooftop bar, not in the office. */
   roof?: boolean;

@@ -1,0 +1,103 @@
+/* The boss's computer (features/retro): its library and its game, right over the monitor's screen.
+   The window itself is the shared .arcade frame (styles/hud.css): the bar under the screen, the ✕ off its corner. */
+.arcade.retro { --rs-bg: #0b1320; --rs-panel: #131d33; --rs-card: #1a2642; --rs-line: #2a3a63; --rs-text: #e8ecf8; --rs-dim: #8f9bc0; }
+.arcade.retro.dropping .retro-screen { outline: 4px dashed var(--warn); outline-offset: 4px; }
+.retro .arcade-bar { max-width: calc(100vw - 32px); }
+.retro .arcade-bar .tip { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.retro .arcade-bar .btn { padding: 4px 10px; font-size: 13px; }
+.retro-screen { position: relative; color: var(--rs-text); background: var(--rs-bg); container-type: size; }
+
+/* The emulator's frame lives on the page, not in the window (see player.ts), laid over the screen while you play. */
+.retro-host { position: fixed; z-index: 51; visibility: hidden; background: #000; }
+.retro-host iframe { display: block; width: 100%; height: 100%; border: 0; background: #000; }
+
+/* ---- The library ---------------------------------------------------------------------------- */
+.retro-lib { display: grid; grid-template-columns: minmax(128px, 17%) minmax(0, 1fr) minmax(190px, 27%); height: 100%; }
+.retro-screen.playing .retro-lib { display: none; }
+.retro-side { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; overflow-y: auto; background: var(--rs-panel); border-right: 2px solid var(--rs-line); }
+.retro-brand { padding: 2px 8px 10px; font-weight: 900; font-size: 20px; letter-spacing: .04em; color: var(--accent); text-shadow: 0 3px 0 #000; }
+.retro-brand small { display: block; font-size: 11px; letter-spacing: .12em; color: var(--rs-dim); text-transform: uppercase; text-shadow: none; }
+.retro-side h3 { margin: 12px 8px 4px; font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--rs-dim); }
+.retro-nav { display: flex; align-items: center; gap: 6px; padding: 5px 8px; font: inherit; font-size: 13px; font-weight: 800; color: var(--rs-text); background: none; border: 0; border-radius: 8px; cursor: pointer; text-align: left; }
+.retro-nav span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.retro-nav .n { font-size: 11px; color: var(--rs-dim); }
+.retro-nav:hover { background: var(--rs-card); }
+.retro-nav.sel { background: var(--accent); color: #fff; }
+.retro-nav.sel .n { color: #fff; }
+
+.retro-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.retro-top { display: flex; gap: 8px; padding: 10px 12px; border-bottom: 2px solid var(--rs-line); }
+.retro-top input { flex: 1; min-width: 0; font: inherit; font-size: 14px; font-weight: 700; color: var(--rs-text); background: var(--rs-card); border: 2px solid var(--rs-line); border-radius: 10px; padding: 6px 10px; outline: none; }
+.retro-top input:focus { border-color: var(--accent); }
+.retro-top input::placeholder { color: var(--rs-dim); }
+.retro-add { flex: none; padding: 4px 10px; font-size: 13px; }
+.retro-grid { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); align-content: start; gap: 12px; padding: 12px; overflow-y: auto; scrollbar-color: var(--rs-line) transparent; }
+.retro-empty { grid-column: 1 / -1; margin: 24px 0; text-align: center; font-weight: 800; color: var(--rs-dim); }
+
+.retro-card { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 6px; font: inherit; text-align: left; color: var(--rs-text); background: var(--rs-card); border: 2px solid transparent; border-radius: 12px; cursor: pointer; }
+.retro-card:hover { border-color: var(--rs-line); }
+.retro-card.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.retro-card:focus-visible { outline: 2px solid var(--warn); outline-offset: 2px; }
+.retro-card .name { font-size: 13px; font-weight: 900; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.retro-card .sub { font-size: 11px; font-weight: 700; color: var(--rs-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* A game's picture: its own pixels, or its console's colors with its name. */
+.retro .art { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 8px; background: #000; }
+.retro .art img { display: block; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+.retro .art .blank { display: flex; flex-direction: column; justify-content: center; gap: 4px; height: 100%; padding: 8px; color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, .45); background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, .08) 0 8px, transparent 8px 16px) !important; }
+.retro .art .blank b { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; opacity: .85; }
+.retro .art .blank span { font-size: 14px; font-weight: 900; line-height: 1.15; overflow-wrap: anywhere; }
+.retro .art .badge { position: absolute; top: 5px; left: 5px; padding: 1px 7px; font-size: 10px; font-weight: 900; color: var(--ink); background: var(--warn); border-radius: 99px; }
+.retro .art .sys { position: absolute; right: 5px; bottom: 5px; padding: 1px 6px; font-size: 9px; font-weight: 900; letter-spacing: .04em; color: #fff; background: rgba(11, 19, 32, .82); border-radius: 6px; }
+
+/* What you picked out. */
+.retro-info { display: flex; flex-direction: column; gap: 6px; padding: 12px; overflow-y: auto; background: var(--rs-panel); border-left: 2px solid var(--rs-line); scrollbar-color: var(--rs-line) transparent; }
+.retro-info .art.big { flex: none; border: 2px solid var(--rs-line); }
+.retro-info h2 { margin: 4px 0 0; font-size: 18px; font-weight: 900; line-height: 1.15; }
+.retro-info .facts { font-size: 12px; font-weight: 800; color: var(--warn); }
+.retro-info .by { font-size: 12px; font-weight: 700; color: var(--rs-dim); }
+.retro-info p { margin: 2px 0; font-size: 13px; font-weight: 600; line-height: 1.4; }
+.retro-info p.note { font-size: 12px; color: var(--rs-dim); overflow-wrap: anywhere; }
+.retro-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.retro-buttons .btn { padding: 5px 12px; font-size: 14px; }
+.retro-saves h3 { margin: 10px 0 6px; font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--rs-dim); }
+.retro-save { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.retro-save .thumb { width: 56px; aspect-ratio: 4 / 3; flex: none; object-fit: cover; image-rendering: pixelated; border-radius: 4px; background: #000; }
+.retro-save .btn { padding: 2px 8px; font-size: 12px; border-width: 2px; box-shadow: 0 2px 0 var(--ink); }
+.retro-save .btn:first-of-type { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.retro-remove { align-self: flex-start; margin-top: 10px; padding: 3px 10px; font-size: 12px; }
+
+/* ---- Playing -------------------------------------------------------------------------------- */
+.retro-area { position: absolute; inset: 0; display: none; background: #000; }
+.retro-screen.playing .retro-area { display: block; }
+/* Over the game: loading, a game that wouldn't start, your saves. The game's frame steps aside for it. */
+.retro-panel { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; padding: 16px; overflow-y: auto; background: rgba(11, 19, 32, .96); }
+.retro-loading { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 460px; text-align: center; }
+.retro-loading b { font-size: 20px; font-weight: 900; }
+.retro-loading span { font-size: 13px; font-weight: 700; color: var(--rs-dim); }
+.retro-loading .spinner { width: 34px; height: 34px; border-width: 4px; border-color: rgba(255, 255, 255, .15); border-top-color: var(--accent); }
+.retro-saves-panel { width: min(100%, 640px); text-align: center; }
+.retro-saves-panel h2 { margin: 0 0 12px; font-size: 18px; font-weight: 900; }
+.retro-saves-panel p { font-weight: 700; color: var(--rs-dim); }
+.retro-saves-panel .retro-buttons { justify-content: center; margin-top: 14px; }
+.retro-save-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 170px)); justify-content: center; gap: 10px; }
+.retro-save-pick { display: flex; flex-direction: column; gap: 4px; padding: 6px; font: inherit; font-size: 12px; font-weight: 800; color: var(--rs-text); background: var(--rs-card); border: 2px solid var(--rs-line); border-radius: 10px; cursor: pointer; }
+.retro-save-pick:hover { border-color: var(--accent); }
+.retro-save-pick .thumb { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; image-rendering: pixelated; border-radius: 6px; background: #000; }
+
+/* A small screen: the details go, and the side gets narrower. */
+@container (max-width: 760px) {
+  .retro-lib { grid-template-columns: minmax(110px, 22%) minmax(0, 1fr); }
+  .retro-info { display: none; }
+}
+
+/* ---- Adding games --------------------------------------------------------------------------- */
+.modal.retro-addgames { width: min(580px, 100%); }
+.retro-drop { display: flex !important; flex-direction: column; align-items: center; gap: 2px; margin: 12px 0 !important; padding: 18px; border: 3px dashed var(--ink); border-radius: 14px; background: var(--paper-2); cursor: pointer; text-align: center; }
+.retro-drop span { font-size: 12px; color: var(--muted); }
+.retro-drop.over, .retro-drop:hover { border-color: var(--accent); }
+.retro-files { margin: 0; padding: 0; list-style: none; }
+.retro-files li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 2px dashed var(--paper-2); font-size: 13px; font-weight: 700; }
+.retro-files .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.retro-files .size { flex: none; color: var(--muted); font-size: 12px; }
+.retro-files select { flex: none; font: inherit; font-size: 13px; padding: 3px 6px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; }

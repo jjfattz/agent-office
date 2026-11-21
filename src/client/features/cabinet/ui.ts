@@ -4,7 +4,7 @@ import type { WorkerInfo } from '../../../shared/protocol';
 import type { Net } from '../../net';
 import { store } from '../../state';
 import { h, openModal, toast, type Modal } from '../../ui/dom';
-import { ScreenZoom } from '../arcade/ui';
+import { ScreenZoom } from '../../core/screen-zoom';
 import type { ArcadeSound, CabinetGame, ScreenView } from './cart';
 import { CARTS, cartOf } from './games';
 import { cardAt, paintAttract, paintMenu, type ChoiceView, type MenuView } from './menu';
