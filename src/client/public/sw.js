@@ -6,7 +6,7 @@
 //   behind sign-in, and no API answer, ever. Everything else goes straight to the network.
 // - A push from the office (server/push/) shows as a notification, even with the office closed.
 // - Tapping one opens the 2D view on that worker; its buttons (Android) answer the worker there and then.
-const CACHE = 'office-shell-v1';
+const CACHE = 'office-shell-v2';
 const SHELL = ['/offline.html', '/favicon.svg', '/icons/icon-192.png', '/icons/badge-96.png'];
 const APP_PAGES = new Set(['/lite', '/lite.html']);
 /** A page that hasn't answered by then is taken for an office that can't be reached. */
