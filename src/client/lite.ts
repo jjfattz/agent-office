@@ -33,6 +33,7 @@ import { openNotify } from './push/window';
 import { installHint } from './pwa/install';
 import { keepSignedIn } from './pwa/session';
 import { repoChoices } from './shared/hiring';
+import { askSendHome } from './shared/send-home';
 // The tab title counts the workers waiting on someone, on every floor, as the 3D office's does.
 import { renderTitle } from './shared/title';
 
@@ -182,7 +183,13 @@ function openWorker(id: string) {
     if (!w.sessionId && w.kind !== 'shell') toast(`${w.name} has no saved session — starting a fresh one`, 'warn');
     net.send({ t: 'worker.resume', workerId: id });
   }
-  openTerminal(net, id, () => openChanges(net, id, () => openWorker(id)), undefined, { keypad: true });
+  openTerminal(net, id, () => openChanges(net, id, () => openWorker(id)), undefined, { keypad: true, sendHome: () => sendHome(id) });
+}
+
+/** 🏠 on its card or in its terminal: asks what becomes of its worktree, then sends it home. */
+function sendHome(id: string) {
+  const w = store.workers.get(id);
+  if (w) askSendHome(net, w, DESK_BY_ID.get(w.deskId));
 }
 
 /** Its worktree was deleted outside agent-office: put it back (everyone's who lost theirs), or send it home. */
@@ -232,6 +239,7 @@ const cardActions: CardActions = {
   prompt: (id) => promptWorker(id),
   answer: (id, key) => net.send({ t: 'worker.answer', workerId: id, key }),
   pr: (id) => openPr(id),
+  home: (id) => sendHome(id),
 };
 
 /** A worker's pull request: its window, if the board has it, or GitHub's page. */

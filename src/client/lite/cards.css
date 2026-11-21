@@ -1,4 +1,4 @@
-/* What a worker card in the 2D view asks of you (lite/cards.ts): its choices as buttons, or ✍️ Reply and its PR. */
+/* What a worker card in the 2D view asks of you (lite/cards.ts): its choices as buttons, or ✍️ Reply, its PR and 🏠. */
 .lite-worker { flex-wrap: wrap; }
 .lite-worker > .lite-card { flex: 1 1 0; }
 .lite-answers, .lite-actions { flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: 8px; padding: 0 12px 12px 38px; }
@@ -8,4 +8,6 @@
 .lite-answers .btn:disabled:not(.sent) { opacity: .45; }
 .lite-key { flex: none; display: inline-grid; place-items: center; min-width: 24px; height: 24px; border: 2px solid currentColor; border-radius: 8px; font-size: 13px; font-weight: 900; font-variant-numeric: tabular-nums; }
 .lite-actions .btn { flex: 1 1 0; justify-content: center; }
+/* 🏠 on its own is just the icon, beside ✍️ Reply and the PR. */
+.lite-actions .btn.lite-home:not(:only-child) { flex: 0 0 auto; min-width: 52px; }
 @media (max-width: 380px) { .lite-answers, .lite-actions { padding-left: 12px; } }

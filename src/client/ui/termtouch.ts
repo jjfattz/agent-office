@@ -1,6 +1,7 @@
 // A worker's terminal on a phone (the 2D view's keypad terminal, see TerminalOptions.keypad): A− and
-// A+ for a font size you can read, kept for next time; scrolling back with one finger; and holding a
-// finger on a line to select it, with a 📋 Copy that copies it (or the whole screen).
+// A+ for a font size you can read, kept for next time; scrolling back with one finger, in a shell and in
+// a program that takes the whole screen, like Claude Code; and holding a finger on a line to select it,
+// with a 📋 Copy that copies it (or the whole screen).
 import type { Terminal } from '@xterm/xterm';
 import { h, toast } from './dom';
 
@@ -75,6 +76,18 @@ export function termTouch(term: Terminal, host: HTMLElement, keys: HTMLElement, 
     return row >= 0 && row < term.rows ? term.buffer.active.viewportY + row : undefined;
   };
 
+  /**
+   * A program that takes the whole screen (Claude Code, vim, less) is in the alternate buffer, which
+   * has no scrollback of xterm's own to move: it scrolls its own view, by the mouse wheel. So the finger
+   * turns the wheel there, a notch a line, and xterm.js sends the program each notch as a wheel report
+   * where it asked for the mouse (Claude Code does) or as ↑ / ↓ where it didn't, as a mouse's wheel does.
+   */
+  const wheel = (screen: Element, lines: number, at: Touch) => {
+    for (let i = 0; i < Math.abs(lines); i++) {
+      screen.dispatchEvent(new WheelEvent('wheel', { deltaY: Math.sign(lines), deltaMode: WheelEvent.DOM_DELTA_LINE, clientX: at.clientX, clientY: at.clientY, bubbles: true, cancelable: true }));
+    }
+  };
+
   let startY = 0;
   let lastY = 0;
   let moved = false;
@@ -109,13 +122,14 @@ export function termTouch(term: Terminal, host: HTMLElement, keys: HTMLElement, 
         clearTimeout(hold);
       }
       // Scrolling back through what it printed, a line at a time as the finger goes.
-      if (term.buffer.active.type !== 'normal') return;
-      const cell = (host.querySelector('.xterm-screen')?.getBoundingClientRect().height ?? 0) / term.rows || 16;
+      const screen = host.querySelector('.xterm-screen');
+      const cell = (screen?.getBoundingClientRect().height ?? 0) / term.rows || 16;
       carry += (lastY - y) / cell;
       lastY = y;
       const lines = Math.trunc(carry);
       if (lines) {
-        term.scrollLines(lines);
+        if (term.buffer.active.type === 'normal') term.scrollLines(lines);
+        else if (screen) wheel(screen, lines, e.touches[0]);
         carry -= lines;
       }
       e.preventDefault();
