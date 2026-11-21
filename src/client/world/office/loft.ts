@@ -94,6 +94,8 @@ export function buildLoft(group: THREE.Group, colliders: Collider[], interactabl
   profile.lineTo(toX - fromX, 0);
   profile.closePath();
   const stairs = mesh(new THREE.ExtrudeGeometry(profile, { depth: sw, bevelEnabled: false }), wallMat, fromX, 0, STAIRS.minZ);
+  // Its tall plain side faces away from the sun and would shimmer with shadow acne up close (by the skeeball machine).
+  stairs.receiveShadow = false;
   group.add(stairs);
   for (let i = 1; i <= steps; i++) {
     group.add(mesh(box(run + 0.04, 0.06, sw), woodMat, fromX + (i - 0.5) * run - 0.02, i * rise - 0.03, STAIRS.minZ + sw / 2, false));

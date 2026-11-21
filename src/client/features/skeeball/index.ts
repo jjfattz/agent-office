@@ -4,7 +4,7 @@
  * kept in this browser.
  */
 import * as THREE from 'three';
-import { BALLS, LANE, roll, type Outcome } from '../../../shared/skeeball';
+import { BALLS, roll, type RollEvent } from '../../../shared/skeeball';
 import type { Ctx, Hint } from '../../core/context';
 import { aside, hintTitle, key, onE } from '../../core/hint';
 import { DESK_KEYS } from '../../interaction';
@@ -76,8 +76,9 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
 
   const roller = new Roller(ctx.player, ctx.camera, ctx.canvas, {
     roll: (aim, power, n) => {
-      ctx.net.send({ t: 'skeeball', aim, power, n });
-      rollHere(store.you, aim, power, n);
+      const points = roll(aim, power).outcome.points;
+      ctx.net.send({ t: 'skeeball', aim, power, n, points });
+      rollHere(store.you, aim, power, n, points);
     },
     done: () => ctx.hint.invalidate(),
   });
@@ -98,7 +99,13 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
     takesCamera: true,
     hidesHands: true,
   });
-  ctx.view.add({ fov: (fov) => (roller.active ? roller.fov : fov) });
+  ctx.view.add({
+    fov: (fov) => (roller.active ? roller.fov : fov),
+    // At the machine the camera's just over your head, looking up the lane: you're out of its way (everyone else still sees you there).
+    update: () => {
+      if (roller.active) ctx.me.root.visible = false;
+    },
+  });
 
   /** Someone else's game under way at the machine, if there is one: whose. */
   function playing(): string | null {
@@ -133,8 +140,11 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
   });
 
   const at = new THREE.Vector3();
-  /** A ball rolled at the machine, by you or anyone else on the floor: up the lane, into a ring, and onto the display. */
-  function rollHere(by: string, aim: number, power: number, n: number) {
+  /**
+   * A ball rolled at the machine, by you or anyone else on the floor: up the lane, into a ring, and
+   * onto the display. It counts `points`, what it scored for whoever rolled it.
+   */
+  function rollHere(by: string, aim: number, power: number, n: number, points: number) {
     const m = machine();
     if (!m) return;
     const mine = by === store.you;
@@ -149,29 +159,33 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
     idleAt = 0;
     m.setTrough(BALLS - it.rolled);
     m.display({ kind: 'game', name: it.name, color: it.color, score: it.score, ball: n });
-    const { path, outcome } = roll(aim, power);
-    const hump = path.findIndex((p) => p.s >= LANE.hump.s);
-    ctx.sound.skeeball('roll', m.toWorld(0.6, 0, 0.8, at), 0, hump > 0 ? path[hump].t : path[path.length - 1].t);
-    m.launch(path, {
-      hop: () => ctx.sound.skeeball('hop', m.toWorld(LANE.hump.s, 0, LANE.hump.y, at)),
-      drop: () => dropped(m, it, outcome, mine),
-    });
+    const { path, events, outcome } = roll(aim, power);
+    const hop = events.find((e) => e.kind === 'hop');
+    ctx.sound.skeeball('roll', m.toWorld(0.6, 0, 0.8, at), 0, hop?.t ?? path[path.length - 1].t);
+    m.launch(path, events, sound, () => dropped(m, it, points, points === outcome.points ? outcome.label : String(points), mine));
+  }
+
+  /** What the ball sounds like as it goes: off the hump, onto the target, off a lip or a rail. */
+  function sound(e: RollEvent, where: THREE.Vector3) {
+    if (e.kind === 'hop') ctx.sound.skeeball('hop', where);
+    else if (e.kind === 'land' || e.kind === 'back') ctx.sound.skeeball('thud', where, e.speed);
+    else if (e.kind === 'lip' || e.kind === 'rail') ctx.sound.skeeball('click', where, e.speed);
+    else ctx.sound.skeeball('drop', where);
   }
 
   /** A ball went down its hole: its points on the board, and the game over after the last one. */
-  function dropped(m: SkeeballMachine, it: Game, outcome: Outcome, mine: boolean) {
+  function dropped(m: SkeeballMachine, it: Game, points: number, label: string, mine: boolean) {
     const where = m.toWorld(2.8, 0, 1.2, at);
-    ctx.sound.skeeball('drop', where);
     // Somebody else's game started while this was on its way: it doesn't count on theirs.
     if (game !== it || it.dropped >= BALLS) return;
     it.dropped++;
-    it.score += outcome.points;
-    if (outcome.points) {
-      ctx.sound.skeeball(outcome.points === 100 ? 'jackpot' : 'score', where, outcome.points);
-      m.flash(outcome.points === 100 ? '100!' : `+${outcome.points}`, outcome.points >= 50 ? '#ef476f' : '#118ab2', outcome.points >= 50);
-    } else m.flash('Too soft', '#6c757d', false);
+    it.score += points;
+    if (points) {
+      ctx.sound.skeeball(points === 100 ? 'jackpot' : 'score', where, points);
+      m.flash(points, points === 100 ? '100!' : `+${points}`, points === 100 ? '#ffbe0b' : points >= 50 ? '#ff3d7f' : '#3a86ff');
+    } else m.flash(0, 'Too soft', '#6c757d');
     const over = it.dropped === BALLS;
-    if (mine) roller.setInfo(`${outcome.label} · ${it.score} so far`);
+    if (mine) roller.setInfo(`${label} · ${it.score} so far`);
     if (!over) {
       m.display({ kind: 'game', name: it.name, color: it.color, score: it.score, ball: Math.min(BALLS, it.rolled + 1) });
       return;
@@ -206,7 +220,7 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
   ctx.messages.on('skeeball', (msg) => {
     const p = store.peers.get(msg.id);
     if (!p || !store.onMyFloor(p)) return;
-    rollHere(msg.id, msg.aim, msg.power, msg.n);
+    rollHere(msg.id, msg.aim, msg.power, msg.n, msg.points);
   });
 
   ctx.ticks.add('play', ({ dt }) => {

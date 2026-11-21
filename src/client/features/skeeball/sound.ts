@@ -4,12 +4,13 @@ import type { Pos } from '../../sound/places';
 
 // ---- The skeeball machine -----------------------------------------------------------------------
 
-export type SkeeballSound = 'roll' | 'hop' | 'drop' | 'score' | 'jackpot';
+export type SkeeballSound = 'roll' | 'hop' | 'thud' | 'click' | 'drop' | 'score' | 'jackpot';
 
 /**
  * The skeeball machine, from where it happens: a ball rumbling up the wooden lane for `len` seconds,
- * its knock off the hump, its clunk down a hole, and the machine's chime for what it scored (a
- * rising run of notes, more of them for more `points`, and a bell for the 100).
+ * its knock off the hump, its thud onto the target or the back wall and its click off a ring's lip
+ * or a rail (`points` is how hard, in m/s, for those), its clunk down a hole, and the machine's chime
+ * for what it scored (a rising run of notes, more of them for more `points`, and a bell for the 100).
  */
 export function skeeball(a: AudioCore, kind: SkeeballSound, at: Pos, points = 0, len = 1) {
   const ctx = a.ctx;
@@ -34,6 +35,14 @@ export function skeeball(a: AudioCore, kind: SkeeballSound, at: Pos, points = 0,
   } else if (kind === 'hop') {
     a.play(pick(a.buf.steps), { gain: 0.45, rate: rand(1.3, 1.5), dest: out });
     a.blip(out, t0, 190, 0.7, 0.1, 0.12);
+  } else if (kind === 'thud') {
+    const loud = Math.min(1, points / 4);
+    a.play(pick(a.buf.steps), { gain: 0.15 + 0.4 * loud, rate: rand(0.9, 1.1), dest: out });
+    a.blip(out, t0, 120, 0.6, 0.09, 0.04 + 0.08 * loud);
+  } else if (kind === 'click') {
+    const loud = Math.min(1, points / 2);
+    a.blip(out, t0, rand(900, 1200), 0.8, 0.04, 0.03 + 0.07 * loud, 'triangle');
+    a.play(pick(a.buf.steps), { gain: 0.1 + 0.2 * loud, rate: rand(2, 2.4), dest: out });
   } else if (kind === 'drop') {
     // Into the hole and down the chute, knocking as it goes.
     for (let i = 0; i < 3; i++) a.play(pick(a.buf.steps), { gain: 0.35 - i * 0.08, rate: rand(1.6, 1.9), when: t0 + i * 0.09, dest: out });

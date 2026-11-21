@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AIM_MAX, BALLS, CORNERS, LANE, RINGS, SKEEBALL, fold, pathAt, roll, rollOk, scoreAt } from '../src/shared/skeeball.js';
+import { AIM_MAX, BALLS, CORNERS, LANE, RINGS, SKEEBALL, laneY, onFace, pathAt, roll, rollOk, scoreAt } from '../src/shared/skeeball.js';
 import { MEETING_ROOM, SPAWN, STAIRS } from '../src/shared/layout.js';
 import { route, walkable } from '../src/shared/nav.js';
 
@@ -20,74 +20,98 @@ test('skeeball: you can walk up to its front, and nobody walks through it', () =
 });
 
 test('skeeball: the target scores each ring, the corner pockets, and the 10 round them', () => {
-  assert.equal(scoreAt(RINGS.d, 0).points, 50);
+  assert.equal(scoreAt(RINGS.d, 0), 50);
   const [[r50], [r40], [r30], [r20]] = RINGS.bands;
-  assert.equal(scoreAt(RINGS.d + (r50 + r40) / 2, 0).points, 40);
-  assert.equal(scoreAt(RINGS.d - (r40 + r30) / 2, 0).points, 30);
-  assert.equal(scoreAt(RINGS.d, (r30 + r20) / 2).points, 20);
-  assert.equal(scoreAt(CORNERS.d, -CORNERS.u).points, 100);
-  assert.equal(scoreAt(CORNERS.d, CORNERS.u).points, 100);
-  assert.equal(scoreAt(0.05, 0.2).points, 10);
-  assert.equal(scoreAt(-0.1, 0).points, 10, 'short of the face drops into the 10');
-  assert.equal(scoreAt(LANE.face.long + 0.1, 0).points, 10, 'over the top comes back down into the 10');
+  assert.equal(scoreAt(RINGS.d + (r50 + r40) / 2, 0), 40);
+  assert.equal(scoreAt(RINGS.d - (r40 + r30) / 2, 0), 30);
+  assert.equal(scoreAt(RINGS.d, (r30 + r20) / 2), 20);
+  assert.equal(scoreAt(CORNERS.d, -CORNERS.u), 100);
+  assert.equal(scoreAt(CORNERS.d, CORNERS.u), 100);
+  assert.equal(scoreAt(0.05, 0.3), 10);
 });
 
-test('skeeball: too soft rolls back for nothing; harder rolls land further up the face', () => {
-  assert.deepEqual([roll(0, 0).outcome.points, roll(0, 0).outcome.label], [0, 'Too soft']);
+test('skeeball: the lane climbs smoothly into the hump', () => {
   let last = -Infinity;
-  for (let p = 0.1; p <= 1; p += 0.1) {
-    const { outcome } = roll(0, p);
-    assert.ok(outcome.land, `${p.toFixed(1)} gets over the hump`);
-    assert.ok(outcome.land.d > last, `${p.toFixed(1)} lands further up than a softer roll`);
-    last = outcome.land.d;
+  for (let s = LANE.start.s; s <= LANE.hump.s; s += 0.01) {
+    const y = laneY(s);
+    assert.ok(y >= last, `it never dips (at ${s.toFixed(2)})`);
+    last = y;
   }
+  assert.ok(Math.abs(laneY(LANE.foot.s) - LANE.foot.y) < 1e-9 && Math.abs(laneY(LANE.hump.s) - LANE.hump.y) < 1e-9);
 });
 
-test('skeeball: every score is reachable, straight up for the 50 and into a corner for the 100', () => {
+test('skeeball: too soft rolls back for nothing; straight up the middle, harder climbs the rings in turn', () => {
+  assert.deepEqual([roll(0, 0).outcome.points, roll(0, 0).outcome.label], [0, 'Too soft']);
+  // Up the middle: 10s short, then each ring further up, to the 50.
+  const seen: number[] = [];
+  for (let p = 0.12; p <= 0.6; p += 0.02) {
+    const pts = roll(0, p).outcome.points;
+    if (seen[seen.length - 1] !== pts) seen.push(pts);
+  }
+  assert.deepEqual(seen, [10, 20, 30, 40, 50]);
+});
+
+test('skeeball: every score can be had, the 100s only near the edges', () => {
   const seen = new Set<number>();
-  for (let a = -AIM_MAX; a <= AIM_MAX + 1e-9; a += AIM_MAX / 20) for (let p = 0; p <= 1; p += 0.01) seen.add(roll(a, p).outcome.points);
+  const hundreds: number[] = [];
+  for (let a = -AIM_MAX; a <= AIM_MAX + 1e-9; a += AIM_MAX / 15)
+    for (let p = 0; p <= 1; p += 0.02) {
+      const pts = roll(a, p).outcome.points;
+      seen.add(pts);
+      if (pts === 100) hundreds.push(a);
+    }
   assert.deepEqual([...seen].sort((x, y) => x - y), [0, 10, 20, 30, 40, 50, 100]);
-  assert.ok([0.42, 0.46, 0.5].every((p) => roll(0, p).outcome.points === 50));
-  assert.ok(roll(AIM_MAX * 0.85, 0.96).outcome.points === 100 && roll(-AIM_MAX * 0.85, 0.96).outcome.points === 100);
+  assert.ok(hundreds.every((a) => Math.abs(a) > 0.15), 'no 100 from aiming at the middle');
+  assert.ok(hundreds.some((a) => a < 0) && hundreds.some((a) => a > 0), 'both corners');
 });
 
-test('skeeball: a roll works out the same every time, and its path stays inside the machine', () => {
+test('skeeball: a roll works out the same every time, stays inside the machine, and drops in its hole', () => {
   for (const [a, p] of [
-    [0, 0.5],
-    [0.08, 0.9],
-    [-0.1, 0.2],
+    [0, 0.55],
+    [0.25, 0.9],
+    [-0.29, 0.6],
+    [0.1, 0.3],
+    [0, 1],
     [0.03, 0.02],
   ]) {
     const one = roll(a, p);
     assert.deepEqual(roll(a, p), one);
     for (const pt of one.path) {
-      assert.ok(pt.s >= 0 && pt.s <= LANE.length, `s ${pt.s} is inside the machine`);
+      assert.ok(pt.s >= 0 && pt.s <= LANE.back, `s ${pt.s} is inside the machine`);
       assert.ok(Math.abs(pt.u) <= LANE.inner / 2, `u ${pt.u} is between the rails`);
+      assert.ok(pt.y > 0.4 && pt.y < 2.1, `y ${pt.y} is inside the machine`);
     }
     for (let i = 1; i < one.path.length; i++) assert.ok(one.path[i].t > one.path[i - 1].t);
     const mid = one.path[Math.floor(one.path.length / 2)];
     assert.deepEqual(pathAt(one.path, mid.t), mid);
+    assert.ok(one.path[one.path.length - 1].t < 6.5, 'it is all over in a few seconds');
+    const { hole, points } = one.outcome;
+    if (hole.d >= 0) assert.equal(scoreAt(hole.d, hole.u), points, `${points} drops in its own hole`);
   }
 });
 
-test('skeeball: a ball bounces off the rails', () => {
-  assert.ok(Math.abs(fold(0.1, 0.25) - 0.1) < 1e-9);
-  assert.ok(Math.abs(fold(0.3, 0.25) - 0.2) < 1e-9);
-  assert.ok(Math.abs(fold(-0.3, 0.25) + 0.2) < 1e-9);
+test('skeeball: the ball goes over the hump before it lands on the target, and you hear it', () => {
+  const { events } = roll(0, 0.55);
+  const kinds = events.map((e) => e.kind);
+  assert.ok(kinds.indexOf('hop') >= 0 && kinds.indexOf('hop') < kinds.indexOf('land'));
+  assert.equal(kinds[kinds.length - 1], 'drop');
+  assert.ok(onFace(1, 0).y > onFace(0, 0).y, 'the target leans back');
 });
 
 test('skeeball: only a roll anybody could have rolled goes on to the floor', () => {
-  assert.ok(rollOk({ aim: 0, power: 0.5, n: 1 }));
-  assert.ok(rollOk({ aim: -AIM_MAX, power: 1, n: BALLS }));
+  assert.ok(rollOk({ aim: 0, power: 0.5, n: 1, points: 50 }));
+  assert.ok(rollOk({ aim: -AIM_MAX, power: 1, n: BALLS, points: 0 }));
   for (const bad of [
-    { aim: AIM_MAX * 2, power: 0.5, n: 1 },
-    { aim: 0, power: 1.5, n: 1 },
-    { aim: 0, power: -0.1, n: 1 },
-    { aim: 0, power: 0.5, n: 0 },
-    { aim: 0, power: 0.5, n: BALLS + 1 },
-    { aim: 0, power: 0.5, n: 1.5 },
-    { aim: Number.NaN, power: 0.5, n: 1 },
-    { aim: '0', power: 0.5, n: 1 },
+    { aim: AIM_MAX * 2, power: 0.5, n: 1, points: 10 },
+    { aim: 0, power: 1.5, n: 1, points: 10 },
+    { aim: 0, power: -0.1, n: 1, points: 10 },
+    { aim: 0, power: 0.5, n: 0, points: 10 },
+    { aim: 0, power: 0.5, n: BALLS + 1, points: 10 },
+    { aim: 0, power: 0.5, n: 1.5, points: 10 },
+    { aim: Number.NaN, power: 0.5, n: 1, points: 10 },
+    { aim: '0', power: 0.5, n: 1, points: 10 },
+    { aim: 0, power: 0.5, n: 1, points: 60 },
+    { aim: 0, power: 0.5, n: 1 },
   ])
-    assert.ok(!rollOk(bad), JSON.stringify(bad));
+    assert.ok(!rollOk(bad as never), JSON.stringify(bad));
 });
