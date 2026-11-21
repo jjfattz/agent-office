@@ -11,6 +11,7 @@ import { DESK_KEYS } from '../../interaction';
 import { store } from '../../state';
 import { clip, h, toast } from '../../ui/dom';
 import { Roller } from './controller';
+import { SPEAKER, TROUGH } from './sound';
 import type { SkeeballMachine } from './world';
 
 // The kinds of thing you can use that this defines (see InteractKinds in world/types.ts).
@@ -67,6 +68,8 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
   let game: Game | null = null;
   /** When the display goes back to inviting you (performance.now()), once a game's over. */
   let idleAt = 0;
+  /** You stepped up and the coin's in: your first roll starts a game without another. */
+  let coined = false;
 
   /** The machine, if the floor you're on has one (the office's own map does; the castle doesn't). */
   function machine(): SkeeballMachine | null {
@@ -123,7 +126,8 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
     ctx.activities.stopAll('start');
     deps.stopWalking();
     roller.start(m);
-    m.setTrough(BALLS);
+    newBalls(m, BALLS);
+    coined = true;
     m.display({ kind: 'game', name: store.profile.name, color: store.profile.color, score: 0, ball: 1 });
   }
 
@@ -140,6 +144,15 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
   });
 
   const at = new THREE.Vector3();
+
+  /** The coin goes in and the machine lets go of `n` balls, which rattle down into the trough. */
+  function newBalls(m: SkeeballMachine, n: number) {
+    ctx.sound.skeeball('coin', SPEAKER);
+    ctx.sound.skeeball('release', TROUGH);
+    m.setTrough(0);
+    m.setTrough(n);
+  }
+
   /**
    * A ball rolled at the machine, by you or anyone else on the floor: up the lane, into a ring, and
    * onto the display. It counts `points`, what it scored for whoever rolled it.
@@ -152,6 +165,9 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
     // A new game (or somebody else's): the last one's over.
     if (n === 1 || !game || game.by !== by) {
       game = { by, name: mine ? store.profile.name : (peer?.name ?? 'Someone'), color: mine ? store.profile.color : (peer?.color ?? '#8ecae6'), rolled: 0, dropped: 0, score: 0, at: 0 };
+      // Stepping up put the coin in for your first game; any other game puts in one of its own.
+      if (!(mine && coined)) newBalls(m, BALLS);
+      coined = false;
     }
     const it = game;
     it.rolled = Math.max(it.rolled, n);
@@ -183,7 +199,10 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
     if (points) {
       ctx.sound.skeeball(points === 100 ? 'jackpot' : 'score', where, points);
       m.flash(points, points === 100 ? '100!' : `+${points}`, points === 100 ? '#ffbe0b' : points >= 50 ? '#ff3d7f' : '#3a86ff');
-    } else m.flash(0, 'Too soft', '#6c757d');
+    } else {
+      ctx.sound.skeeball('gutter', SPEAKER);
+      m.flash(0, 'Too soft', '#6c757d');
+    }
     const over = it.dropped === BALLS;
     if (mine) roller.setInfo(`${label} · ${it.score} so far`);
     if (!over) {
@@ -197,6 +216,11 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
     const beat = mine && (best === null || it.score > best);
     m.display({ kind: 'over', name: it.name, color: it.color, score: it.score, best: beat });
     idleAt = performance.now() + OVER_SHOWN;
+    // The game-over tune, the dispenser paying out a ticket for every 20 points, and a flourish for your best yet.
+    ctx.sound.skeeball('over', SPEAKER, it.score);
+    const tickets = Math.min(30, Math.max(1, Math.round(it.score / 20)));
+    window.setTimeout(() => ctx.sound.skeeball('tickets', TROUGH, 0, tickets), 1400);
+    if (beat && best !== null) window.setTimeout(() => ctx.sound.skeeball('best', SPEAKER), 1200);
     const great = it.score >= GREAT;
     if (great) {
       const top = m.toWorld(2.9, 0, 2.6, at);
@@ -232,10 +256,18 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
     const stale = game && !(game.by === store.you && roller.active) && performance.now() - game.at > IDLE * 2;
     if ((idleAt && performance.now() > idleAt) || stale) {
       idleAt = 0;
+      // The balls that were rolled come back round to the trough.
+      if (game?.rolled && machine()) ctx.sound.skeeball('release', TROUGH);
       game = null;
       m.setTrough(BALLS);
       m.display({ kind: 'idle', best });
     }
+    // The speaker: the game tune while a game's on (faster on its last ball), now and then a jingle to call people over.
+    const now = performance.now();
+    const mineOver = game?.by === store.you && game.dropped >= BALLS;
+    const live = (roller.active && !mineOver) || (!!game && game.dropped < BALLS && now - game.at < IDLE * 2);
+    const last = !!game && game.rolled >= BALLS - 1 && game.dropped < BALLS;
+    ctx.sound.skeeballMusic(!machine() ? 'off' : live ? (last ? 'hurry' : 'game') : 'attract');
   });
 
   return { roller };

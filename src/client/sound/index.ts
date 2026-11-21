@@ -32,6 +32,7 @@ import { needsYou } from '../features/needsyou/sound';
 import type { Pos } from './places';
 import { pageTurn, paper } from './paper';
 import { skeeball, type SkeeballSound } from '../features/skeeball/sound';
+import { SkeeballTunes, type SkeeballMusic } from '../features/skeeball/music';
 import { toss, type TossSound } from '../features/bargames/sound';
 import { fidgeting, Typing } from './typing';
 import { Rain, thunder } from './weather';
@@ -40,6 +41,7 @@ export class OfficeSound {
   private readonly a: AudioCore = new AudioCore({ start: (ctx) => this.start(ctx), touched: () => this.music.touched() });
   private readonly music = new Jukebox(this.a, (text) => this.onMusicError?.(text));
   private readonly dj = new Dj(this.a);
+  private readonly skeeTunes = new SkeeballTunes(this.a);
   private readonly typing = new Typing(this.a);
   private readonly motors = new Motors(this.a);
   private readonly fridge = new Fridge(this.a);
@@ -67,6 +69,7 @@ export class OfficeSound {
   private start(ctx: AudioContext) {
     this.music.connect(ctx);
     this.dj.connect(this.music.musicBus);
+    this.skeeTunes.connect(this.music.musicBus);
     this.a.applyVolume();
     this.music.applyMusicVolume();
     this.music.applyJukebox();
@@ -181,6 +184,11 @@ export class OfficeSound {
   /** The skeeball machine: `points` for what a ball scored, `len` seconds for how long it rolls. */
   skeeball(kind: SkeeballSound, at: Pos, points = 0, len = 1) {
     skeeball(this.a, kind, at, points, len);
+  }
+
+  /** What the skeeball machine's speaker plays (see SkeeballMusic), through your music volume. */
+  skeeballMusic(mode: SkeeballMusic) {
+    this.skeeTunes.set(mode);
   }
 
   arcade(kind: ArcadeSound, lines = 1) {
