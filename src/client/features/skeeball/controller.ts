@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import { meterAt } from '../../../shared/bargames';
-import { AIM_MAX, BALLS, LANE } from '../../../shared/skeeball';
+import { AIM_MAX, BALLS, LANE, RINGS, onFace } from '../../../shared/skeeball';
 import { isTyping, type PlayerController } from '../../player';
 import { $, h, modalOpen } from '../../ui/dom';
 import type { SkeeballMachine } from './world';
 
 // Stepping up to the skeeball machine (E there): you stand at its front with a ball in hand, and the
-// camera looks over your head up the lane. The mouse (or A and D, or the arrows) turns the dotted
-// guide up the lane the way the ball will go. Holding Space (or the mouse button) runs the meter up
-// and down; let go to roll, harder the fuller it is. Nine balls a game. E steps back.
+// camera looks straight up the lane from just over your head (you're out of the way, see index.ts).
+// The mouse (or A and D, or the arrows) slides a mark across the target, and the dotted guide up the
+// lane turns to it. Holding Space (or the mouse button) runs the meter up and down; let go to roll,
+// harder the fuller it is. Nine balls a game. E steps back.
 
 /** The meter runs from nothing to full in this long, then back down. */
 const METER = 1.25;
@@ -16,14 +17,18 @@ const METER = 1.25;
 const MIN_POWER = 0.03;
 /** Seconds from one roll to having the next ball in hand. */
 const BETWEEN = 0.7;
-/** How fast the keys turn your aim (radians a second), and how far a pixel of the mouse does while it's captured. */
-const KEYS = 0.09;
-const MOUSE = 0.0005;
 /**
- * The camera: back from where you stand, out to your left (the stairs are on your right), up, and how
- * wide it sees (degrees), looking `at` up the lane (s along it, y up).
+ * How fast the keys slide the mark across the target (m/s), and how far a pixel of the mouse does
+ * while it's captured: the whole width in about a hand's sweep.
  */
-const CAM = { back: 0.5, left: 0.65, up: 2.1, fov: 50, at: { s: 2.1, y: 0.95 } };
+const KEYS = 0.55;
+const MOUSE = 0.0011;
+/** The camera: back from where you stand, up, and how wide it sees (degrees), looking `at` up the lane (s along it, y up). */
+const CAM = { back: 0.12, up: 1.78, fov: 58, at: { s: 2.3, y: 0.95 } };
+/** From the foot of the lane up to the rings, along it: what the mark across the target is scaled by. */
+const RUN = onFace(RINGS.d, 0).s - LANE.start.s;
+/** The target, as a plane in the machine's frame. */
+const FACE_NORMAL = new THREE.Vector3(-Math.sin(LANE.face.angle), Math.cos(LANE.face.angle), 0);
 
 export type RollStage = 'aim' | 'wind' | 'wait';
 
@@ -41,7 +46,7 @@ const turn = new THREE.Quaternion();
 const UP = new THREE.Vector3(0, 1, 0);
 const ray = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
-const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -LANE.foot.y);
+const plane = new THREE.Plane();
 const hit = new THREE.Vector3();
 
 export class Roller {
@@ -137,6 +142,7 @@ export class Roller {
     if (!m) return;
     this.machine = null;
     m.aim(null);
+    m.ready(false);
     const p = this.player;
     p.rig = null;
     p.mouseLook = true;
@@ -169,7 +175,9 @@ export class Roller {
       this.aimAt = THREE.MathUtils.clamp(this.aimAt, -AIM_MAX, AIM_MAX);
     }
     if (this.stage === 'wait' && performance.now() >= this.readyAt) this.stage = 'aim';
-    m.aim(this.stage === 'wait' || !this.next ? null : this.aimAt);
+    const aiming = this.stage !== 'wait' && this.next > 0;
+    m.aim(aiming ? this.aimAt : null);
+    m.ready(aiming);
     this.placeCamera(dt, m);
     this.render();
   }
@@ -209,7 +217,7 @@ export class Roller {
     this.hooks.roll(this.aimAt, power, this.n);
   }
 
-  /** The mouse turns your aim: by how far it moved while it's captured, or toward wherever it points up the lane. */
+  /** The mouse slides your mark across the target: by how far it moved while it's captured, or to wherever it points on it. */
   private pointer(e: PointerEvent) {
     const m = this.machine;
     if (!m || modalOpen()) return;
@@ -220,22 +228,21 @@ export class Roller {
       const r = this.canvas.getBoundingClientRect();
       ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(ndc, this.camera);
+      plane.setFromNormalAndCoplanarPoint(FACE_NORMAL, m.toWorld(LANE.face.s, 0, LANE.face.y, want));
       if (!ray.ray.intersectPlane(plane, hit)) return;
+      // Pointing at the target, or up the lane short of it: the line from the foot of the lane through there, where it meets the rings.
       const start = m.toWorld(LANE.start.s, 0, 0, want);
       const ahead = hit.x - start.x;
-      if (ahead < 0.2) return;
-      this.aimAt = Math.atan2(hit.z - start.z, ahead);
+      if (ahead < 0.3) return;
+      this.aimAt = ((hit.z - start.z) * RUN) / ahead;
     }
     this.aimAt = THREE.MathUtils.clamp(this.aimAt, -AIM_MAX, AIM_MAX);
   }
 
-  /** Over your left shoulder, looking up the lane at the target. */
+  /** Square behind the lane, just over your head, looking up it at the target. */
   private placeCamera(dt: number, m: SkeeballMachine) {
     const s = m.spot;
-    const fx = Math.sin(s.facing);
-    const fz = Math.cos(s.facing);
-    // Your left, facing (fx, fz), is (fz, -fx).
-    want.set(s.x - fx * CAM.back + fz * CAM.left, CAM.up, s.z - fz * CAM.back - fx * CAM.left);
+    want.set(s.x - Math.sin(s.facing) * CAM.back, CAM.up, s.z - Math.cos(s.facing) * CAM.back);
     m.toWorld(CAM.at.s, 0, CAM.at.y, look);
     const k = 1 - Math.exp(-dt * 7);
     this.camPos.lerp(want, k);
@@ -258,6 +265,6 @@ export class Roller {
     if (text === this.shown) return;
     this.shown = text;
     this.titleEl.textContent = title;
-    this.infoEl.textContent = this.info || 'Aim with the mouse · hold Space and let go';
+    this.infoEl.textContent = this.info || 'Move the mouse to aim · hold Space and let go';
   }
 }

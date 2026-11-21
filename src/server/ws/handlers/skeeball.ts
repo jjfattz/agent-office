@@ -10,8 +10,8 @@ const ROLL_EVERY = 400;
 
 export const skeeballHandlers = {
   skeeball(ctx, c, msg) {
-    const roll = { aim: msg.aim, power: msg.power, n: msg.n };
+    const roll = { aim: msg.aim, power: msg.power, n: msg.n, points: msg.points };
     if (!c.peer.floor || c.peer.floor === ROOF || !rollOk(roll) || !throttle(c, 'skeeball', ROLL_EVERY)) return;
-    ctx.toNeighbors(c, { t: 'skeeball', id: c.id, aim: roll.aim, power: roll.power, n: roll.n });
+    ctx.toNeighbors(c, { t: 'skeeball', id: c.id, aim: roll.aim, power: roll.power, n: roll.n, points: roll.points });
   },
 } satisfies HandlerMap<SkeeballClientMsg>;
