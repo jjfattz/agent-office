@@ -3,6 +3,7 @@ import type { AccountInvite, AccountRole, ServerMsg } from '../../shared/protoco
 import type { Net } from '../net';
 import { store } from '../state';
 import { h, openModal, timeAgo } from './dom';
+import { devicesSection } from './phone-devices';
 import { confirmDialog } from './prompt';
 import { copyButton } from './team';
 
@@ -143,6 +144,8 @@ export function openAccounts(net: Net) {
         s.sharedPassword && !canSwitchOff ? h('b', {}, ' Make yourself an admin account and sign in with it before you switch it off.') : null,
       ),
     );
+    // Every phone paired with a QR code, whoever's it is.
+    body.append(devices.el);
     if (typing) nameInput.focus();
   };
 
@@ -158,7 +161,8 @@ export function openAccounts(net: Net) {
     render();
   };
   // No longer an admin (someone changed your role): the list isn't yours to see any more.
-  const unsubs = [store.on('accounts', render), store.on('me', () => (store.me.admin ? render() : modal.close()))];
+  const devices = devicesSection(net, '📱 Paired devices', true);
+  const unsubs = [devices.off, store.on('accounts', render), store.on('me', () => (store.me.admin ? render() : modal.close()))];
   const modal = openModal(el, {
     onClose: () => {
       unsubs.forEach((u) => u());

@@ -23,6 +23,7 @@ import { machine } from './machine';
 import { map } from './map';
 import { meeting } from './meeting';
 import { notify } from './notify';
+import { phone } from './phone';
 import { prompts } from './prompts';
 import { providerAccounts } from './provider-accounts';
 import { services } from './services';
@@ -63,4 +64,5 @@ export const SLICES: readonly Slice[] = [
   accounts,
   signins,
   providerAccounts,
+  phone,
 ];

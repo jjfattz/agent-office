@@ -1,8 +1,19 @@
 import type http from 'node:http';
 import type { Config } from '../config.js';
 
-export function clientIp(req: http.IncomingMessage, trustProxy: boolean): string {
-  if (trustProxy) {
+const LOOPBACK = /^(?:127\.|::1$|::ffff:127\.)/;
+
+/**
+ * Whether this request's X-Forwarded-* headers come from a proxy the office trusts: any, behind
+ * --trust-proxy; or Tailscale Serve while the office has it serving for 📱 Use on your phone, which
+ * connects from this computer. From anywhere else they're whatever the visitor typed, and ignored.
+ */
+export function trustsProxy(req: http.IncomingMessage, cfg: Pick<Config, 'trustProxy' | 'localProxy'>): boolean {
+  return cfg.trustProxy || (!!cfg.localProxy && LOOPBACK.test(req.socket.remoteAddress ?? ''));
+}
+
+export function clientIp(req: http.IncomingMessage, cfg: Pick<Config, 'trustProxy' | 'localProxy'>): string {
+  if (trustsProxy(req, cfg)) {
     const fwd = req.headers['x-forwarded-for'];
     // The rightmost hop is the one our proxy appended; anything left of it is client-controlled.
     if (typeof fwd === 'string' && fwd) return fwd.split(',').pop()!.trim();
@@ -12,7 +23,7 @@ export function clientIp(req: http.IncomingMessage, trustProxy: boolean): string
 
 export function isSecure(req: http.IncomingMessage, cfg: Config): boolean {
   if (cfg.tls) return true;
-  return cfg.trustProxy && req.headers['x-forwarded-proto'] === 'https';
+  return trustsProxy(req, cfg) && req.headers['x-forwarded-proto'] === 'https';
 }
 
 export function readBody(req: http.IncomingMessage, limit = 1024 * 1024): Promise<string> {
@@ -38,7 +49,7 @@ export function readBytes(req: http.IncomingMessage, limit: number): Promise<Buf
 /** Whether the page asking is the office itself, so another site can't open a socket with a visitor's cookie. */
 export function sameOrigin(req: http.IncomingMessage, cfg: Config): boolean {
   const origin = req.headers.origin;
-  const host = (cfg.trustProxy && (req.headers['x-forwarded-host'] as string)) || req.headers.host;
+  const host = (trustsProxy(req, cfg) && (req.headers['x-forwarded-host'] as string)) || req.headers.host;
   try {
     return !!origin && new URL(origin).host === host;
   } catch {

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Agent Office · Pair your phone</title>
+    <link rel="icon" href="/favicon.svg" />
+    <link rel="stylesheet" href="./login.css" />
+  </head>
+  <body>
+    <main class="card">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" width="72" height="72"><rect x="6" y="30" width="52" height="8" rx="3" fill="#e0a96d"/><rect x="18" y="14" width="28" height="18" rx="3" fill="#2b2d42"/><rect x="21" y="17" width="22" height="12" rx="1" fill="#7cf29a"/><circle cx="32" cy="50" r="9" fill="#ff8a5b"/><circle cx="29" cy="48" r="1.8" fill="#222"/><circle cx="35" cy="48" r="1.8" fill="#222"/></svg>
+      </div>
+      <h1 id="title">📱 Pairing your phone</h1>
+      <p class="sub" id="sub">Signing you in…</p>
+      <form id="form" hidden>
+        <label>Name this device<input id="name" type="text" maxlength="40" autocomplete="off" spellcheck="false" required /></label>
+        <p class="note">So you can tell it apart from your other devices, and sign it out from the office if you lose it.</p>
+        <button type="submit" id="submit">Open the office</button>
+      </form>
+      <p id="error" class="error" role="alert"></p>
+      <a id="login" href="/login?next=/lite" hidden>Sign in with a password instead →</a>
+    </main>
+    <script type="module" src="./pair.ts"></script>
+  </body>
+</html>

@@ -21,7 +21,7 @@ export function acceptWebSockets(ctx: Ctx, server: http.Server | https.Server) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 2 * 1024 * 1024 });
   server.on('upgrade', (req, socket, head) => {
     socket.on('error', () => socket.destroy());
-    const tunneled = tunneledService(req, cfg.port, cfg.tailnet, (port) => ctx.services.lookup(port));
+    const tunneled = tunneledService(req, cfg.port, ctx.tailnet.host, (port) => ctx.services.lookup(port));
     if (tunneled) {
       if (tunneled.svc !== 'gone' && auth.fromAnyCookie(req)) return relayUpgrade(req, socket, head, tunneled.svc);
       return refuseUpgrade(socket);

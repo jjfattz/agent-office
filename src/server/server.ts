@@ -50,6 +50,7 @@ export async function startServer(cfg: Config, opts: StartOptions = {}) {
   const { services, tailnet } = ctx;
   services.start();
   tailnet.start(() => services.list().map((s) => s.port));
+  ctx.phone.start();
 
   /** With `keep` (a restart), workers' terminals keep running for the next office to pick up. */
   const shutdown = (keep = false) => {
@@ -59,6 +60,7 @@ export async function startServer(cfg: Config, opts: StartOptions = {}) {
     ctx.upgrader.stop();
     services.stop();
     tailnet.stop();
+    ctx.phone.stop();
     ctx.webhook.stop();
     ctx.machine.stop();
     ctx.sky.stop();

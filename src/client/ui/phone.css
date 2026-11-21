@@ -1,0 +1,53 @@
+/* ☰ → 📱 Use on your phone (phone.ts): numbered steps, each with its mark, and the pairing QR code. */
+.phone-steps { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.phone-step { border: 3px solid var(--ink); border-radius: 14px; padding: 10px 14px 12px; background: #fff; }
+.phone-step.ok { background: #f3fbf6; }
+.phone-step.error { background: #fff4f6; }
+.phone-step.todo .phone-step-body:empty { display: none; }
+.phone-step-head { display: flex; align-items: center; gap: 10px; }
+.phone-step-head h4 { margin: 0; font-size: 15px; }
+.phone-mark { font-size: 18px; line-height: 1; width: 22px; text-align: center; flex: none; }
+.phone-step-body { padding-left: 32px; }
+.phone-step-body > * { margin-top: 8px; }
+.phone-step-body .note { margin-top: 8px; }
+.phone-step-body .team-status { margin-top: 8px; }
+.phone-step-body a.btn { text-decoration: none; }
+
+/* More specific than base.css's .modal label, which is a block. */
+.modal .phone-switch { display: inline-flex; align-items: center; gap: 10px; margin: 0; font-weight: 800; font-size: 14px; cursor: pointer; user-select: none; }
+.phone-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.phone-slider { position: relative; display: inline-block; width: 46px; height: 26px; flex: none; border: 3px solid var(--ink); border-radius: 999px; background: #dee2e6; transition: background .15s; }
+.phone-slider::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--ink); transition: transform .15s; }
+.phone-switch input:checked + .phone-slider { background: var(--good); }
+.phone-switch input:checked + .phone-slider::after { transform: translateX(20px); }
+.phone-switch input:focus-visible + .phone-slider { outline: 3px solid var(--info); outline-offset: 2px; }
+.phone-switch input:disabled + .phone-slider { opacity: .5; }
+.phone-switch:has(input:disabled) { cursor: default; }
+
+.phone-pair { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.phone-pair-code { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.phone-pair-code small { color: var(--muted); font-weight: 700; }
+.phone-qr { display: block; border: 3px solid var(--ink); border-radius: 12px; background: #fff; image-rendering: pixelated; }
+.phone-qr-wait { width: 220px; height: 220px; display: grid; place-items: center; color: var(--muted); font-weight: 800; }
+.phone-pair-how { flex: 1; min-width: 220px; margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-weight: 700; font-size: 14px; line-height: 1.45; }
+.phone-stores { display: flex; gap: 10px; margin-top: 6px; }
+.phone-store { display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--ink); font-size: 12px; font-weight: 800; text-decoration: none; }
+.phone-store .phone-qr { border-width: 2px; border-radius: 8px; }
+
+.phone-devices { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.phone-devices li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 2px solid var(--ink); border-radius: 12px; background: #fff; }
+.phone-device-icon { font-size: 20px; }
+.phone-device { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.phone-device b { overflow-wrap: anywhere; }
+.phone-device small { color: var(--muted); font-weight: 700; }
+.phone-devices-section h4 { margin: 18px 0 0; }
+
+@media (max-width: 520px) {
+  .phone-step-body { padding-left: 0; }
+  .phone-step-body .cmd { flex-wrap: wrap; }
+  .phone-step-body .cmd pre { flex-basis: 100%; }
+  .phone-pair { justify-content: center; }
+}
+
+/* The one-time offer after your first hire (features/phone): a toast you can click. */
+.phone-offer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; pointer-events: auto; max-width: min(560px, 92vw); }

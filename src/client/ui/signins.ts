@@ -4,6 +4,7 @@ import type { Net } from '../net';
 import { store } from '../state';
 import { h, openModal, type Modal } from './dom';
 import { confirmDialog } from './prompt';
+import { devicesSection } from './phone-devices';
 import { copyButton } from './team';
 
 const NAMES: Record<SignInKind, string> = { claude: 'Claude', github: 'GitHub' };
@@ -21,6 +22,8 @@ export function openSignIns(net: Net, why?: string) {
   const close = h('button.btn.close', { 'aria-label': 'Close' }, '✕');
   const banner = h('p.team-status', { hidden: true });
   const cards = h('div.signins');
+  // Phones you paired with a QR code (☰ → 📱 Use on your phone), each signed out from here.
+  const devices = devicesSection(net, '📱 Your devices');
   const el = h(
     'div.modal',
     { role: 'dialog', 'aria-label': 'Your sign-ins', style: 'width:min(640px,100%)' },
@@ -32,6 +35,7 @@ export function openSignIns(net: Net, why?: string) {
       banner,
       cards,
       h('p.note', {}, 'Or open a 🐚 shell at any desk: it runs as you, so ', h('code', {}, 'claude auth login'), ' and ', h('code', {}, 'gh auth login'), ' typed there sign you in too.'),
+      devices.el,
     ),
   );
 
@@ -154,6 +158,7 @@ export function openSignIns(net: Net, why?: string) {
   const modal = openModal(el, {
     onClose: () => {
       unsub();
+      devices.off();
       open = null;
     },
   });

@@ -7,6 +7,7 @@ import { authRoutes } from './auth.js';
 import { fileRoutes } from './files.js';
 import { githubRoutes } from './github.js';
 import { pageRoutes } from './pages.js';
+import { phoneRoutes } from './phone.js';
 import { retroRoutes } from './retro.js';
 import { searchRoutes } from './search.js';
 import { serviceRoutes } from './services.js';
@@ -20,15 +21,18 @@ export const routes: readonly Route[] = [
   authRoutes.claim,
   authRoutes.link,
   authRoutes.logout,
+  phoneRoutes.pair,
   pageRoutes.health,
   pageRoutes.assets,
   pageRoutes.login,
   pageRoutes.claim,
   pageRoutes.join,
+  phoneRoutes.page,
   pageRoutes.favicon,
   // Signed in.
   authRoutes.whoami,
   agentRoutes.models,
+  phoneRoutes.name,
   fileRoutes.image,
   fileRoutes.whiteboardFile,
   fileRoutes.termDrop,

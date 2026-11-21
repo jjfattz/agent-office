@@ -13,7 +13,7 @@ const TOO_MANY_ATTEMPTS = 'Too many attempts. Try again in a few minutes.';
  * body. Undefined once it has already answered (rate limited, or a bad body).
  */
 async function readGuess(ctx: Ctx, req: http.IncomingMessage, res: http.ServerResponse): Promise<{ ip: string; body: Record<string, unknown> } | undefined> {
-  const ip = clientIp(req, ctx.cfg.trustProxy);
+  const ip = clientIp(req, ctx.cfg);
   // Counted before the body is read, so parallel guesses can't all slip under the limit.
   if (!ctx.auth.allowAttempt(ip)) return void send(res, 429, { error: TOO_MANY_ATTEMPTS });
   try {
