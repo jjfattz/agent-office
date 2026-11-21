@@ -24,7 +24,7 @@ export interface PushOptions {
   /** `owner`'s list changed (null: the shared password's). */
   changed(owner: string | null): void;
   /** For tests: how a push is sent, and the decider's settle time. */
-  send?: (keys: VapidKeys, target: PushTarget, payload: object, opts: { ttl?: number; topic?: string }) => Promise<PushResult>;
+  send?: (keys: VapidKeys, target: PushTarget, payload: object, opts: { ttl?: number }) => Promise<PushResult>;
   settleMs?: number;
 }
 
@@ -32,9 +32,6 @@ const oneLine = (s: string, max: number) => {
   const t = s.replace(/\s+/g, ' ').trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 };
-
-/** A push service's topic is at most 32 URL-safe characters. */
-const topicOf = (workerId: string) => `w${workerId}`.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32);
 
 /** What the push for a worker says, and where tapping it goes. */
 export function workerPayload(w: WorkerInfo, status: PushAlert, floor?: { id: string; name: string }): PushPayload {
@@ -54,12 +51,16 @@ export class Push {
   private decider: PushDecider;
   /** Each connection whose 2D view is on screen, and its device's endpoint. */
   private visible = new Map<string, string>();
+  /** Connections whose 2D view is off screen (the phone locked, or another app on top): open terminals there don't count as looking. */
+  private away = new Set<string>();
+  /** Pushes a device didn't get because it had the 2D view on screen: worker id → what it was waiting for. */
+  private skipped = new Map<string, Map<string, PushAlert>>();
   private send: NonNullable<PushOptions['send']>;
 
   constructor(private o: PushOptions) {
     this.store = new PushStore(o.dataDir);
     this.send = o.send ?? sendPush;
-    this.decider = new PushDecider((w, status) => void this.alert(w, status), undefined, o.settleMs);
+    this.decider = new PushDecider((w, status) => void this.alert(w, status), undefined, o.settleMs, (id) => this.away.has(id));
   }
 
   onWorker(w: WorkerInfo) {
@@ -68,6 +69,7 @@ export class Push {
 
   onWorkerGone(id: string) {
     this.decider.onWorkerGone(id);
+    for (const m of this.skipped.values()) m.delete(id);
   }
 
   stop() {
@@ -101,12 +103,37 @@ export class Push {
 
   /** A connection has the 2D view on screen (with its device's endpoint), or stopped having it. */
   here(clientId: string, endpoint: string | undefined, visible: boolean) {
+    const was = this.visible.get(clientId);
     if (visible && endpoint) this.visible.set(clientId, endpoint);
     else this.visible.delete(clientId);
+    // It said goodbye while it was on screen: it saw what it wasn't pushed.
+    if (was && !this.lookingWith(was)) this.skipped.delete(was);
+    if (visible) this.away.delete(clientId);
+    else if (!this.away.has(clientId)) {
+      this.away.add(clientId);
+      this.decider.recheck();
+    }
   }
 
+  /**
+   * A connection closed. One that went without saying its 2D view was off screen (a phone that locked
+   * before it could, and dropped off later) may well not have seen what it wasn't pushed: it gets it now.
+   */
   forget(clientId: string) {
+    const was = this.visible.get(clientId);
     this.visible.delete(clientId);
+    // Gone, though its terminals on other floors only let go after this (closedOn): they don't count meanwhile.
+    this.away.add(clientId);
+    queueMicrotask(() => this.away.delete(clientId));
+    if (!was || this.lookingWith(was)) return;
+    const missed = this.skipped.get(was);
+    this.skipped.delete(was);
+    const sub = this.store.all().find((s) => s.endpoint === was);
+    if (!missed || !sub || !this.o.allowed(sub)) return;
+    for (const [id, status] of missed) {
+      const w = this.decider.stillWaiting(id, status);
+      if (w) void this.deliver(sub, workerPayload(w, status, this.o.floorOf(w.id)));
+    }
   }
 
   /** A test push to `who`'s devices. Resolves to how many it reached, or why none. */
@@ -123,14 +150,19 @@ export class Push {
   /** Everyone's devices but the ones looking at the 2D view right now. */
   private async alert(w: WorkerInfo, status: PushAlert) {
     const looking = new Set(this.visible.values());
-    const subs = this.store.all().filter((s) => !looking.has(s.endpoint) && this.o.allowed(s));
-    if (!subs.length) return;
+    const subs = this.store.all().filter((s) => this.o.allowed(s));
+    for (const s of subs) if (looking.has(s.endpoint)) this.skipped.set(s.endpoint, (this.skipped.get(s.endpoint) ?? new Map()).set(w.id, status));
     const payload = workerPayload(w, status, this.o.floorOf(w.id));
-    await Promise.all(subs.map((s) => this.deliver(s, payload, topicOf(w.id))));
+    await Promise.all(subs.filter((s) => !looking.has(s.endpoint)).map((s) => this.deliver(s, payload)));
   }
 
-  private async deliver(sub: PushSub, payload: PushPayload, topic?: string): Promise<PushResult> {
-    const r = await this.send(this.store.keys, sub, payload, { ttl: 6 * 3600, topic });
+  /**
+   * Every push goes out the same way, the test too, so passing the test means workers get through. No
+   * Topic header: Apple's push service refused worker pushes with one (400 BadWebPushTopic) while the
+   * test, without one, went through. The notification's tag already replaces a worker's older one.
+   */
+  private async deliver(sub: PushSub, payload: PushPayload): Promise<PushResult> {
+    const r = await this.send(this.store.keys, sub, payload, { ttl: 6 * 3600 });
     if (!this.store.get(sub.id)) return r;
     if (!r.ok && r.gone) {
       // Unsubscribed in the browser, or expired: it'll subscribe again from 🔔 if it wants to.
@@ -144,6 +176,11 @@ export class Push {
     }
     this.o.changed(sub.owner ?? null);
     return r;
+  }
+
+  /** Whether a connection still has the 2D view on screen with this endpoint. */
+  private lookingWith(endpoint: string): boolean {
+    return [...this.visible.values()].includes(endpoint);
   }
 
   private mine(who: PushWho): PushSub[] {

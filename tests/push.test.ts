@@ -184,7 +184,7 @@ test('doesn’t push a flicker, a worker someone is looking at, or a shell', () 
   d.onWorker(worker({ status: 'working', waitingSince: 1 }));
   assert.equal(clock.pending, 0, 'moving on takes the push back');
   d.onWorker(worker({ status: 'needs_input', acked: false, waitingSince: 2 }));
-  d.onWorker(worker({ status: 'needs_input', acked: false, waitingSince: 2, viewers: ['Ana'] }));
+  d.onWorker(worker({ status: 'needs_input', acked: false, waitingSince: 2, viewers: ['Ana'], viewerIds: ['c1'] }));
   clock.run();
   d.onWorker(worker({ status: 'done', acked: true, waitingSince: 3 }));
   clock.run();
@@ -243,4 +243,77 @@ test('pushes every allowed device but the ones looking at the 2D view, and drops
   assert.ok(push.unsubscribe({ owner: 'b' }, two.id, true));
   assert.deepEqual(push.view({ owner: 'a' }).devices.map((d) => d.name), ['one']);
   assert.ok(changed.includes('a'));
+});
+
+test('looks again when whoever was at its terminal leaves it, or locks their phone with it open', () => {
+  const clock = fakeTimers();
+  const pushed: string[] = [];
+  const away = new Set<string>();
+  const d = new PushDecider((w, s) => pushed.push(`${w.name}:${s}`), clock.timers, 5000, (id) => away.has(id));
+  const at = { viewers: ['Ana'], viewerIds: ['c1'] };
+  d.onWorker(worker(at));
+  // Asking while Ana has its terminal open: no push, until she closes it without answering.
+  d.onWorker(worker({ ...at, status: 'needs_input', acked: false, waitingSince: 1 }));
+  clock.run();
+  assert.deepEqual(pushed, []);
+  d.onWorker(worker({ status: 'needs_input', acked: false, waitingSince: 1 }));
+  clock.run();
+  assert.deepEqual(pushed, ['Byte:needs_input']);
+  // Done while Ana watched it finish: she saw it, and the office says so (acked), even once she's left.
+  d.onWorker(worker({ ...at, status: 'working' }));
+  d.onWorker(worker({ ...at, status: 'done', acked: true, waitingSince: 2 }));
+  d.onWorker(worker({ status: 'done', acked: true, waitingSince: 2 }));
+  clock.run();
+  assert.deepEqual(pushed, ['Byte:needs_input']);
+  // Her phone is locked with the terminal open: it's as good as nobody there, done or asking.
+  away.add('c1');
+  d.onWorker(worker({ ...at, status: 'working' }));
+  d.onWorker(worker({ ...at, status: 'done', acked: true, waitingSince: 3 }));
+  clock.run();
+  assert.deepEqual(pushed, ['Byte:needs_input', 'Byte:done']);
+  away.delete('c1');
+  d.onWorker(worker({ ...at, status: 'needs_input', acked: false, waitingSince: 4 }));
+  clock.run();
+  assert.deepEqual(pushed, ['Byte:needs_input', 'Byte:done']);
+  away.add('c1');
+  d.recheck();
+  clock.run();
+  assert.deepEqual(pushed, ['Byte:needs_input', 'Byte:done', 'Byte:needs_input']);
+});
+
+test('sends no Topic, and catches up a phone that dropped off while the office thought it was looking', async (t) => {
+  const sent: { endpoint: string; title: string; topic: unknown }[] = [];
+  const push = new Push({
+    dataDir: tmpDir(t),
+    floorOf: () => ({ id: 'f2', name: 'Other project' }),
+    allowed: () => true,
+    changed: () => {},
+    settleMs: 0,
+    send: async (_k, target, payload, opts) => {
+      sent.push({ endpoint: target.endpoint, title: (payload as { title: string }).title, topic: (opts as { topic?: unknown }).topic });
+      return { ok: true };
+    },
+  });
+  t.after(() => push.stop());
+  push.subscribe({}, target(1), 'phone');
+  push.subscribe({}, target(2), 'tablet');
+  const tick = () => new Promise((r) => setTimeout(r, 30));
+  // The phone had the 2D view up, then locked before it could say so: it isn't pushed…
+  push.here('phone', target(1).endpoint, true);
+  push.here('tablet', target(2).endpoint, true);
+  push.onWorker(worker());
+  push.onWorker(worker({ status: 'done', acked: false, waitingSince: 1 }));
+  await tick();
+  assert.deepEqual(sent, []);
+  // …the tablet said goodbye properly (it saw it), the phone's connection just dropped (it didn't).
+  push.here('tablet', target(2).endpoint, false);
+  push.forget('tablet');
+  // Its terminal there was still open as it went (the floors let go of it after push does).
+  push.onWorker(worker({ status: 'done', acked: false, waitingSince: 1, viewers: ['Ana'], viewerIds: ['phone'] }));
+  push.forget('phone');
+  await tick();
+  assert.deepEqual(sent, [{ endpoint: target(1).endpoint, title: '✅ Byte is done', topic: undefined }]);
+  // The test goes out exactly as a worker's push does.
+  await push.test({});
+  assert.ok(sent.every((s) => s.topic === undefined));
 });
