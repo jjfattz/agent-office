@@ -22,6 +22,7 @@ import { openPhone, phoneLive } from '../../ui/phone';
 import { openProviderAccounts } from '../../ui/provider-accounts';
 import { openServices } from '../../ui/services';
 import { openSettings, type SettingsPane } from '../../ui/settings';
+import { outsideSetting } from '../../ui/settings-sky';
 import { needsSigningIn, openSignIns } from '../../ui/signins';
 import { openTeam } from '../../ui/team';
 import { openUpgrade } from '../../ui/upgrade';
@@ -152,10 +153,10 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
     },
   });
   function showSettings(pane?: SettingsPane) {
-    openSettings(
-      net,
+    const outside = store.sky ? { now: describeSky(store.sky, store.officeNow()), live: !!store.sky.city } : undefined;
+    openSettings(net, {
       settings,
-      (s) => {
+      onChange: (s) => {
         // Switching to push to talk mutes you now; back to an open mic turns it on.
         const talkChanged = s.pushToTalk !== settings.pushToTalk;
         Object.assign(settings, s);
@@ -168,13 +169,11 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
         sound.setVolume(settings.volume, settings.muted);
         sound.setMusicVolume(settings.music, settings.musicMuted);
       },
-      editProfile,
-      sound,
-      parts.notifier,
-      signOut,
-      store.sky ? { now: describeSky(store.sky, store.officeNow()), live: !!store.sky.city } : undefined,
-      pane,
-    );
+      notifier: parts.notifier,
+      onSignOut: signOut,
+      office: { onCharacter: editProfile, sound, sky: outside && ((frame) => outsideSetting(net, outside, frame)) },
+      first: pane,
+    });
   }
 
   async function signOut() {

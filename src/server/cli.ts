@@ -4,6 +4,7 @@ import { loadConfig, ensureSelfSigned } from './config.js';
 import { startServer } from './server.js';
 import { tildify } from './building.js';
 import { openBrowser } from './browser.js';
+import { restarter } from './restart.js';
 
 const argv = process.argv.slice(2);
 if (argv[0] === 'prune') {
@@ -64,6 +65,13 @@ function floorsLine() {
   return `🛗 ${floors.length} floor${floors.length === 1 ? '' : 's'}: ${floors.map((f) => f.def.name).join(', ')} (${where})`;
 }
 
+function restartLine() {
+  const how = restarter();
+  if (how === 'launcher') return '⚙️ Settings → Restart Agent Office (it looks for updates as it starts again)';
+  if (how === 'service') return '⚙️ Settings → Restart Agent Office';
+  return 'Ctrl+C, then start it again (the ⚙️ Settings button needs the agent-office command)';
+}
+
 function passwordLine() {
   if (!office.accounts.sharedPassword) return 'off — everyone signs in with their own account (agent-office accounts)';
   if (!cfg.passwordGenerated) return '(from --password / AGENT_OFFICE_PASSWORD)';
@@ -72,14 +80,14 @@ function passwordLine() {
   return cfg.password;
 }
 
-// Someone started it in a terminal: a link that signs them in once, opened in their browser, so
-// there's no password to copy. Not for an office that's claimed from a link (deploy/provision.sh)
-// or signed in to with accounts only.
+// Someone started it in a terminal: a link that signs them in once, printed below so there's no
+// password to copy (and opened in their browser with --open, though not again on a restart). Not
+// for an office that's claimed from a link (deploy/provision.sh) or signed in to with accounts only.
 let signIn = '';
 let opened = false;
 if (atTerminal && office.accounts.sharedPassword && !cfg.claimToken) {
   signIn = here + office.signInLink();
-  if (cfg.open) opened = openBrowser(signIn);
+  if (cfg.open && !process.env.AGENT_OFFICE_RESTARTED) opened = openBrowser(signIn);
 }
 
 // Started in a project that's still one of the floors (it can be taken off like any other).
@@ -90,15 +98,18 @@ console.log(`
   ${floorsLine()}
 
   ${[...urls].join('\n  ')}${loopback ? '\n  (only this computer can open it: --host 0.0.0.0 lets your network in)' : ''}
-${signIn ? `\n  sign in: ${signIn}\n           ${opened ? 'opened in your browser; ' : ''}the link works once\n` : ''}
+${signIn ? `\n  sign in: ${signIn}\n           ${opened ? 'opened in your browser; ' : 'open it in your browser; '}the link works once\n` : ''}
   password: ${passwordLine()}
+  restart: ${restartLine()}
   default agent: ${[agent ?? `${cfg.agentCmd} (via login shell)`, ...cfg.agentArgs].join(' ')}
   choose a provider (including Pi and Cursor) when hiring or queueing a task
 ${cfg.tls || loopback ? '' : '\n  tip: voice & screen share need https off localhost — use a reverse proxy or --self-signed\n'}`);
 
 let closing = false;
-// SIGTERM is a restart (tsx watch reloading, a plain `kill`, systemd): workers keep running in their
-// terminal host and the next office picks them back up. Ctrl+C closes the office and stops them.
+// SIGTERM is a restart (tsx watch reloading, a plain `kill`, systemd, ⚙️ Settings → Restart Agent
+// Office): workers keep running in their terminal host and the next office picks them back up.
+// Ctrl+C closes the office and stops them. The exit code is process.exitCode: restart.ts sets it to
+// ask the agent-office command to start the office again.
 // (Under systemd that needs KillMode=process, or stopping the service stops the host with it; see
 // deploy/provision.sh. Workers cut off that way are resumed and carry on.)
 const stop = (signal: NodeJS.Signals) => {
@@ -107,7 +118,7 @@ const stop = (signal: NodeJS.Signals) => {
   const keep = signal === 'SIGTERM';
   console.log(keep ? '\n  closing the office — workers keep running for the next one…' : '\n  closing the office…');
   office.shutdown(keep);
-  setTimeout(() => process.exit(0), 300);
+  setTimeout(() => process.exit(), 300);
 };
 // Last line of defense: one bad request must never take down every running worker.
 process.on('unhandledRejection', (err) => console.error('agent-office: unhandled rejection', err));

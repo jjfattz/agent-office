@@ -10,7 +10,7 @@ import { dogSetting } from './settings-dog';
 import { h, openModal, timeAgo } from './dom';
 import { agentFields, choiceLabel, officeChoice } from './provider';
 import { openPromptEditor, rewrittenPrompts } from './prompts';
-import { outsideSetting } from './settings-sky';
+import { restartSetting } from './settings-restart';
 import { choiceRow } from './settings-rows';
 import { touchSetting } from './settings-touch';
 import { openPhone } from './phone';
@@ -32,7 +32,7 @@ const PANES: { id: SettingsPane; icon: string; label: string; blurb: string }[] 
   { id: 'sound', icon: '🔊', label: 'Sound & voice', blurb: 'How loud the office is for you, and how voice chat works.' },
   { id: 'notify', icon: '🔔', label: 'Notifications', blurb: 'Hear about a worker that needs someone, or finished, while you’re somewhere else.' },
   { id: 'phone', icon: '📱', label: 'Phone', blurb: 'Reach the office from your phone, anywhere, over your own private Tailscale network.' },
-  { id: 'building', icon: '🏢', label: 'Building', blurb: 'The map, the decorations, the sky, the dog, and where new floors are cloned.' },
+  { id: 'building', icon: '🏢', label: 'Building', blurb: 'The map, the decorations, the sky, the dog, where new floors are cloned, and restarting the office.' },
   { id: 'workers', icon: '🤖', label: 'Workers', blurb: 'What workers start on, how many run at once, when they go home and what the office tells them.' },
 ];
 
@@ -51,8 +51,28 @@ const setting = (title: string, scope: Scope | null, ...body: Node[]) =>
 /** Where ⚙️ Settings was last, so it opens there again. */
 let lastPane: SettingsPane = 'you';
 
-/** `outside` describes the sky over the office (see describeSky), once the server has said. `first` opens on that category instead of the last one. */
-export function openSettings(net: Net, settings: Settings, onChange: (s: Settings) => void, onCharacter: () => void, sound: Pick<OfficeSound, 'ding' | 'needsYou'>, notifier: DesktopNotifier, onSignOut: () => void, outside?: { now: string; live: boolean }, first?: SettingsPane) {
+/** A section of ⚙️ Settings, made by a part of its own from what goes in it (see settings-sky.ts). */
+type Section = (frame: (body: Node[]) => HTMLElement) => { section: HTMLElement; off: () => void };
+
+export interface SettingsOptions {
+  /** Your own settings, as this browser keeps them; `onChange` has whoever opened it take up new ones. */
+  settings: Settings;
+  onChange: (s: Settings) => void;
+  notifier: DesktopNotifier;
+  onSignOut: () => void;
+  /**
+   * What only the 3D office has: your character, the camera, its sounds and the sky (Outside, once the
+   * server has said what it's doing). Without it, it's the 2D view's settings, which leave those out.
+   */
+  office?: { onCharacter: () => void; sound: Pick<OfficeSound, 'ding' | 'needsYou'>; sky?: Section };
+  /** Opens on that category instead of the last one. */
+  first?: SettingsPane;
+}
+
+export function openSettings(net: Net, opts: SettingsOptions) {
+  let { settings } = opts;
+  const { onChange, notifier, onSignOut, office, first } = opts;
+  const sound = office?.sound;
   const seg = h('div.seg', { role: 'radiogroup', 'aria-label': 'Camera view' });
   const note = h('p.setting-note');
   const paint = () => {
@@ -111,7 +131,7 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
     });
     return row;
   };
-  const soundRow = volumeRow('Office sounds volume', 'volume', 'muted', () => sound.ding('done'));
+  const soundRow = volumeRow('Office sounds volume', 'volume', 'muted', () => sound?.ding('done'));
 
   /** Changes some of your own settings, and has the office take them up. */
   const change = (some: Partial<Settings>) => {
@@ -127,7 +147,7 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
   // The alarm when a worker stops to ask you something; picking one plays it.
   const alarmRow = choiceRow<NeedsYouSound>('When a worker needs you', [['once', '🔔 Ring once'], ['remind', '🔁 Keep reminding me'], ['off', '🔕 Off']], () => settings.needsYouSound, (needsYouSound) => {
     change({ needsYouSound });
-    if (needsYouSound !== 'off') sound.needsYou();
+    if (needsYouSound !== 'off') sound?.needsYou();
   });
 
   // The building's holiday theme, for everyone.
@@ -440,16 +460,18 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
   const { section: dogSection, paint: paintDog } = dogSetting(net, (body) => setting('Office dog', 'floor', ...body));
 
   // What the sky's doing, and which clock it keeps (see settings-sky.ts).
-  const sky = outside && outsideSetting(net, outside, (body) => setting('Outside', 'office', ...body));
+  const sky = office?.sky?.((body) => setting('Outside', 'office', ...body));
+  // Restarting the office, to pick up an update (see settings-restart.ts).
+  const { section: restartSection, paint: paintRestart } = restartSetting(net, (body) => setting('Restart Agent Office', 'office', ...body));
   const account = store.me.account;
   const signOut = h('button.btn', { type: 'button' }, '🚪 Sign out');
   signOut.addEventListener('click', onSignOut);
   const character = h('button.btn', { type: 'button' }, account ? '🧍 Change your look' : '🧍 Change your look & name');
   const panes: Record<SettingsPane, Node[]> = {
     you: [
-      setting('Your character', null, character),
-      setting('Camera view', 'you', seg, note),
-      setting('Touch controls', 'you', ...touchSetting(() => settings, change)),
+      ...(office
+        ? [setting('Your character', null, character), setting('Camera view', 'you', seg, note), setting('Touch controls', 'you', ...touchSetting(() => settings, change))]
+        : []),
       setting('Signed in', null, h('div.volume', {}, signOut), h('p.setting-note', {}, account ? `As ${account.name}, with your own account (${account.role}).` : 'With the shared office password.')),
     ],
     sound: [
@@ -477,6 +499,7 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
       ...(sky ? [sky.section] : []),
       dogSection,
       setting('Workspace folder', 'office', dirRow, dirActions, dirNote),
+      restartSection,
     ],
     workers: [
       setting('Default worker', 'office', agentNow, agent.element, agentActions, agentNote),
@@ -490,7 +513,9 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
   const nav = h('nav.settings-nav', { role: 'tablist', 'aria-orientation': 'vertical', 'aria-label': 'Settings' });
   const tabs = new Map<SettingsPane, HTMLButtonElement>();
   const bodies = new Map<SettingsPane, HTMLElement>();
-  for (const p of PANES) {
+  // The 2D view has no sounds of the office's own to set.
+  const shown = PANES.filter((p) => office || p.id !== 'sound');
+  for (const p of shown) {
     const tab = h('button.settings-tab', { type: 'button', role: 'tab', onclick: () => show(p.id) }, h('span.icon', { 'aria-hidden': 'true' }, p.icon), h('span', {}, p.label)) as HTMLButtonElement;
     tabs.set(p.id, tab);
     nav.append(tab);
@@ -512,8 +537,8 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
     const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
     if (!step) return;
     e.preventDefault();
-    const i = PANES.findIndex((p) => p.id === lastPane);
-    const next = PANES[(i + step + PANES.length) % PANES.length].id;
+    const i = shown.findIndex((p) => p.id === lastPane);
+    const next = shown[(i + step + shown.length) % shown.length].id;
     show(next);
     tabs.get(next)!.focus();
   });
@@ -527,6 +552,7 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
   const offLeave = store.on('leaveOnMerge', paintLeave);
   const offLimit = [store.on('machine', paintLimit), store.on('me', paintLimit)];
   const offDir = [store.on('projectsDir', paintDir), store.on('me', paintDir)];
+  const offRestart = [store.on('upgrade', paintRestart), store.on('me', paintRestart)];
   const offPrompts = [store.on('prompts', paintAgent), store.on('prompts', paintPrompts), store.on('me', paintAgent), store.on('me', paintPrompts)];
   const modal = openModal(el, {
     doing: '⚙️ in settings',
@@ -539,13 +565,15 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
       offLeave();
       offLimit.forEach((off) => off());
       offDir.forEach((off) => off());
+      offRestart.forEach((off) => off());
       offPrompts.forEach((off) => off());
     },
   });
-  show(first ?? lastPane);
+  const open = first ?? lastPane;
+  show(shown.some((p) => p.id === open) ? open : 'you');
   close.addEventListener('click', () => modal.close());
   character.addEventListener('click', () => {
     modal.close();
-    onCharacter();
+    office?.onCharacter();
   });
 }

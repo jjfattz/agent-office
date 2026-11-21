@@ -1,4 +1,4 @@
-// ⚙️ Settings: team notifications, the worker limit, upgrades, the holiday theme, the building's map,
+// ⚙️ Settings: team notifications, the worker limit, upgrades and restarting, the holiday theme, the building's map,
 // the office's prompts and default worker, and whether merged workers go home by themselves.
 import path from 'node:path';
 import { OPEN_CODE_MODEL_MAX } from '../../../shared/providers.js';
@@ -62,6 +62,14 @@ export const settingsHandlers = {
     void ctx.upgrader.start(who).then((err) => {
       if (err) ctx.warn(c, err);
       else ctx.toastAll(`${who} is upgrading the office — it restarts when the new version is built`);
+    });
+  },
+  'office.restart'(ctx, c) {
+    const who = c.peer.name;
+    if (!ctx.meOf(c.accountId).admin) return ctx.warn(c, 'Only admins can restart the office');
+    void ctx.upgrader.restartNow(who).then((err) => {
+      if (err) ctx.warn(c, err);
+      else console.log(`\n  🔄 ${who} is restarting the office…`);
     });
   },
   'theme.set'(ctx, c, msg) {

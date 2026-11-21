@@ -19,7 +19,7 @@ export interface Config {
   project?: string;
   host: string;
   port: number;
-  /** Open the office in a browser, signed in, when it's started in a terminal (--no-open: don't). */
+  /** Open the office in a browser, signed in, when it's started in a terminal (--open). Off by default: it prints where to go instead. */
   open: boolean;
   /** Plaintext password, only when known: from --password, or generated and not yet claimed. */
   password?: string;
@@ -132,8 +132,9 @@ Options:
                           is kept and the password is never displayed again.
       --reset-password    Forget the generated password (a new one is made on the
                           next start) and exit
-      --no-open           Don't open the office in your browser when it starts
-                          (env AGENT_OFFICE_NO_OPEN=1)
+      --open              Open the office in your browser, signed in, when it
+                          starts (env AGENT_OFFICE_OPEN=1). Without it, the
+                          office only prints its address and a sign-in link
       --agent <cmd>       Default agent command (default "claude", env AGENT_OFFICE_AGENT)
       --agent-args <str>  Extra args for the configured agent, e.g. "--model opus"
                           Workers can also select Claude Code, OpenCode, Codex, Grok,
@@ -233,7 +234,8 @@ export function loadConfig(argv: string[]): Config {
   let port = Number(process.env.PORT) || 4600;
   // Loopback unless asked: an office lets whoever signs in run commands on this machine.
   let host = '127.0.0.1';
-  let open = !process.env.AGENT_OFFICE_NO_OPEN || process.env.AGENT_OFFICE_NO_OPEN === '0';
+  // Opening a browser is asked for (--open): by default the office prints where to go instead.
+  let open = process.env.AGENT_OFFICE_OPEN === '1';
   let password = process.env.AGENT_OFFICE_PASSWORD || '';
   let agentCmd = process.env.AGENT_OFFICE_AGENT || 'claude';
   let agentArgs: string[] = splitArgs(process.env.AGENT_OFFICE_AGENT_ARGS || '');
@@ -302,6 +304,10 @@ export function loadConfig(argv: string[]): Config {
       case '--reset-password':
         resetPassword = true;
         break;
+      case '--open':
+        open = true;
+        break;
+      // What turned opening off when it was on by default: still taken, so a command line with it works.
       case '--no-open':
         open = false;
         break;

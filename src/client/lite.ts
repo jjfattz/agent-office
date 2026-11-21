@@ -5,7 +5,7 @@
 // anywhere in it.
 
 import { Net } from './net';
-import { AVATAR_COLORS, loadProfile, loadSettings, saveProfile, store } from './state';
+import { AVATAR_COLORS, loadProfile, loadSettings, saveProfile, saveSettings, store } from './state';
 import { randomLook } from '../shared/avatar';
 import { cloneLabel } from '../shared/floors';
 import { ROOF } from '../shared/rooftop';
@@ -23,6 +23,7 @@ import { openQueue } from './ui/queue';
 import { openAsk } from './ui/ask';
 import { openMeeting, type MeetingPreset } from './ui/meeting';
 import { openSignIns } from './ui/signins';
+import { openSettings } from './ui/settings';
 import { byUrgency, waitingInOrder, waitingLabel } from './nextup';
 import { buzz, DesktopNotifier, waitingOnSomeone } from './notify';
 import { workerCard, type CardActions } from './lite/cards';
@@ -99,7 +100,8 @@ net.onMessage((msg) => {
     case 'upgrade':
       if (msg.state.phase === 'restarting') {
         net.expectRestart();
-        toast('⬆️ The office is restarting on its new version. Back in a minute.');
+        const { by, restart } = msg.state;
+        toast(restart ? `🔄 ${by ?? 'Someone'} is restarting the office. Back in a few seconds.` : '⬆️ The office is restarting on its new version. Back in a minute.');
       }
       break;
   }
@@ -347,6 +349,21 @@ onDoingChange(() => sendDoing());
 const bell = h('button.btn', { type: 'button', title: 'Notifications: have this phone buzz when a worker needs you', 'aria-label': 'Notifications' }, '🔔');
 bell.addEventListener('click', () => openNotify(net));
 $('to-3d').before(bell);
+
+// ---- ⚙️ Settings: the office's own, and yours that mean something here (not the 3D office's sounds or camera) ----
+const gear = h('button.btn', { type: 'button', title: 'Settings', 'aria-label': 'Settings' }, '⚙️');
+gear.addEventListener('click', () =>
+  openSettings(net, {
+    settings,
+    onChange: (s) => saveSettings(Object.assign(settings, s)),
+    notifier,
+    onSignOut: async () => {
+      await fetch('/api/logout', { method: 'POST' }).catch(() => {});
+      location.href = '/login?next=/lite';
+    },
+  }),
+);
+$('to-3d').before(gear);
 installPush(net, (id, floor) => linkTo(id, floor));
 
 // ---- Opened on a worker (a notification's link: /lite?worker=…&floor=…) ------------------------
