@@ -8,6 +8,7 @@ import { providerPicker } from '../provider';
 import { getJson } from './api';
 import { openClose } from './close';
 import { commentBox } from './comment-box';
+import { issueEditor, type IssueEditor, type IssueText } from './issue-edit';
 import { labelButton, labelChip } from './labels';
 import { avatar, commentCard, errorBox, nodes, spinnerRow } from './pieces';
 import { issueContext, issuePrompt, type BoardActions } from './prompts';
@@ -19,6 +20,8 @@ export function openIssue(first: GhIssue, net: Net, actions: BoardActions) {
   const itemUrl = it.url;
   let detail: GhIssueDetail | null = null;
   let error = '';
+  /** The title and description being edited in place of the first card, while they are. */
+  let editor: IssueEditor | null = null;
   const close = h('button.btn.close', { 'aria-label': 'Close' }, '✕');
   const pill = h('span.pill');
   const conv = h('div.gh-conv');
@@ -41,11 +44,12 @@ export function openIssue(first: GhIssue, net: Net, actions: BoardActions) {
   const queue = h('button.btn', { type: 'button', onclick: addIssueToQueue }) as HTMLButtonElement;
   const carry = actions.pickUp;
   const pickUp = carry ? h('button.btn', { type: 'button', title: 'Carry its card to an empty desk, a worker or the queue board, and press E there', onclick: () => carry(it) }, '✋ Pick it up') : null;
+  const heading = h('h2');
   const meta = h('div.gh-meta');
   const el = h(
     'div.modal.gh-window.issue',
     { role: 'dialog', 'aria-label': `Issue #${it.number}` },
-    h('header', {}, pill, h('h2', { title: it.title }, `#${it.number} ${it.title}`), close),
+    h('header', {}, pill, heading, close),
     meta,
     h('div.gh-body', {}, conv),
     h(
@@ -63,6 +67,8 @@ export function openIssue(first: GhIssue, net: Net, actions: BoardActions) {
   );
   const renderFrame = () => {
     const isOpen = it.state === 'OPEN';
+    heading.textContent = `#${it.number} ${it.title}`;
+    heading.title = it.title;
     meta.replaceChildren(
       ...nodes(
         avatar(it.author),
@@ -85,8 +91,29 @@ export function openIssue(first: GhIssue, net: Net, actions: BoardActions) {
     queue.title = onQueue ? '' : 'A worker picks it up by itself when a desk is free and there is room under the worker limit';
     queue.textContent = onQueue ? (task!.status === 'running' ? `🤖 ${task!.workerName ?? 'A worker'} is on it` : '📋 On the queue') : '📋 Add to queue';
   };
+  const edited = (saved?: IssueText) => {
+    editor?.dispose();
+    editor = null;
+    if (saved) {
+      if (detail) detail.body = saved.body;
+      it = { ...it, ...saved };
+      renderFrame();
+    }
+    render();
+  };
+  const edit = () => {
+    // Only once the full description is in: the board's copy of it is cut short.
+    if (!detail || editor) return;
+    editor = issueEditor(it.number, { title: it.title, body: detail.body }, itemUrl, detail.viewer, net, edited);
+    render();
+  };
+  const bodyCard = () => {
+    const card = commentCard({ id: 'body', author: it.author, body: detail?.body ?? it.body, createdAt: it.createdAt, url: it.url }, itemUrl, 'opened this');
+    if (detail) card.querySelector('header')?.append(h('span.grow'), h('button.btn', { type: 'button', title: "Change the issue's title and description on GitHub", onclick: edit }, '✏️ Edit'));
+    return card;
+  };
   const render = () => {
-    thread.replaceChildren(commentCard({ id: 'body', author: it.author, body: detail?.body ?? it.body, createdAt: it.createdAt, url: it.url }, itemUrl, 'opened this'));
+    thread.replaceChildren(editor?.el ?? bodyCard());
     if (error) thread.append(errorBox(error, load));
     else if (!detail) thread.append(spinnerRow('Loading comments…'));
     else if (!detail.comments.length) thread.append(h('p.gh-quiet', {}, 'No comments yet.'));
@@ -121,6 +148,7 @@ export function openIssue(first: GhIssue, net: Net, actions: BoardActions) {
     doing: `📋 reading issue #${it.number}`,
     onClose: () => {
       comment.dispose();
+      editor?.dispose();
       unsubs.forEach((u) => u());
     },
   });

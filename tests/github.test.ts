@@ -128,3 +128,40 @@ test('pull request listing works when older gh versions reject optional fields',
   assert.equal(pulls?.items[0].checks, 'none');
   assert.ok(calls.some((fields) => !fields.includes('url') && !fields.includes('updatedAt')));
 });
+
+test('an issue edited from the office shows its new title at once, and over a list asked for before the edit', async () => {
+  const issue = { number: 4, title: 'Old', state: 'OPEN', url: 'u', author: { login: 'ada' }, labels: [], assignees: [], createdAt: '', updatedAt: '', body: 'old body', comments: [] };
+  const sent: string[][] = [];
+  let release = () => {};
+  const runner = async (args: string[]) => {
+    sent.push(args);
+    if (args[0] === 'api') return JSON.stringify({ title: 'New', body: 'new body' });
+    if (args[args.indexOf('--state') + 1] !== 'open') return '[]';
+    // The look at GitHub that was under way when the edit went in still has the old title.
+    await new Promise<void>((r) => (release = r));
+    return JSON.stringify([issue]);
+  };
+  let issues: GhState<GhIssue> | undefined;
+  const github = new GitHub('/repo', (s) => (issues = s), () => {}, runner);
+  github.issues = { items: [{ ...issue, author: 'ada', labels: [], assignees: [], comments: 0 }], fetchedAt: 0, loading: false };
+  const listing = (github as unknown as { refreshIssues(): Promise<void> }).refreshIssues();
+
+  assert.deepEqual(await github.edit(4, 'New', 'new body'), { title: 'New', body: 'new body' });
+  const patch = sent.find((a) => a[0] === 'api')!;
+  assert.deepEqual(patch.slice(0, 4), ['api', '--method', 'PATCH', 'repos/{owner}/{repo}/issues/4']);
+  assert.ok(patch.includes('title=New') && patch.includes('body=new body'));
+  assert.equal(issues?.items[0].title, 'New');
+
+  release();
+  await listing;
+  assert.equal(issues?.items[0].title, 'New');
+  assert.equal(issues?.items[0].body, 'new body');
+});
+
+test("an edit GitHub turns away says why and leaves the board as it was", async () => {
+  const github = new GitHub('/repo', () => {}, () => {}, async () => {
+    throw new Error('HTTP 403: Must have admin rights to Repository.');
+  });
+  github.issues = { items: [], fetchedAt: 0, loading: false };
+  assert.deepEqual(await github.edit(4, 'New', ''), { error: 'HTTP 403: Must have admin rights to Repository.' });
+});

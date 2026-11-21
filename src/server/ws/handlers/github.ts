@@ -1,7 +1,7 @@
-// The floor's GitHub boards: refreshing them, and merging, commenting on, closing and labeling
-// issues and pull requests, as whoever asks (see withGitHub).
+// The floor's GitHub boards: refreshing them, and merging, commenting on, closing, labeling and
+// editing issues and pull requests, as whoever asks (see withGitHub).
 import type { GitHubClientMsg } from '../../../shared/protocol.js';
-import { GH_COMMENT_MAX, GH_LABEL_MAX } from '../../../shared/protocol.js';
+import { GH_COMMENT_MAX, GH_LABEL_MAX, GH_TITLE_MAX } from '../../../shared/protocol.js';
 import { num, str } from '../../office/input.js';
 import { here } from './common.js';
 import type { HandlerMap, ViewPieces } from './types.js';
@@ -97,6 +97,29 @@ export const githubHandlers = {
           if (r.labels) ctx.toastFloor(floor, `🏷️ ${who} labeled ${kind === 'pull' ? 'PR' : 'issue'} #${n}: ${[...add.map((l) => `+${l}`), ...remove.map((l) => `−${l}`)].join(' ')}`);
         }),
       (error) => ctx.sendTo(c, { t: 'gh.labeled', kind, number: n, error }),
+    );
+  },
+  'gh.edit'(ctx, c, msg) {
+    const who = c.peer.name;
+    const floor = here(ctx, c);
+    const n = num(msg.number);
+    if (!floor || !Number.isSafeInteger(n) || n <= 0) return;
+    const title = typeof msg.title === 'string' ? msg.title.trim() : '';
+    const body = typeof msg.body === 'string' ? msg.body : '';
+    // Refused rather than cut short, as a comment is.
+    const invalid = !title ? 'The issue needs a title' : title.length > GH_TITLE_MAX ? `GitHub takes titles of up to ${GH_TITLE_MAX} characters` : body.length > GH_COMMENT_MAX ? `GitHub takes descriptions of up to ${GH_COMMENT_MAX} characters` : '';
+    if (invalid) {
+      ctx.sendTo(c, { t: 'gh.edited', number: n, error: invalid });
+      return;
+    }
+    ctx.withGitHub(
+      c,
+      (as) =>
+        void floor.github.edit(n, title, body, as).then((r) => {
+          ctx.sendTo(c, { t: 'gh.edited', number: n, ...r });
+          if (!r.error) ctx.toastFloor(floor, `✏️ ${who} edited issue #${n}`);
+        }),
+      (error) => ctx.sendTo(c, { t: 'gh.edited', number: n, error }),
     );
   },
 } satisfies HandlerMap<GitHubClientMsg>;
