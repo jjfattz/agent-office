@@ -6,9 +6,9 @@ import './push.css';
 import type { Net } from '../net';
 import { store } from '../state';
 import type { PushDevice } from '../../shared/protocol';
-import { h, openModal, timeAgo, toast } from '../ui/dom';
+import { h, openModal, timeAgo } from '../ui/dom';
 import { confirmDialog } from '../ui/prompt';
-import { currentSubscription, pushBlocked, pushOn, thisEndpoint, turnOff, turnOn } from './index';
+import { currentSubscription, preparePush, pushBlocked, pushOn, thisEndpoint, turnOff, turnOn } from './index';
 
 let open = false;
 
@@ -32,33 +32,45 @@ export function openNotify(net: Net) {
       list,
     ),
   );
-  let busy = false;
+  /** Turning it on or off: the switch shows where it's going till it gets there. */
+  let busy: boolean | undefined;
+  /** Why the last try didn't work, until the next one. It stays on screen: a toast is gone before you've read it. */
+  let error: string | undefined;
   const paint = () => {
     const blocked = pushBlocked();
     const on = pushOn();
-    box.checked = on;
-    box.disabled = busy || (!!blocked && !on);
-    test.disabled = busy || !store.push?.devices.length;
-    say.classList.toggle('bad', !!blocked && !on);
-    say.textContent = busy
-      ? 'One moment…'
-      : on
-        ? 'On: this phone buzzes when a worker needs you or is done, even with the office closed. Tap the notification to go straight to that worker.'
-        : (blocked ?? 'Off. Turn it on to hear about workers that need you with the office closed and your phone locked.');
+    const why = on ? undefined : (error ?? blocked);
+    box.checked = busy ?? on;
+    box.disabled = busy !== undefined || (!!blocked && !on);
+    test.disabled = busy !== undefined || !store.push?.devices.length;
+    say.classList.toggle('bad', busy === undefined && !!why);
+    say.textContent =
+      busy !== undefined
+        ? 'One moment…'
+        : on
+          ? 'On: this phone buzzes when a worker needs you or is done, even with the office closed. Tap the notification to go straight to that worker.'
+          : (why ?? 'Off. Turn it on to hear about workers that need you with the office closed and your phone locked.');
     list.replaceChildren(...deviceRows(net, store.push?.devices ?? []));
   };
   box.addEventListener('change', async () => {
-    busy = true;
+    // Before anything else, while the tap still counts: see turnOn.
+    const job = box.checked ? turnOn(net) : turnOff(net).then(() => undefined);
+    busy = box.checked;
+    error = undefined;
     paint();
-    const err = box.checked ? await turnOn(net) : (await turnOff(net), undefined);
-    busy = false;
-    if (err) toast(err, 'warn');
+    error = await job;
+    busy = undefined;
     paint();
   });
   test.addEventListener('click', () => net.send({ t: 'push.test' }));
   const off = store.on('push', paint);
   net.send({ t: 'push.get' });
   void currentSubscription().then(paint);
+  // The service worker and the office's key, ready for the tap.
+  void preparePush(net).then((err) => {
+    if (err && !pushOn() && busy === undefined) error = err;
+    paint();
+  });
   paint();
   openModal(el, {
     onClose: () => {
