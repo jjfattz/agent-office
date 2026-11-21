@@ -115,7 +115,7 @@ export function knownPushService(endpoint: string): boolean {
 export type PushResult = { ok: true } | { ok: false; gone: boolean; error: string };
 
 /** Sends one push. `ttl` is how long the push service keeps trying a phone that's off (seconds). */
-export async function sendPush(keys: VapidKeys, target: PushTarget, payload: object, opts: { ttl?: number; urgency?: 'high' | 'normal'; topic?: string } = {}): Promise<PushResult> {
+export async function sendPush(keys: VapidKeys, target: PushTarget, payload: object, opts: { ttl?: number; urgency?: 'high' | 'normal' } = {}): Promise<PushResult> {
   if (!knownPushService(target.endpoint)) return { ok: false, gone: true, error: 'Not a push service the office knows' };
   const body = encryptPush(target, Buffer.from(JSON.stringify(payload)));
   try {
@@ -126,8 +126,6 @@ export async function sendPush(keys: VapidKeys, target: PushTarget, payload: obj
         'content-encoding': 'aes128gcm',
         ttl: String(opts.ttl ?? 3600),
         urgency: opts.urgency ?? 'high',
-        // A newer push with the same topic replaces one the push service is still holding.
-        ...(opts.topic ? { topic: opts.topic } : {}),
         authorization: vapidAuth(keys, target.endpoint),
       },
       body: new Uint8Array(body),
