@@ -1,0 +1,5 @@
+/* The Claude limits box under the 2D view's workers: ui/limits.css's, sized for a thumb like the cards. */
+.lite-limits { margin-top: 14px; padding: 12px 14px; background: #fff; box-shadow: 0 3px 0 var(--ink); font-size: 14px; gap: 6px; }
+.lite-limits .plan { font-size: 13px; }
+.lite-limits .reset { font-size: 12px; }
+.lite-limits:active { background: var(--paper-2); }

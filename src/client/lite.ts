@@ -27,6 +27,7 @@ import { byUrgency, waitingInOrder, waitingLabel } from './nextup';
 import { buzz, DesktopNotifier, waitingOnSomeone } from './notify';
 import { workerCard, type CardActions } from './lite/cards';
 import { installWake } from './lite/wake';
+import { installLimits } from './lite/limits';
 import { followKeyboard } from './shared/viewport';
 import { installPush, pushOn } from './push';
 import { openNotify } from './push/window';
@@ -52,6 +53,7 @@ const settings = loadSettings();
 // A phone with 🔔 on hears by web push instead (see push/), so it isn't notified twice.
 const notifier = new DesktopNotifier(() => settings.notify && !pushOn(), (id) => openWorker(id));
 const wake = installWake(net);
+installLimits(net);
 followKeyboard();
 
 /** The server version this page was loaded with. */

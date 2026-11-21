@@ -1,0 +1,15 @@
+/* Claude plan limits: the 5-hour session and the week, under the workers in the 3D office and the 2D view. */
+.limits { cursor: pointer; font-size: 12px; font-weight: 700; display: flex; flex-direction: column; gap: 4px; }
+.panel.limits h3 { margin: 0 0 2px; font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: baseline; gap: 5px; }
+.limits .plan { margin-left: auto; font-size: 12px; text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 800; }
+.limits .row { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.limits .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.limits .row b { font-weight: 900; font-variant-numeric: tabular-nums; }
+.limits .row b.over { color: var(--bad); }
+.limits .reset { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.limits .meter + .row { margin-top: 3px; }
+.limits .muted { color: var(--muted); font-weight: 600; }
+.meter { height: 10px; border: 2px solid var(--ink); border-radius: 999px; background: #fff; overflow: hidden; }
+.meter .fill { height: 100%; background: var(--good); transition: width .3s; }
+.meter.near .fill { background: var(--warn); }
+.meter.over .fill { background: var(--bad); }

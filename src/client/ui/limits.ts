@@ -1,7 +1,7 @@
+import './limits.css';
 import type { PlanWindow } from '../../shared/protocol';
 import { store } from '../state';
-import { $, h } from './dom';
-import { panelHide } from './menu';
+import { h } from './dom';
 
 /** Numbers older than this say when they were read. */
 const STALE_MS = 10 * 60_000;
@@ -34,16 +34,18 @@ function windowRow(w: PlanWindow, now: number): HTMLElement[] {
   ];
 }
 
-/** The Claude plan's 5-hour session and weekly limits, under the workers. Click to read them again. */
-export function renderLimits() {
+/**
+ * The Claude plan's 5-hour session and weekly limits, under the workers, into `el`: the 3D office's
+ * panel (with its ✕ as `close`) and the 2D view's box both. Click to read them again.
+ */
+export function renderLimits(el: HTMLElement, close?: HTMLElement) {
   const s = store.limits;
-  const el = $('limits');
   el.classList.toggle('hidden', !s.windows.length);
   if (!s.windows.length) return;
   const now = Date.now();
   const plan = s.plan ? s.plan.charAt(0).toUpperCase() + s.plan.slice(1) : '';
   // Whose plan they are: the floor's provider account, when its Claude workers run on one.
   const account = s.account ? h('div.row.muted', { title: `The Claude account this floor's workers run on` }, h('span.what', {}, `🪪 ${s.account}`)) : null;
-  el.replaceChildren(h('h3', {}, 'Claude limits', plan ? h('span.plan', {}, plan) : null, panelHide('limits')), ...(account ? [account] : []), ...s.windows.flatMap((w) => windowRow(w, now)));
+  el.replaceChildren(h('h3', {}, 'Claude limits', plan ? h('span.plan', {}, plan) : null, close ?? null), ...(account ? [account] : []), ...s.windows.flatMap((w) => windowRow(w, now)));
   if (now - s.at > STALE_MS) el.append(h('div.row.muted', {}, `As of ${new Date(s.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`));
 }

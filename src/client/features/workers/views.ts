@@ -24,6 +24,7 @@ import { $ } from '../../ui/dom';
 import { openExpand } from '../../ui/floorplan';
 import { renderWorkers } from '../../ui/workers-panel';
 import { renderLimits } from '../../ui/limits';
+import { panelHide } from '../../ui/menu';
 import { modelBadge, providerLabel } from '../../ui/provider';
 import { renderUsage } from '../../ui/usage';
 import { Worker } from '../../world/character';
@@ -387,9 +388,10 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
   }
   store.on('theme', dressUp);
   store.on('usage', renderUsage);
-  store.on('limits', renderLimits);
+  const showLimits = () => renderLimits($('limits'), panelHide('limits'));
+  store.on('limits', showLimits);
   // The reset countdowns tick down between reads.
-  setInterval(renderLimits, 30_000);
+  setInterval(showLimits, 30_000);
   $('limits').addEventListener('click', () => net.send({ t: 'limits.refresh' }));
 
   /** Where confetti comes from over a desk: above the worker's head. */
