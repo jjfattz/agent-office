@@ -84,6 +84,8 @@ Its HTTP routes, if it has any, go in `http/routes/`, and its tests in `tests/`.
 
 A new game for the arcade cabinet isn't a feature of its own: it's three modules and a line in each of the cabinet's three lists, in [Adding a game](arcade.md#adding-a-game).
 
+The boss's computer (`features/retro/`, with its server side in `src/server/retro.ts` and `retro-db.ts`) has its own map of what's where, and what's easy to break, in [Working on it](retro.md#working-on-it).
+
 ## Adding an agent provider
 
 One adapter file in `src/server/providers/`, one entry in `PROVIDERS` in `src/server/providers/index.ts`, and one row in `src/shared/providers.ts` (its id in `AGENT_PROVIDERS`, its entry in `PROVIDER_META`). The typecheck fails until all three are there. Its row says which models and efforts it takes and how the hire dialog asks for them; one whose CLI lists its models gets a lister in `src/server/models.ts` too. What reads them, and the one place that still names providers one by one, are in [Provider seams](dsh-acp-integration.md#provider-seams).

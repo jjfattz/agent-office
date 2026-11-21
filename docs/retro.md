@@ -102,3 +102,34 @@ The first time the office looks up a console's games, it downloads that console'
 The games play in [EmulatorJS](https://emulatorjs.org) (version 4.2.3, from its own site), which runs the [libretro](https://www.libretro.com) emulators in the browser. It needs the internet: the page downloads the emulator for a console the first time you play one of its games, and the browser keeps it after that.
 
 EmulatorJS runs in a sandboxed frame with no origin of its own, so it can't see the office's page, its sign-in or its terminals. The office hands it the game and talks to it only in messages: start, pause, save. Its code is in `src/client/features/retro/`, and the office's shelf is `src/server/retro.ts`. Recognizing games is `src/server/retro-db.ts` (the lists), `src/shared/retro-crc.ts` (the checksums, which the browser works out for games you add and sends to the office to look up) and `src/shared/retro-names.ts` (game names, folders and boxes).
+
+## Working on it
+
+What's where, for changing the boss's computer:
+
+| File | What it is |
+| --- | --- |
+| `src/shared/retro.ts` | The consoles (`RETRO_SYSTEMS`: name, EmulatorJS core, file extensions, color, libretro list names), checking a game file's name, and `RetroMeta`, what the office says a game is. |
+| `src/shared/retro-names.ts` | No-Intro names: a game's title (`prettyTitle`), what two names of one game have in common (`titleKey`), its region, which copy to prefer (`nameRank`), its box's address (`thumbUrls`), and a console from a folder's name (`FOLDERS`). |
+| `src/shared/retro-crc.ts` | CRC-32 of a game file, with and without a header, and a zip's CRCs from its directory. The server and the browser both use it. |
+| `src/server/retro.ts` | The office's shelf: `files()` lists it, `list()` lists it recognized (waiting up to 4 s, then saying `pending`), `open()` hands out a game. |
+| `src/server/retro-db.ts` | libretro's lists: downloading, `parseDat`, `buildIndex`, and `RetroDb.identify` (CRC, then name). |
+| `src/server/http/routes/retro.ts` | `GET /api/retro/shelf`, `POST /api/retro/identify` (the browser's games), `GET /api/retro/rom`. |
+| `src/client/features/retro/` | The page's side: `catalog.ts` (the homebrew), `games.ts` (the library as one list, recognizing, fetching a game), `library.ts` (the library's screen), `add.ts` (＋ Add games), `store.ts` (what the browser keeps), `frame.ts` (the page inside the sandbox), `player.ts` (the frame on the office's page), `monitor.ts` (the monitor in 3D), `ui.ts` (the window). |
+| `tests/retro.test.ts`, `tests/retro-recognize.test.ts` | Its tests. |
+
+**Pinned versions.** EmulatorJS is `EJS_VERSION` in `frame.ts`, the homebrew collections are `COLLECTIONS` in `catalog.ts`, and libretro's lists are `LIBRETRO_DB_COMMIT` in `retro-db.ts`. A new list commit is a new folder in `.agent-office/retro-db/`, so offices download the lists again. The boxes aren't pinned (libretro-thumbnails' `master`); `thumbnails.libretro.com` answered 404 for them, so they come from GitHub.
+
+**A new console.** Its row in `RETRO_SYSTEMS` (with its EmulatorJS core and libretro's list names for it, as in `metadat/no-intro/` in libretro-database), its folder names in `FOLDERS` in `retro-names.ts` (more particular ones before the ones they contain: `snes` before `nes`, `gba` before `gb`), and its row in the tables on this page. A console that needs its own BIOS to play anything stays out.
+
+**A new homebrew game.** Its entry in `CATALOG` in `catalog.ts`, from one of the pinned collections, with its maker, year, genre, players and a blurb. The tests check every file is for its console, under a pinned commit, and has a title of its own. Only games their makers let be handed out, and none that are copies or ports of somebody else's. The office never comes with, or downloads, commercial games: people play their own copies, which it recognizes.
+
+**What's easy to break.**
+- **The frame stays put.** It lives in `.retro-host` on the page, not in the window, and `place()` lays it over the screen each frame, because moving an iframe in the page reloads it and the game would be gone. Chrome stops drawing a hidden frame from another origin, and EmulatorJS only takes a picture (for a save) as it draws, so a frame being saved stays drawn, see-through, until it's done.
+- **Pictures of a paused game.** The bridge in `frame.ts` runs a paused game for a moment to take one, else a save's picture is empty.
+- **Focus.** A hidden frame can't take the keyboard, so `focus()` waits for it to be up (`wantsFocus`).
+- **Starting another game.** `quit()` takes a game out; `cancel()` also gives up on one still starting. Starting a game cancels the last one, never itself.
+- **The sandbox.** The frame has no storage of its own, so its settings come and go in messages, and EmulatorJS's wake lock is stubbed out. Never give it `allow-same-origin`: a test checks.
+- **Recognizing.** `identify` gives `undefined` when a console's lists couldn't be loaded and `null` for a game it doesn't know. `pending` means only that it ran out of time, so the library asks again (every 3 s, up to 40 times); a list that couldn't be downloaded isn't asked for again for 10 minutes.
+
+**Trying it.** `scripts/fork/sandbox.sh` (see [The fork](fork.md)), with game files in the sandbox's `.agent-office/roms/<console>/`. A file named like a real game (`Super Metroid.sfc`, even if it's not one) is enough to see it recognized by name, with its box. In a headless browser, sign in, close the welcome windows with Esc, then `window.__office.retro.play()` opens the library and `window.__office.retro.games` lists what's in it, with what each was recognized as (`known`). Chrome needs `--use-angle=swiftshader --enable-unsafe-swiftshader` for the office's 3D, and shows a "running slowly" card that's only the headless GPU.
