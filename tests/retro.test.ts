@@ -84,7 +84,7 @@ test('the games the computer comes with are each a file of a pinned collection, 
 test("the office's shelf lists the game files in each console's folder, and nothing else", (t) => {
   const dir = dataDir(t);
   const shelf = new RetroShelf(dir);
-  assert.deepEqual(shelf.list(), []);
+  assert.deepEqual(shelf.files(), []);
   // Looking made a folder for every console, so whoever runs the office can see where games go.
   for (const id of SYSTEM_IDS) assert.ok(existsSync(path.join(dir, 'roms', id)), id);
   const put = (rel: string, bytes = 'game') => writeFileSync(path.join(dir, 'roms', rel), bytes);
@@ -97,7 +97,7 @@ test("the office's shelf lists the game files in each console's folder, and noth
   put('snes/game.nes', 'wrong console');
   put('atari2600/combat.bin');
   writeFileSync(path.join(dir, 'secret.nes'), 'outside');
-  const list = shelf.list();
+  const list = shelf.files();
   assert.deepEqual(
     list.map((g) => `${g.system}/${g.file}`),
     ['nes/a game.zip', 'nes/B Game.nes', 'atari2600/combat.bin'],
@@ -108,7 +108,7 @@ test("the office's shelf lists the game files in each console's folder, and noth
 test('the shelf only hands out its own games, by a name that cannot step outside it', async (t) => {
   const dir = dataDir(t);
   const shelf = new RetroShelf(dir);
-  shelf.list();
+  shelf.files();
   writeFileSync(path.join(dir, 'roms', 'nes', 'game.nes'), 'NES\x1a');
   writeFileSync(path.join(dir, 'secret.nes'), 'outside');
   writeFileSync(path.join(dir, 'roms', 'secret.nes'), 'outside');

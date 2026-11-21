@@ -14,6 +14,8 @@ export interface MyRom {
   size: number;
   added: number;
   data: Blob;
+  /** Its CRCs, to recognize it by in libretro's database (see crcsOf in shared/retro-crc.ts). */
+  crcs?: string[];
 }
 
 /**
