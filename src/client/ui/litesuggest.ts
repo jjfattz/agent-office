@@ -4,13 +4,10 @@ import './litesuggest.css';
 
 import { h } from './dom';
 
+export { touchOnly } from './touch';
+
 /** Said to stay in 3D: this browser isn't offered the 2D view again (it's in the ☰ menu). */
 const DECLINED_KEY = 'agent-office.lite-declined';
-
-/** A touch screen and no mouse: a phone or a tablet, which can't walk around the office anyway. */
-export function touchOnly(): boolean {
-  return matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
-}
 
 function declined(): boolean {
   try {

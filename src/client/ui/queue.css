@@ -39,4 +39,8 @@
 .queue-empty { margin-top: 16px; text-align: center; padding: 18px 8px; border: 3px dashed var(--muted); border-radius: 14px; font-weight: 800; }
 @media (max-width: 640px) {
   .queue-limit span { display: none; }
+  /* The title and ✕ keep the top row; how many at once goes under them. */
+  .modal[aria-label="Task queue"] header { flex-wrap: wrap; row-gap: 8px; }
+  .modal[aria-label="Task queue"] header h2 { flex: 1 1 calc(100% - 70px); }
+  .modal[aria-label="Task queue"] header .queue-limit { order: 1; }
 }

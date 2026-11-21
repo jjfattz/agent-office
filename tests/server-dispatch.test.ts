@@ -142,6 +142,12 @@ before(async () => {
   for (const page of ['index', 'login', 'claim', 'join', 'lite']) writeFileSync(path.join(publicDir, `${page}.html`), `<!doctype html><title>${page}</title>`);
   writeFileSync(path.join(publicDir, 'favicon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
   writeFileSync(path.join(publicDir, 'assets', 'app.js'), 'export {};\n');
+  // The home-screen app's files (see http/routes/app.ts).
+  writeFileSync(path.join(publicDir, 'sw.js'), '// sw\n');
+  writeFileSync(path.join(publicDir, 'offline.html'), '<!doctype html><title>offline</title>');
+  writeFileSync(path.join(publicDir, 'manifest.webmanifest'), '{"name":"Agent Office"}');
+  mkdirSync(path.join(publicDir, 'icons'));
+  writeFileSync(path.join(publicDir, 'icons', 'icon-192.png'), 'png');
   // A stand-in for Claude Code, so reading the plan's limits never runs the real one.
   const claude = path.join(bin, 'claude');
   writeFileSync(claude, '#!/bin/sh\nexit 0\n');
@@ -177,6 +183,16 @@ test('answers the open routes before anyone signs in', async () => {
   assert.equal(asset.status, 200);
   assert.equal(asset.headers.get('cache-control'), 'public, max-age=31536000, immutable');
   assert.equal((await get('/assets/missing.js')).status, 404);
+  // The home-screen app's own files are public: a phone asks for them before it's signed in.
+  const sw = await get('/sw.js');
+  assert.equal(sw.status, 200);
+  assert.equal(sw.headers.get('content-type'), 'text/javascript; charset=utf-8');
+  assert.equal((await get('/manifest.webmanifest')).headers.get('content-type'), 'application/manifest+json');
+  assert.match(await (await get('/offline.html')).text(), /<title>offline<\/title>/);
+  assert.equal((await get('/icons/icon-192.png')).headers.get('content-type'), 'image/png');
+  assert.equal((await get('/icons/missing.png')).status, 404);
+  // Answering a worker from a notification needs a session.
+  assert.equal((await post('/api/push/answer', { worker: 'x', key: '1' })).status, 401);
 
   // Everything else waits for a session.
   const home = await get('/');
@@ -236,12 +252,25 @@ test('answers the signed-in routes', async () => {
   await bad(await get('/api/changes/file', me), 400, 'Bad request');
   await bad(await get(`/api/docs/file?floor=${floor}`, me), 400, 'Bad request');
   await bad(await get(`/api/docs/other?floor=${floor}&path=x`, me), 404, 'Not found');
+  await bad(await post('/api/push/answer', { worker: 'nope', key: '1' }, me), 403, 'Forbidden');
+  await bad(await post('/api/push/answer', { worker: 'nope', key: '1' }, { ...me, origin: base }), 409, 'That worker has gone home');
   assert.deepEqual(await (await fetch(base + '/api/whoami', { method: 'POST', headers: me })).json(), { ok: true, me: { admin: true } });
   for (const [method, p] of [['GET', '/nothing-here.txt'], ['PUT', '/api/login'], ['POST', '/api/docs'], ['POST', '/api/search']]) {
     const missing = await fetch(base + p, { method, headers: me });
     assert.equal(missing.status, 404, `${method} ${p}`);
     assert.equal(await missing.text(), 'Not found');
   }
+
+  // Opened from a phone's home screen: a device of its own, with a long session it renews.
+  await bad(await post('/api/app/session', {}, me), 403, 'Forbidden');
+  const app = await post('/api/app/session', {}, { ...me, origin: base, 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)' });
+  assert.equal(app.status, 200);
+  assert.match(app.headers.get('set-cookie') ?? '', /Max-Age=7776000/);
+  assert.equal(typeof (await app.json()).device, 'string');
+  const appCookie = { cookie: (app.headers.get('set-cookie') ?? '').split(';')[0] };
+  const again = await post('/api/app/session', {}, { ...appCookie, origin: base });
+  assert.deepEqual(await again.json(), { ok: true }, 'a fresh session needs no renewing yet');
+  assert.equal((await get('/api/whoami', appCookie)).status, 200);
 
   const out = await post('/api/logout', {}, me);
   assert.equal(out.status, 200);
@@ -273,6 +302,16 @@ test('welcomes a browser and dispatches what it sends', async () => {
   a.send({ t: 'ping', at: 42 });
   const pong = await a.take('pong');
   assert.equal(pong.at, 42);
+
+  // 🔔: the office's key to subscribe with, and no device of Ada's yet.
+  a.send({ t: 'push.get' });
+  const push = await a.take('push');
+  assert.equal(Buffer.from(push.state.key, 'base64url').length, 65);
+  assert.deepEqual(push.state.devices, []);
+  a.send({ t: 'push.subscribe', endpoint: 'https://127.0.0.1/steal', keys: { p256dh: 'x', auth: 'y' } });
+  assert.match((await a.take('toast')).text, /push service/);
+  a.send({ t: 'worker.answer', workerId: 'nope', key: '1' });
+  assert.equal((await a.take('toast')).text, 'That worker has gone home');
   assert.equal(typeof pong.now, 'number');
 
   // Someone else walks in: each sees the other.

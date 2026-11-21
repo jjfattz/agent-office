@@ -3,6 +3,7 @@
 // then the rest; the last one answers every path left with the client bundle, or a 404.
 import type { Route } from '../router.js';
 import { agentRoutes } from './agents.js';
+import { appRoutes } from './app.js';
 import { authRoutes } from './auth.js';
 import { fileRoutes } from './files.js';
 import { githubRoutes } from './github.js';
@@ -29,10 +30,16 @@ export const routes: readonly Route[] = [
   pageRoutes.join,
   phoneRoutes.page,
   pageRoutes.favicon,
+  appRoutes.manifest,
+  appRoutes.worker,
+  appRoutes.offline,
+  appRoutes.icons,
   // Signed in.
   authRoutes.whoami,
   agentRoutes.models,
   phoneRoutes.name,
+  appRoutes.answer,
+  appRoutes.appSession,
   fileRoutes.image,
   fileRoutes.whiteboardFile,
   fileRoutes.termDrop,

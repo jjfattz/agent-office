@@ -132,8 +132,17 @@ export class Devices {
     const i = this.data.pairings.findIndex((p) => p.hash === hashOf(token));
     if (i < 0) return undefined;
     const [p] = this.data.pairings.splice(i, 1);
+    return this.enroll(p.owner, ua, name);
+  }
+
+  /**
+   * A device of `owner`'s (none: the shared password's), signed in already: the office as an app on
+   * a phone's home screen (see http/routes/app.ts), which then stays signed in the way a paired one does.
+   */
+  enroll(owner: string | undefined, ua: string, name?: string): Device {
+    this.sync();
     const ua2 = String(ua).slice(0, 300);
-    const device: Device = { id: randomBytes(9).toString('base64url'), ...(p.owner ? { owner: p.owner } : {}), name: cleanDeviceName(name) || guessDevice(ua2), ua: ua2, pairedAt: this.now() };
+    const device: Device = { id: randomBytes(9).toString('base64url'), ...(owner ? { owner } : {}), name: cleanDeviceName(name) || guessDevice(ua2), ua: ua2, pairedAt: this.now() };
     this.data.devices.push(device);
     // The oldest go first, if someone pairs a great many.
     while (this.data.devices.length > MAX_DEVICES) this.data.devices.shift();

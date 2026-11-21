@@ -1,6 +1,7 @@
 import './ask.css';
 import type { AgentEffort, AgentProvider, WorkerStatus } from '../../shared/protocol';
 import { h, openModal, STATUS_LABEL } from './dom';
+import { enterSends } from './enter';
 import { store } from '../state';
 import { providerPicker, type ProviderPicker } from './provider';
 import { repoPicker } from './prompt';
@@ -69,6 +70,7 @@ export function openAsk(opts: AskOptions) {
   }
 
   const cancel = h('button.btn', { type: 'button' }, 'Cancel');
+  const hint = h('span.grow');
   const form = h(
     'form.modal.ask',
     { role: 'dialog', 'aria-label': opts.title },
@@ -85,7 +87,7 @@ export function openAsk(opts: AskOptions) {
       wtRow,
       repos.element,
     ),
-    h('footer', {}, h('span.grow', {}, 'Enter to send · Shift+Enter for a new line'), cancel, submit),
+    h('footer', {}, hint, cancel, submit),
   ) as HTMLFormElement;
   form.noValidate = true;
   pick(to);
@@ -121,12 +123,7 @@ export function openAsk(opts: AskOptions) {
     e.preventDefault();
     send();
   });
-  ta.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-      e.preventDefault();
-      send();
-    }
-  });
+  hint.append(enterSends(ta, send) ?? '');
   setTimeout(() => {
     ta.focus();
     ta.setSelectionRange(ta.value.length, ta.value.length);

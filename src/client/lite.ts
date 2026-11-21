@@ -12,7 +12,7 @@ import { ROOF } from '../shared/rooftop';
 import { DESK_BY_ID, nextFreeSeat } from '../shared/layout';
 import { isAsleep } from '../shared/status';
 import type { AgentEffort, AgentProvider, FloorInfo, WorkerInfo } from '../shared/protocol';
-import { $, clip, closeAllModals, doingNow, h, onDoingChange, onModalChange, openModal, readingNow, STATUS_LABEL, timeAgo, toast } from './ui/dom';
+import { $, closeAllModals, doingNow, h, onDoingChange, onModalChange, openModal, readingNow, toast } from './ui/dom';
 import { openTerminal, openTerminalFor, routeTerminalMessage } from './ui/terminal';
 import { openChanges, openChangesFor, routeChangesMessage } from './ui/changes';
 import { lostWorktreeDialog, openPrompt, routeWorktreeMessage, sendHomeDialog } from './ui/prompt';
@@ -23,9 +23,15 @@ import { openQueue } from './ui/queue';
 import { openAsk } from './ui/ask';
 import { openMeeting, type MeetingPreset } from './ui/meeting';
 import { openSignIns } from './ui/signins';
-import { modelBadge, providerLabel } from './ui/provider';
 import { byUrgency, waitingInOrder, waitingLabel } from './nextup';
-import { askNotifyPermission, buzz, DesktopNotifier, notifyPermission, waitingOnSomeone } from './notify';
+import { buzz, DesktopNotifier, waitingOnSomeone } from './notify';
+import { workerCard, type CardActions } from './lite/cards';
+import { installWake } from './lite/wake';
+import { followKeyboard } from './lite/viewport';
+import { installPush, pushOn } from './push';
+import { openNotify } from './push/window';
+import { installHint } from './pwa/install';
+import { keepSignedIn } from './pwa/session';
 import { repoChoices } from './shared/hiring';
 // The tab title counts the workers waiting on someone, on every floor, as the 3D office's does.
 import { renderTitle } from './shared/title';
@@ -42,12 +48,14 @@ const saved = loadProfile();
 store.profile = { name: saved?.name ?? 'Guest', color: saved?.color ?? AVATAR_COLORS[1], look: saved?.look ?? randomLook() };
 const net = new Net(() => store.profile, () => null, true);
 const settings = loadSettings();
-const notifier = new DesktopNotifier(() => settings.notify, (id) => openWorker(id));
+// A phone with 🔔 on hears by web push instead (see push/), so it isn't notified twice.
+const notifier = new DesktopNotifier(() => settings.notify && !pushOn(), (id) => openWorker(id));
+const wake = installWake(net);
+followKeyboard();
 
 /** The server version this page was loaded with. */
 let bootVersion = '';
 
-net.onStatus((up) => $('conn').classList.toggle('hidden', up));
 net.onMessage((msg) => {
   store.apply(msg);
   routeTerminalMessage(msg);
@@ -66,10 +74,13 @@ net.onMessage((msg) => {
       if (openId && store.workers.has(openId)) net.send({ t: 'worker.attach', workerId: openId });
       const watching = openChangesFor();
       if (watching && store.workers.has(watching.workerId)) net.send({ t: 'changes.watch', ...watching });
+      wake.updated();
+      openLinked();
       break;
     }
     case 'floor.enter':
       offTheRoof();
+      openLinked();
       break;
     case 'toast':
       toast(msg.text, msg.level);
@@ -136,56 +147,10 @@ const lastStatus = new Map<string, string>();
 function renderWorkers() {
   const list = byUrgency(store.workers.values());
   const ul = $('workers');
-  ul.replaceChildren(...list.map(workerCard));
+  ul.replaceChildren(...list.map((w) => workerCard(w, cardActions)));
   if (!list.length) ul.append(h('li.lite-empty', {}, store.project ? 'Nobody is working on this floor. ✨ New task hires someone.' : 'No workers here.'));
   $('waiting-now').textContent = waitingLabel(waitingInOrder(list));
   renderTitle();
-}
-
-function workerCard(w: WorkerInfo): HTMLElement {
-  const desk = DESK_BY_ID.get(w.deskId);
-  const waiting = waitingOnSomeone(w);
-  const asleep = isAsleep(w.status);
-  const badge = w.kind === 'agent' ? modelBadge(w.provider, w.model, w.effort, w.usage?.model) : undefined;
-  const task = w.task?.name ?? w.title ?? (w.prompt ? clip(w.prompt, 90) : undefined);
-  // What it's asking, doing or did, in a line.
-  const now = w.lost
-    ? '🌿 Its worktree was deleted outside agent-office: open it to fix it'
-    : w.status === 'needs_input'
-      ? `🙋 ${w.activity ?? 'Waiting on an answer'}`
-      : asleep
-        ? '💤 Asleep: open it to wake it up'
-        : w.status === 'done'
-          ? w.task?.summary && `✅ ${w.task.summary}`
-          : (w.task?.summary ?? w.activity);
-  const sub = [
-    w.kind === 'agent' ? `⚙️ ${providerLabel(w.provider, store.project)}${badge ? ` · ${badge}` : ''}` : '🐚 shell',
-    w.account && store.accountName(w.account) && `🪪 ${store.accountName(w.account)}`,
-    desk && (desk.station ? `📌 ${desk.label}` : desk.label),
-    w.worktree && `🌿 ${w.worktree.branch}`,
-    w.pr && `🔀 PR #${w.pr.number}`,
-    w.lastInput && `⌨️ ${w.lastInput.by} ${timeAgo(w.lastInput.at)}`,
-  ].filter(Boolean);
-  return h(
-    'li.lite-worker',
-    { class: `${w.status}${waiting ? ' waiting' : ''}` },
-    h(
-      'button.lite-card',
-      { type: 'button', onclick: () => openWorker(w.id), 'aria-label': `${w.name}, ${STATUS_LABEL[w.status] ?? w.status}: open its terminal` },
-      h('span.dot', { style: `background:${w.color}` }),
-      h(
-        'span.lite-info',
-        {},
-        h('span.lite-name', {}, w.name),
-        task ? h('span.lite-task', {}, task) : null,
-        now ? h('span.lite-now', {}, now) : null,
-        h('span.lite-sub', {}, sub.join(' · ')),
-      ),
-      h('span.lite-state', {}, h('span.pill', { class: w.status }, STATUS_LABEL[w.status] ?? w.status), waiting && w.waitingSince ? h('small', {}, timeAgo(w.waitingSince)) : null),
-    ),
-    // One that's asking something is answered in its terminal, where the question is.
-    asleep || w.lost || w.status === 'needs_input' ? null : h('button.btn.lite-say', { type: 'button', title: `Send ${w.name} a prompt`, 'aria-label': `Send ${w.name} a prompt`, onclick: () => promptWorker(w.id) }, '✍️'),
-  );
 }
 
 /** A worker needs input or is done: a notification while you're elsewhere, and a buzz. */
@@ -261,6 +226,24 @@ function promptWorker(id: string) {
   });
 }
 
+/** What a worker card's buttons do. */
+const cardActions: CardActions = {
+  open: (id) => openWorker(id),
+  prompt: (id) => promptWorker(id),
+  answer: (id, key) => net.send({ t: 'worker.answer', workerId: id, key }),
+  pr: (id) => openPr(id),
+};
+
+/** A worker's pull request: its window, if the board has it, or GitHub's page. */
+function openPr(id: string) {
+  const w = store.workers.get(id);
+  if (!w) return;
+  const it = w.pr && store.pulls.items.find((p) => p.number === w.pr!.number);
+  if (it) openPull(it, net, boardActions());
+  else if (w.pr) window.open(w.pr.url, '_blank', 'noopener');
+  else net.send({ t: 'worker.pr', workerId: id });
+}
+
 // ---- New work: a prompt for a worker who's here, or a new one at a free desk -------------------
 function hire(deskId: string, prompt: string, worktree: boolean, provider?: AgentProvider, model?: string, effort?: AgentEffort, repos?: string[], issue?: number) {
   net.send({ t: 'worker.spawn', deskId, prompt, worktree, provider, model, effort, issue, repos: repos?.length ? repos : undefined });
@@ -310,14 +293,7 @@ function showMeeting(preset?: MeetingPreset) {
     net,
     {
       openTerminal: openWorker,
-      openPr: (id) => {
-        const w = store.workers.get(id);
-        if (!w) return;
-        const it = w.pr && store.pulls.items.find((p) => p.number === w.pr!.number);
-        if (it) openPull(it, net, boardActions());
-        else if (w.pr) window.open(w.pr.url, '_blank', 'noopener');
-        else net.send({ t: 'worker.pr', workerId: id });
-      },
+      openPr,
     },
     preset,
   );
@@ -356,14 +332,40 @@ function sendDoing(reconnected = false) {
 onModalChange(() => sendDoing());
 onDoingChange(() => sendDoing());
 
-// ---- Notifications ------------------------------------------------------------------------------
-// The browser only asks from a tap, so there's a button for it while it hasn't been asked.
-const bell = h('button.btn', { type: 'button', title: 'Get a notification when a worker needs input or is done', 'aria-label': 'Turn on notifications' }, '🔔');
-bell.addEventListener('click', async () => {
-  await askNotifyPermission();
-  bell.remove();
-});
-if (notifyPermission() === 'default' && settings.notify) $('to-3d').before(bell);
+// ---- Notifications -----------------------------------------------------------------------------
+// 🔔: this phone buzzes when a worker needs you, even with the office closed (web push, see push/).
+const bell = h('button.btn', { type: 'button', title: 'Notifications: have this phone buzz when a worker needs you', 'aria-label': 'Notifications' }, '🔔');
+bell.addEventListener('click', () => openNotify(net));
+$('to-3d').before(bell);
+installPush(net, (id, floor) => linkTo(id, floor));
+
+// ---- Opened on a worker (a notification's link: /lite?worker=…&floor=…) ------------------------
+let linked: { worker: string; floor?: string } | undefined;
+{
+  const q = new URLSearchParams(location.search);
+  const worker = q.get('worker');
+  if (worker) linked = { worker, floor: q.get('floor') ?? undefined };
+  if (worker) history.replaceState(null, '', location.pathname);
+}
+
+function linkTo(worker: string, floor?: string) {
+  linked = { worker, floor };
+  openLinked();
+}
+
+/** Over to the linked worker's floor, then its terminal, once it's there. */
+function openLinked() {
+  if (!linked || !net.up) return;
+  if (linked.floor && store.floor && linked.floor !== store.floor && store.floors.some((f) => f.id === linked!.floor)) {
+    net.send({ t: 'floor.go', floor: linked.floor });
+    return;
+  }
+  const id = linked.worker;
+  linked = undefined;
+  if (!store.workers.has(id)) return toast('That worker has gone home', 'warn');
+  closeAllModals();
+  openWorker(id);
+}
 
 // ---- In ----------------------------------------------------------------------------------------
 /** Your name, the first time this browser comes in on the shared password. */
@@ -396,6 +398,7 @@ void (async () => {
   } catch {
     // the welcome message says it too
   }
+  keepSignedIn();
   // With an account of your own, your name is that account's.
   if (store.me.account) store.profile.name = store.me.account.name;
   if (saved || store.me.account) return net.connect();
@@ -410,6 +413,7 @@ void (async () => {
 renderFloors();
 renderWorkers();
 renderNav();
+installHint();
 
 // Debug handle for quick checks from the console / headless screenshots.
 (window as any).__lite = { store, net };

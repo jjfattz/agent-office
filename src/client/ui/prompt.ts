@@ -1,6 +1,7 @@
 import './prompt.css';
 import type { AgentEffort, AgentProvider, LostBranch, ServerMsg, WorktreeCleanup, WorktreeState } from '../../shared/protocol';
 import { h, openModal } from './dom';
+import { enterSends } from './enter';
 import { store } from '../state';
 import { providerPicker, type ProviderPicker } from './provider';
 import { dictateField } from './dictate';
@@ -71,12 +72,13 @@ export function openPrompt(opts: PromptOptions) {
   const provider: ProviderPicker | null = opts.providerOption ? providerPicker(store.project, 'prompt-provider') : null;
   const submit = h('button.btn.primary', { type: 'submit' }, opts.submitLabel ?? 'Send ✨');
   const cancel = h('button.btn', { type: 'button' }, 'Cancel');
+  const hint = h('span.grow');
   const form = h(
     'form.modal',
     { role: 'dialog', 'aria-label': opts.title },
     h('header', {}, h('h2', {}, opts.title)),
     h('div.body', {}, opts.warning ? h('p.setting-note.bad', { style: 'margin:0 0 10px', role: 'alert' }, opts.warning) : null, opts.subtitle ? h('p', { style: 'margin:0 0 10px;font-weight:700;color:var(--muted)' }, opts.subtitle) : null, dictateField(ta), provider?.element ?? null, wtRow, repos.element),
-    h('footer', {}, h('span.grow', {}, 'Enter to send · Shift+Enter for a new line'), cancel, submit),
+    h('footer', {}, hint, cancel, submit),
   ) as HTMLFormElement;
   form.noValidate = true;
 
@@ -104,12 +106,7 @@ export function openPrompt(opts: PromptOptions) {
     e.preventDefault();
     send();
   });
-  ta.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-      e.preventDefault();
-      send();
-    }
-  });
+  hint.append(enterSends(ta, send) ?? '');
   setTimeout(() => {
     ta.focus();
     ta.setSelectionRange(ta.value.length, ta.value.length);

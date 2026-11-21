@@ -50,6 +50,11 @@ body.lite { min-height: 100dvh; background: var(--paper); -webkit-tap-highlight-
 .lite-nav .n:empty { display: none; }
 .lite-nav .n { min-width: 20px; padding: 0 5px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 12px; line-height: 20px; font-variant-numeric: tabular-nums; }
 .lite-nav .btn.primary .n { background: #fff; color: var(--ink); }
+/* A phone on its side: clear of the notch. */
+@media (max-width: 760px) {
+  .lite-bar, .lite-nav { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  .lite-main { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+}
 /* A wide window: the bars line up with the list. */
 @media (min-width: 761px) { .lite-bar, .lite-nav { padding-left: calc(50% - 368px); padding-right: calc(50% - 368px); } }
 
@@ -58,6 +63,14 @@ body.lite { min-height: 100dvh; background: var(--paper); -webkit-tap-highlight-
 .toast { text-align: center; }
 .conn { position: fixed; top: 84px; z-index: 60; }
 .backdrop { z-index: 50; }
+/* Windows fit the part of the screen the on-screen keyboard leaves (lite/viewport.ts). */
+body.lite .backdrop { inset: var(--vv-top, 0px) 0 auto 0; height: var(--vv-height, 100dvh); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+body.lite .modal { max-height: calc(var(--vv-height, 100dvh) - 16px); }
+/* With the keyboard up, the bottom bar would sit on top of it: it goes until the keyboard does. */
+body.lite.keyboard-up .lite-nav { display: none; }
+/* A thumb's size: every button in the 2D view's bars and windows. */
+body.lite .modal header .btn, body.lite .modal footer .btn { min-height: 44px; }
+body.lite .modal .btn.close { min-width: 44px; min-height: 44px; justify-content: center; }
 
 /* No zooming in on a box as you tap it (iOS does, for text under 16px). */
 .modal textarea, .modal input[type=text], .modal input[type=password], .modal select { font-size: 16px; }
@@ -66,13 +79,18 @@ body.lite { min-height: 100dvh; background: var(--paper); -webkit-tap-highlight-
 /* On a phone, the big windows take the whole screen; the small ones stay dialogs. */
 @media (max-width: 640px) {
   .backdrop { padding: 8px; }
-  .backdrop:has(> .modal.term, > .modal.board, > .modal.gh-window, > .modal.desk-changes, > .modal.meeting-window, > .modal[aria-label="Task queue"]) { padding: 0; }
+  body.lite .backdrop:has(> .modal.term, > .modal.board, > .modal.gh-window, > .modal.desk-changes, > .modal.meeting-window, > .modal[aria-label="Task queue"]) { padding: 0; }
   /* body.lite outranks the windows' own sizes and padding, whatever order the sheets load in. */
   body.lite .modal.term, body.lite .modal.board, body.lite .modal.gh-window, body.lite .modal.desk-changes, body.lite .modal.meeting-window,
-  body.lite .modal[aria-label="Task queue"] { width: 100%; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
-  .modal { max-height: calc(100dvh - 16px); }
+  body.lite .modal[aria-label="Task queue"] { width: 100%; height: var(--vv-height, 100dvh); max-height: var(--vv-height, 100dvh); border: 0; border-radius: 0; box-shadow: none; padding-top: env(safe-area-inset-top); }
+  body.lite .backdrop { padding-left: max(8px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); }
   body.lite .modal.term .term-host { padding: 6px 2px 2px 6px; }
-  body.lite .modal.board .body { padding: 10px; overflow-x: auto; }
-  .modal.board .column { min-width: 78vw; }
+  body.lite .modal.board .body { padding: 10px; }
   .modal.board header .board-status { display: none; }
+}
+
+/* A touch screen: every button in a window is a thumb's size (44×44 at least), however small it is with a mouse. */
+@media (pointer: coarse) {
+  body.lite .modal button, body.lite .modal .btn, body.lite .modal a.btn { min-height: 44px; min-width: 44px; }
+  body.lite .modal .btn { justify-content: center; }
 }

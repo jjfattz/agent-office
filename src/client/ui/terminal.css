@@ -31,3 +31,9 @@
 .term-say { display: flex; gap: 8px; }
 .modal .term-say input[type=text] { flex: 1; min-width: 0; padding: 8px 10px; }
 .modal.term header .typed { font-size: 12px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+/* A phone's terminal (ui/termtouch.ts): A− / A+ in the key row, and 📋 Copy after holding a finger on a line. */
+.term-keys .btn.term-size { flex: 0 0 auto; min-width: 42px; font-size: 13px; }
+.term-copy { position: absolute; left: 50%; bottom: 10px; z-index: 11; display: flex; gap: 6px; transform: translateX(-50%); padding: 6px; border: 3px solid var(--ink); border-radius: 14px; background: var(--paper); box-shadow: var(--shadow); }
+.term-copy[hidden] { display: none; }
+.term-copy .btn { min-height: 44px; min-width: 44px; justify-content: center; }
+.modal.term:has(.term-keypad) .term-host { touch-action: none; }
