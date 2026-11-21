@@ -31,6 +31,7 @@ import { Jukebox, type JukeboxPlay } from '../features/jukebox/sound';
 import { needsYou } from '../features/needsyou/sound';
 import type { Pos } from './places';
 import { pageTurn, paper } from './paper';
+import { skeeball, type SkeeballSound } from '../features/skeeball/sound';
 import { toss, type TossSound } from '../features/bargames/sound';
 import { fidgeting, Typing } from './typing';
 import { Rain, thunder } from './weather';
@@ -163,7 +164,7 @@ export class OfficeSound {
     airlock(this.a, at, what);
   }
 
-  // ---- Games (features/golf, bargames, basketball and cabinet) -------------------------------------
+  // ---- Games (features/golf, bargames, basketball, skeeball and cabinet) ---------------------------
 
   golf(kind: GolfSound, at?: Pos, speed = 5) {
     golf(this.a, kind, at, speed);
@@ -175,6 +176,11 @@ export class OfficeSound {
 
   ball(kind: BallSound, at: Pos, speed: number) {
     ball(this.a, kind, at, speed);
+  }
+
+  /** The skeeball machine: `points` for what a ball scored, `len` seconds for how long it rolls. */
+  skeeball(kind: SkeeballSound, at: Pos, points = 0, len = 1) {
+    skeeball(this.a, kind, at, points, len);
   }
 
   arcade(kind: ArcadeSound, lines = 1) {

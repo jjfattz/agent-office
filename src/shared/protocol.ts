@@ -16,6 +16,7 @@ import type { ProviderAccountsClientMsg, ProviderAccountsServerMsg } from './pro
 import type { QueueClientMsg, QueueServerMsg } from './protocol/queue.js';
 import type { RooftopClientMsg, RooftopServerMsg } from './protocol/rooftop.js';
 import type { SettingsClientMsg, SettingsServerMsg } from './protocol/settings.js';
+import type { SkeeballClientMsg, SkeeballServerMsg } from './protocol/skeeball.js';
 import type { BallClientMsg, CabinetClientMsg, CarClientMsg, DecorClientMsg, DogClientMsg, JukeboxClientMsg, ToysServerMsg, WhiteboardClientMsg } from './protocol/toys.js';
 import type { UsageClientMsg, UsageServerMsg } from './protocol/usage.js';
 import type { WorkerClientMsg, WorkerServerMsg } from './protocol/workers.js';
@@ -33,6 +34,7 @@ export * from './protocol/provider-accounts.js';
 export * from './protocol/queue.js';
 export * from './protocol/rooftop.js';
 export * from './protocol/settings.js';
+export * from './protocol/skeeball.js';
 export * from './protocol/toys.js';
 export * from './protocol/usage.js';
 export * from './protocol/workers.js';
@@ -61,7 +63,8 @@ export type ClientMsg =
   | CarClientMsg
   | DogClientMsg
   | PhoneClientMsg
-  | PushClientMsg;
+  | PushClientMsg
+  | SkeeballClientMsg;
 
 export type ServerMsg =
   | PresenceServerMsg
@@ -78,4 +81,5 @@ export type ServerMsg =
   | UsageServerMsg
   | ToysServerMsg
   | PhoneServerMsg
-  | PushServerMsg;
+  | PushServerMsg
+  | SkeeballServerMsg;

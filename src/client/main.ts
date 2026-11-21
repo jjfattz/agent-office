@@ -54,6 +54,7 @@ import { installPeers } from './features/peers';
 import { installRetro } from './features/retro';
 import { installRooftop } from './features/rooftop';
 import { installSeating } from './features/seating';
+import { installSkeeball } from './features/skeeball';
 import { installSmoke } from './features/smoke';
 import { installLamplight } from './features/lamplight';
 import { installTelescope } from './features/telescope';
@@ -169,6 +170,7 @@ parts.cards = installCarrying(ctx, {
 });
 parts.seating = installSeating(ctx, { shares: () => parts.talk.currentShares(), watchShare: () => parts.talk.watchShare(), retro: parts.retro, showBar: parts.bar.showBar, usable: () => parts.pointer.usable() });
 installGong(ctx, { burstOver: parts.views.burstOver, workerViews: parts.views.workerViews, court: () => parts.worlds.court(), idleAgents: () => parts.worlds.idleAgents() });
+installSkeeball(ctx, { standUp, stopWalking });
 
 parts.hintbar = installHintBar(ctx, core, parts);
 parts.emotes = installEmotes(ctx, { personOf });
