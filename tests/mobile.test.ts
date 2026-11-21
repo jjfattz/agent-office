@@ -146,6 +146,28 @@ async function lite(page: Page) {
   );
 }
 
+/**
+ * A finger dragged up a worker's terminal while the program in it takes the whole screen and reads the
+ * mouse, as Claude Code does: the terminal has no scrollback there, so the drag turns the wheel and the
+ * program is sent wheel reports (SGR, button 65 = down) to scroll its own view.
+ */
+async function scrollsFullScreen(page: Page) {
+  await page.evaluate(() => {
+    const { net, store } = (window as any).__lite;
+    const sent: unknown[] = ((window as any).__sent = []);
+    const send = net.send.bind(net);
+    net.send = (m: unknown) => (sent.push(m), send(m));
+    const msg = { t: 'term.snapshot', workerId: 'w1', cols: 40, rows: 20, data: `\x1b[?1049h\x1b[?1000h\x1b[?1006h\x1b[H${'a line of the conversation\r\n'.repeat(19)}` };
+    for (const h of net.handlers) h(msg);
+    return store.workers.has('w1');
+  });
+  const box = (await page.locator('.modal.term .xterm-screen').boundingBox())!;
+  await touchDrag(page, { x: box.x + box.width / 2, y: box.y + box.height * 0.8 }, { x: box.x + box.width / 2, y: box.y + box.height * 0.2 }, 50);
+  const input = await page.evaluate(() => ((window as any).__sent as { t: string; data?: string }[]).filter((m) => m.t === 'term.input').map((m) => m.data).join(''));
+  assert.match(input, /\x1b\[<65;\d+;\d+M/, 'dragging up sends the program wheel-down reports');
+  assert.doesNotMatch(input, /\x1b\[<64;/, 'and no wheel-up ones');
+}
+
 const close = (page: Page) => page.locator('.backdrop').last().locator('.btn.close').first().click();
 
 for (const d of DEVICES) {
@@ -158,7 +180,13 @@ for (const d of DEVICES) {
       await lite(page);
       await check(page, d, 'workers');
       assert.equal(await page.locator('.lite-answers .btn').count(), 3, 'Byte’s choices are buttons');
-      assert.equal(await page.locator('.lite-actions .btn').count(), 2, 'Pixel has ✍️ Reply and 🔀 PR #7');
+      assert.equal(await page.locator('.lite-actions .btn').count(), 3, 'Pixel has ✍️ Reply, 🔀 PR #7 and 🏠');
+
+      // 🏠 asks before sending it home.
+      await page.locator('.lite-worker.done .lite-home').click();
+      await page.waitForSelector('.modal[aria-label="Send Pixel home?"]');
+      await check(page, d, 'send-home');
+      await close(page);
 
       await page.click('#btn-new');
       await page.waitForSelector('.modal.ask');
@@ -172,6 +200,12 @@ for (const d of DEVICES) {
       await page.locator('.lite-worker.needs_input .lite-card').click();
       await page.waitForSelector('.modal.term .term-keypad');
       await check(page, d, 'terminal');
+      assert.equal(await page.locator('.modal.term header .term-home').count(), 1, 'its terminal has 🏠 too');
+      // The 🎤 sits inside the reply box, not hanging out of it.
+      const field = await page.locator('.term-say .dictate-field input').boundingBox();
+      const mic = await page.locator('.term-say .dictate-mic').boundingBox();
+      if (field && mic) assert.ok(mic.y >= field.y && mic.y + mic.height <= field.y + field.height, `the 🎤 (${mic.y}–${mic.y + mic.height}) is inside its box (${field.y}–${field.y + field.height})`);
+      await scrollsFullScreen(page);
       await close(page);
 
       await page.click('#btn-issues');

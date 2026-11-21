@@ -28,4 +28,8 @@ body.phone-ui :is(.modal textarea, .modal input[type=text], .modal input[type=pa
 @media (pointer: coarse) {
   body.phone-ui .modal button, body.phone-ui .modal .btn, body.phone-ui .modal a.btn { min-height: 44px; min-width: 44px; }
   body.phone-ui .modal .btn { justify-content: center; }
+  /* A one-line box you can dictate into (the terminal's reply box): tall enough to hold its 🎤 at that
+     size, so the 🎤 sits inside it rather than hanging out of the bottom. */
+  body.phone-ui .modal .dictate-field.line input[type=text] { min-height: 54px; padding-right: 58px; }
+  body.phone-ui .modal .dictate-field.line .btn.dictate-mic { top: 5px; bottom: 5px; right: 6px; }
 }

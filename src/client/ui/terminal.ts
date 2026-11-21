@@ -73,6 +73,8 @@ export interface TerminalOptions {
    * Left out, a phone gets it (body.phone-ui: the 3D office on a phone, see features/touch).
    */
   keypad?: boolean;
+  /** A 🏠 in the header that asks before sending the worker home (the 2D view's, which has no desk to press X at). */
+  sendHome?: () => void;
 }
 
 /** The keypad's keys: what each types, or a function of the terminal for the ones that depend on its mode. */
@@ -129,6 +131,7 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
     'aria-label': 'Send Esc to the terminal',
   }, '⎋ Esc');
   const changesBtn = h('button.btn', { type: 'button', title: 'What this worker changed: files, diff, commit, open a PR (C at the desk)' }, '🌿 Changes');
+  const homeBtn = opts.sendHome ? h('button.btn.term-home', { type: 'button', title: `Send ${info.name} home`, 'aria-label': `Send ${info.name} home` }, '🏠') : null;
   const hideBtn = h('button.btn.term-hide', { type: 'button', title: 'Hide this terminal; the worker keeps running at its desk', 'aria-label': 'Hide terminal' }, 'Hide');
   const closeBtn = h('button.btn.close', { title: 'Hide terminal (Esc or Ctrl+]) · the worker keeps running; ⎋ Esc or Ctrl+[ sends Esc to the terminal', 'aria-label': 'Hide terminal' }, '✕');
   const host = h('div.term-host', { 'data-drop': '📎 Drop screenshots or files here to put them in the terminal' });
@@ -152,7 +155,7 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
   );
   host.append(mic.live);
   // The keypad has an Esc of its own, and a 🎤 on its prompt box.
-  const el = h('div.modal.term', { role: 'dialog', 'aria-label': `${info.name} terminal` }, h('header', {}, dot, title, pill, cost, viewers, typed, modelsBtn, keypad ? null : mic.button, keypad ? null : escBtn, onChanges ? changesBtn : null, hideBtn, closeBtn), tabs.bar, host, tabs.pages, keypad);
+  const el = h('div.modal.term', { role: 'dialog', 'aria-label': `${info.name} terminal` }, h('header', {}, dot, title, pill, cost, viewers, typed, modelsBtn, keypad ? null : mic.button, keypad ? null : escBtn, onChanges ? changesBtn : null, homeBtn, hideBtn, closeBtn), tabs.bar, host, tabs.pages, keypad);
 
   const term = new Terminal({
     fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
@@ -363,6 +366,8 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
     },
   };
   hideBtn.addEventListener('click', () => modal.close());
+  // The question opens over the terminal, which stays open behind it until the worker has gone.
+  homeBtn?.addEventListener('click', () => opts.sendHome?.());
   closeBtn.addEventListener('click', () => modal.close());
   changesBtn.addEventListener('click', () => {
     onChanges?.();
