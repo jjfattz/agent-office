@@ -1,0 +1,11 @@
+/* What a worker card in the 2D view asks of you (lite/cards.ts): its choices as buttons, or ✍️ Reply and its PR. */
+.lite-worker { flex-wrap: wrap; }
+.lite-worker > .lite-card { flex: 1 1 0; }
+.lite-answers, .lite-actions { flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: 8px; padding: 0 12px 12px 38px; }
+.lite-answers .btn, .lite-actions .btn { min-height: 44px; flex: 1 1 auto; justify-content: flex-start; gap: 8px; white-space: normal; text-align: left; line-height: 1.2; font-size: 14px; }
+.lite-answers { flex-direction: column; }
+.lite-answers .btn.sent { opacity: 1; background: var(--paper-2); color: var(--ink); }
+.lite-answers .btn:disabled:not(.sent) { opacity: .45; }
+.lite-key { flex: none; display: inline-grid; place-items: center; min-width: 24px; height: 24px; border: 2px solid currentColor; border-radius: 8px; font-size: 13px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.lite-actions .btn { flex: 1 1 0; justify-content: center; }
+@media (max-width: 380px) { .lite-answers, .lite-actions { padding-left: 12px; } }

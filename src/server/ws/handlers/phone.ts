@@ -43,11 +43,14 @@ export const phoneHandlers = {
   },
   'phone.test'(ctx, c) {
     if (!throttle(c, 'phone.test', 2000)) return;
-    // Your own paired devices with the office open (web push to a closed one is still to come).
+    // Your own paired devices with the office open buzz now; the ones with 🔔 on hear by web push.
     const mine = [...ctx.clients.values()].filter((o) => o.device && !o.out && o.accountId === c.accountId);
-    if (!mine.length) return ctx.warn(c, 'Open the office on your phone first: it buzzes while the office is open there');
     for (const o of mine) ctx.sendTo(o, { t: 'phone.buzz', title: '🔔 It works!', body: 'Your phone will hear from the office here.' });
-    ctx.sendTo(c, { t: 'toast', text: `🔔 Sent to ${mine.length === 1 ? 'your phone' : `${mine.length} of your devices`}`, level: 'info' });
+    void ctx.push.test({ owner: c.accountId, device: c.device }).then(({ sent }) => {
+      if (!mine.length && !sent) return ctx.warn(c, 'Open the office on your phone and turn on 🔔 there, so it hears from the office even when it’s closed');
+      const n = Math.max(mine.length, sent);
+      ctx.sendTo(c, { t: 'toast', text: `🔔 Sent to ${n === 1 ? 'your phone' : `${n} of your devices`}`, level: 'info' });
+    });
   },
   'phone.revoke'(ctx, c, msg) {
     const d = ctx.phone.devices.get(str(msg.id, 64));

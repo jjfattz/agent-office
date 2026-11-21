@@ -25,6 +25,7 @@ import { meeting } from './meeting';
 import { notify } from './notify';
 import { phone } from './phone';
 import { prompts } from './prompts';
+import { push } from './push';
 import { providerAccounts } from './provider-accounts';
 import { services } from './services';
 import { signins } from './signins';
@@ -65,4 +66,5 @@ export const SLICES: readonly Slice[] = [
   signins,
   providerAccounts,
   phone,
+  push,
 ];

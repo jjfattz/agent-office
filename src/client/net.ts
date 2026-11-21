@@ -16,6 +16,8 @@ export class Net {
   private closedByUs = false;
   /** The server is restarting on purpose: retry every second instead of backing off. */
   private restartExpected = false;
+  /** The next try after the socket closed, while it waits out its backoff. */
+  private retryTimer: ReturnType<typeof setTimeout> | undefined;
   up = false;
 
   constructor(
@@ -79,8 +81,26 @@ export class Net {
         // offline; keep retrying
       }
       const delay = this.restartExpected ? 1000 : Math.min(8000, 500 * 2 ** this.retry++);
-      setTimeout(() => this.connect(), delay);
+      this.retryTimer = setTimeout(() => this.connect(), delay);
     };
+  }
+
+  /**
+   * A fresh connection now, rather than waiting out the backoff or trusting a socket a phone may
+   * have dropped while it was asleep: for coming back to the app, or pulling to refresh. The office
+   * sends everything again as it welcomes it back.
+   */
+  reconnect() {
+    clearTimeout(this.retryTimer);
+    const old = this.ws;
+    this.ws = null; // its close is ours, not one to retry after
+    old?.close();
+    if (this.up) {
+      this.up = false;
+      this.statusHandlers.forEach((h) => h(false));
+    }
+    this.retry = 0;
+    this.connect();
   }
 
   expectRestart() {

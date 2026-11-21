@@ -137,6 +137,21 @@ export class Auth {
     return account ? { account, ...on } : undefined;
   }
 
+  /**
+   * A device's session that's past half its life: each visit from it gets a fresh one, so a phone
+   * that keeps using the office stays signed in (until it's signed out from the office).
+   */
+  refreshDue(req: IncomingMessage, now = Date.now()): boolean {
+    const token = parseCookies(req.headers.cookie)[cookieName(req)];
+    if (!token || !this.verify(token)?.device) return false;
+    try {
+      const { exp } = JSON.parse(Buffer.from(token.slice(0, token.indexOf('.')), 'base64url').toString('utf8')) as { exp?: unknown };
+      return typeof exp === 'number' && exp - now < DEVICE_TTL_MS / 2;
+    } catch {
+      return false;
+    }
+  }
+
   fromRequest(req: IncomingMessage): Session | undefined {
     return this.verify(parseCookies(req.headers.cookie)[cookieName(req)]);
   }

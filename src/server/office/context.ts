@@ -17,6 +17,7 @@ import type { ImageProxy } from '../decor.js';
 import type { Ledger } from '../usage.js';
 import type { WhoseLimits } from '../whose-limits.js';
 import type { Webhook } from '../webhook.js';
+import type { Push } from '../push/index.js';
 import type { Machine } from '../machine.js';
 import type { Building, FloorDef } from '../building.js';
 import type { Floor } from '../floor.js';
@@ -70,6 +71,8 @@ export interface BuildingServices {
   /** The Claude plan limits each person sees: of their own Claude, their floor's account, or the office's own. */
   limits: WhoseLimits;
   webhook: Webhook;
+  /** 🔔 Web push to phones and computers with the office closed (see push/). */
+  push: Push;
   machine: Machine;
   /** Queues everywhere may be waiting for room under the worker limit: let them look again. */
   pumpQueues(except?: Floor): void;

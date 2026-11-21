@@ -4,6 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Agent Office</title>
+    <script>
+      // A phone goes to the 2D view before the 3D office starts loading (a touch screen and no mouse:
+      // touchOnly() in ui/touch.ts). ?3d=1, which 🏢 3D in the 2D view opens, stays here, and
+      // remembers it as Stay in 3D does (ui/litesuggest.ts), so the next visit stays too.
+      (function () {
+        try {
+          var KEY = 'agent-office.lite-declined';
+          var q = new URLSearchParams(location.search);
+          if (q.get('3d') === '1') return localStorage.setItem(KEY, '1');
+          var touch = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
+          if (touch && localStorage.getItem(KEY) !== '1') location.replace('/lite' + location.hash);
+        } catch (e) {}
+      })();
+    </script>
     <link rel="icon" href="/favicon.svg" />
     <link rel="stylesheet" href="./style.css" />
   </head>

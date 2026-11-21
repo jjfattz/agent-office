@@ -91,3 +91,11 @@ article.gh-card > header { display: flex; align-items: center; gap: 8px; padding
 /* .modal.gh-labeler outranks the frame's .modal footer .grow, whatever order the sheets load in. */
 .modal.gh-labeler footer .grow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
 .gh-labeler .gh-quiet a { color: #1d6fd6; font-weight: 800; }
+/* A phone: the tabs scroll on their own row, and the buttons that act (Merge, Approve…) are a thumb's size. */
+@media (max-width: 640px) {
+  .gh-tabs { overflow-x: auto; scrollbar-width: none; }
+  .gh-tab { flex: none; min-height: 44px; }
+  .gh-meta { padding: 8px 10px; }
+  .gh-conv { padding: 12px 8px 18px; }
+  .modal.gh-window footer .btn, .gh-foot .btn, .gh-mergebox-go .btn { min-height: 44px; }
+}

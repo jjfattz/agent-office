@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- What the home-screen app shows while the office can't be reached (see sw.js): it keeps
+         trying, and goes back to where it was going once the office answers. Nothing from the office is in it. -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#fff1de" />
+    <title>Agent Office</title>
+    <link rel="icon" href="/favicon.svg" />
+    <style>
+      :root { --ink: #2b2d42; --paper: #fffaf3; --muted: #7a6f65; --accent: #ff8a5b; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; background: var(--paper); color: var(--ink); font-family: 'Nunito', ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, sans-serif; }
+      main { min-height: 100dvh; display: grid; place-items: center; padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom)); text-align: center; }
+      .card { max-width: 360px; }
+      img { width: 88px; height: 88px; animation: bob 1.6s ease-in-out infinite; }
+      h1 { margin: 12px 0 6px; font-size: 22px; font-weight: 900; }
+      p { margin: 0 0 18px; font-weight: 700; color: var(--muted); line-height: 1.4; }
+      button { min-width: 44px; min-height: 48px; padding: 0 22px; border: 3px solid var(--ink); border-radius: 14px; background: var(--accent); color: #fff; font: 900 16px/1 inherit; font-family: inherit; box-shadow: 0 4px 0 var(--ink); }
+      button:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--ink); }
+      @keyframes bob { 50% { transform: translateY(-6px); } }
+      @media (prefers-reduced-motion: reduce) { img { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="card" role="status" aria-live="polite">
+        <img src="/favicon.svg" alt="" />
+        <h1>Reconnecting…</h1>
+        <p id="say">Can’t reach the office right now. Is its computer on, and your phone online? This page keeps trying.</p>
+        <button id="retry" type="button">Try again</button>
+      </div>
+    </main>
+    <script>
+      // Back to the page it was opened as (/lite, say) once the office answers again.
+      const go = () => location.replace(location.pathname === '/offline.html' ? '/lite' : location.href);
+      let timer = 0;
+      async function check() {
+        clearTimeout(timer);
+        try {
+          const res = await fetch('/api/health', { cache: 'no-store' });
+          if (res.ok) return go();
+        } catch {}
+        timer = setTimeout(check, document.hidden ? 15000 : 4000);
+      }
+      document.getElementById('retry').addEventListener('click', go);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+      timer = setTimeout(check, 2000);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,4 @@
+/* Coming back to the 2D view (lite/wake.ts): cards dim until the office has sent them again, and the pull-to-refresh tab. */
+body.lite-stale .lite-workers { opacity: .55; transition: opacity .2s; }
+.lite-pull { position: fixed; left: 50%; top: calc(70px + env(safe-area-inset-top)); z-index: 30; padding: 6px 14px; border: 3px solid var(--ink); border-radius: 999px; background: var(--paper); font-weight: 900; font-size: 13px; opacity: 0; pointer-events: none; transform: translate(-50%, calc(var(--pull, 0px) * .5 - 30px)); transition: opacity .15s; }
+.lite-pull.on { opacity: 1; }

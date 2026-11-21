@@ -1,6 +1,7 @@
 import './terminal.css';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { phoneFontSize, termTouch } from './termtouch';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import type { Net } from '../net';
 import { store } from '../state';
@@ -153,8 +154,8 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
 
   const term = new Terminal({
     fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
-    // A few more columns on a phone's narrow screen.
-    fontSize: opts.keypad ? 12 : 14,
+    // On a phone: the size picked with A− / A+ (see termtouch.ts).
+    fontSize: opts.keypad ? phoneFontSize() : 14,
     lineHeight: 1.1,
     theme: TERM_THEME,
     cursorBlink: true,
@@ -485,6 +486,7 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
     });
     keys.append(b);
   }
+  if (opts.keypad) termTouch(term, host, keys, () => sendSize());
   sayForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const prompt = say.value.trim();

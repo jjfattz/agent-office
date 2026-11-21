@@ -15,7 +15,7 @@ Open **☰ → 📱 Use on your phone** (also **⚙️ Settings → 📱 Phone**
 3. **Turn on secure links.** Your tailnet needs MagicDNS and HTTPS certificates on. **Turn on** opens the page in Tailscale's admin console that does it (once step 4 has asked Tailscale for it, the exact link Tailscale hands back).
 4. **Open the office to your devices.** Flip **Let my devices open the office**. The office runs Tailscale Serve for itself and shows its address, `https://<your-computer>.<your-tailnet>.ts.net`, with **Copy** and **Turn off**. If another app already serves `https://<your-computer>…/` through Tailscale, the office leaves it alone and takes port 8443 (or 10000) instead, and says so.
 5. **Your phone.** Install the Tailscale app on your phone (the App Store and Google Play each have their own small QR code there), sign in with the same account, then scan the big QR code with the phone's camera. It opens the 2D view on your phone, already signed in, and asks what to call the phone. The step turns ✅ when the phone first connects.
-6. **Get a buzz.** **Send a test notification** buzzes your phone while the office is open on it. Tap **🔔** there to allow notifications; on an iPhone, add the page to your home screen first (**Share → Add to Home Screen**), since a web page can only notify you once it's there.
+6. **Get a buzz.** On the phone, add the office to your home screen when it offers (**📲 Add to home screen** on Android; on an iPhone a card shows where **Share → Add to Home Screen** is), open it from its new icon, tap **🔔** and turn on **Notify this phone**. From then on the phone buzzes when a worker needs you, even with the office closed and the phone locked. **Send a test notification** here buzzes every phone of yours that has it on (and any with the office open).
 7. **Keep this computer awake.** On by default once phone access is on: your phone can only reach the office while this computer is on and awake. On a Mac it holds `caffeinate`, on Linux `systemd-inhibit`, and on Windows the system's own keep-awake, for as long as the office runs. A laptop still sleeps when you close its lid, and the window warns you when it can tell.
 
 ![Pairing on the phone: one tap after scanning the code](images/phone-pair.png)
@@ -26,7 +26,21 @@ Phone access stays on through restarts: when the office starts, it checks Serve 
 
 ### Your devices
 
-Every phone you paired is listed in the 📱 window and in **🔐 Your sign-ins**, with when it was last seen. **Sign out** ends its session at once (good for a lost phone). Admins see everyone's in **🔑 Accounts**. A pairing QR code works once, for ten minutes, and signs the phone in as whoever made it (or with the shared office password, when you came in with that). A paired phone stays signed in for 90 days, or until it's signed out.
+Every phone you paired is listed in the 📱 window and in **🔐 Your sign-ins**, with when it was last seen. **Sign out** ends its session at once (good for a lost phone). Admins see everyone's in **🔑 Accounts**. A pairing QR code works once, for ten minutes, and signs the phone in as whoever made it (or with the shared office password, when you came in with that). A paired phone stays signed in for 90 days, or until it's signed out. The office opened from a phone's home screen is listed here too (*iPhone (home screen)*), once it's first opened there: its session starts over every time it's used, so a phone you use the office on never asks for the password again until you sign it out.
+
+### Notifications on your phone
+
+**🔔** at the top of the 2D view opens one switch, **Notify this phone**, and **Send a test**. With it on, the office sends the phone a web push when a worker has needed input, or been done, for a few seconds with nobody at its terminal (the same rule as the team webhook), so it buzzes with the office closed and the screen locked: *🙋 Byte needs you: Wants permission: Bash: npm test*. Tapping it opens the 2D view on that worker's terminal. On Android, a worker asking for permission gets its first and last choices as buttons on the notification (*Yes*, *No…*), which answer it there and then. A phone that has the 2D view on screen isn't pushed, and its notifications go away once someone has dealt with the worker.
+
+When it can't work, the window says why: *On iPhone, add the office to your Home Screen first* (iOS only lets a page on the home screen notify), or that notifications are blocked for the office in the phone's settings. Every device of yours that gets notifications is listed there and in **🔐 Your sign-ins**, each with a 🗑.
+
+There's nothing to set up for it. The office makes its own VAPID key pair the first time, and keeps it and the devices in `.agent-office/push.json` in its data folder. A push goes through the phone's own push service (Apple's, Google's or Mozilla's, which is how web push works), encrypted so only the phone can read it; the office sends to those services and nowhere else.
+
+### The office as an app
+
+![The 2D view on an iPhone: a worker's choices as buttons, the issues board one column at a time, a terminal with its keys, and 🔔 Notify this phone](images/phone-app.png)
+
+On a phone, the office's own address goes straight to the 2D view, before the 3D office starts to load (**🏢 3D** there, or `/?3d=1`, still opens the 3D office, and that browser stays in 3D after that). Added to the home screen, it opens full screen with its own icon. While the office can't be reached (the computer asleep, Tailscale off), it shows *Reconnecting…* and keeps trying, instead of a browser error. Coming back to it after a while, it reconnects at once and says *Updating…* until the floor is current; pulling the list down does the same.
 
 ### What it does and doesn't do
 
@@ -72,13 +86,13 @@ If you'd rather do it yourself, this is what the window does:
    agent-office --trust-proxy
    ```
 
-5. On your phone, with Tailscale connected, open `https://<your-computer>.<your-tailnet>.ts.net/lite` and sign in with the office password or your own [account](../README.md#add-users). Add it to your home screen and tap **🔔** to allow notifications.
+5. On your phone, with Tailscale connected, open `https://<your-computer>.<your-tailnet>.ts.net/lite` and sign in with the office password or your own [account](../README.md#add-users). Add it to your home screen, open it from there, and turn on **🔔 Notify this phone**.
 
 `tailscale serve reset` stops serving everything on your tailnet (the window's **Turn off** removes only the office's). To keep a Mac awake by hand, `caffeinate -s` while it's plugged in, or **System Settings → Battery → Options → Prevent automatic sleeping on power adapter when the display is off**.
 
 ## On your phone
 
-From there you have the whole floor: every worker with what it's asking or doing, ones waiting on you first; tap one for its terminal, with **1** **2** **3** for a permission prompt, the arrows, Enter, Esc and Ctrl+C; **✍️** sends a worker a prompt without opening its terminal; **📌 Issues**, **🔀 PRs**, **📋 Queue** and **✨ New task** to hand out work; and the floor switcher at the top for your other projects. Everything the 2D view does is in [Features](features.md) (*The 2D view, for your phone*). The full 3D office opens at the same address without `/lite`, but it's heavy for a phone.
+From there you have the whole floor: every worker with what it's asking or doing, ones waiting on you first. One asking for permission or to pick an option shows its choices as buttons (**1 Yes**, **2 Yes, and don't ask again…**, **3 No…**), answered right there; one that's done has **✍️ Reply** and its **🔀 PR**. Tap a card for its terminal, with **1** **2** **3** for a permission prompt, the arrows, Enter, Esc and Ctrl+C, **A−** **A+** for the text size, one finger to scroll back, and a long press on a line to copy it; **✍️** sends a worker a prompt without opening its terminal; **📌 Issues**, **🔀 PRs**, **📋 Queue** and **✨ New task** to hand out work; and the floor switcher at the top for your other projects. Everything the 2D view does is in [Features](features.md) (*The 2D view, for your phone*). The windows fit a phone: the boards show one column at a time, picked from tabs along the top; in a prompt box Return makes a new line and **Send** sends; and the windows and the terminal's keys stay above the on-screen keyboard. The full 3D office opens at `/?3d=1`, but it's heavy for a phone.
 
 If you want the office there whether or not your computer is on, run it on a server instead: [`deploy/provision.sh --tailscale`](self-hosting.md) does all of the above for you, on any Ubuntu or Debian machine.
 

@@ -1,0 +1,9 @@
+/* 🔔 Notifications (push/window.ts). The switch is 📱's (ui/phone.css), made a thumb's size. */
+.push-window { width: min(520px, 100%); }
+.modal .push-switch { min-height: 44px; font-size: 16px; }
+.push-say { margin: 10px 0 0; font-weight: 700; }
+.push-say.bad { color: #c9184a; }
+.push-btns { display: flex; gap: 8px; margin-top: 12px; }
+.push-btns .btn { min-height: 44px; }
+.push-devices h4 { margin: 18px 0 8px; }
+.push-devices .phone-devices .btn { min-width: 44px; min-height: 44px; justify-content: center; }

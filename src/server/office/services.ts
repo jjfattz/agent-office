@@ -13,6 +13,7 @@ import { Ledger } from '../usage.js';
 import { PlanLimitsReader } from '../limits.js';
 import { WhoseLimits } from '../whose-limits.js';
 import { Webhook } from '../webhook.js';
+import { Push } from '../push/index.js';
 import { Machine } from '../machine.js';
 import type { Floor } from '../floor.js';
 import { Sky } from '../sky.js';
@@ -100,6 +101,20 @@ export function createServices(ctx: Ctx): BuildingServices {
     if (err) console.error(`agent-office: --webhook: ${err}`);
   }
 
+  // Web push for workers that need you or finish, to phones with the office closed (🔔 in the 2D view).
+  const push = new Push({
+    dataDir: cfg.dataDir,
+    floorOf: (workerId) => {
+      const f = ctx.workerFloor(workerId);
+      return f && { id: f.id, name: f.def.name };
+    },
+    // Its account is still there (or the shared password still on), and its paired device still signed in.
+    allowed: (s) => (s.owner ? !!accounts.get(s.owner) : accounts.sharedPassword) && (!s.device || !!ctx.phone?.devices.get(s.device)),
+    changed: (owner) => {
+      for (const c of clients.values()) if (!c.out && (c.accountId ?? null) === owner) ctx.sendTo(c, { t: 'push', state: push.view({ owner: c.accountId, device: c.device }) });
+    },
+  });
+
   // The machine's CPU and memory, for the monitor on the wall and a warning before hiring, and the
   // most workers the office runs at once, across every floor (--max-workers, or ⚙️ Settings).
   const machine = new Machine(
@@ -122,7 +137,7 @@ export function createServices(ctx: Ctx): BuildingServices {
     });
   };
 
-  return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, providerAccounts, limits, webhook, machine, pumpQueues };
+  return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, providerAccounts, limits, webhook, push, machine, pumpQueues };
 }
 
 /** What's made once the floors are open: the SSH team, the tailnet, workers' web servers, pictures and upgrades. */

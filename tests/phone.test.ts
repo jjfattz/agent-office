@@ -155,6 +155,25 @@ test('a device’s session ends the moment it’s signed out', () => {
   assert.equal(auth.verify(cookie), undefined);
 });
 
+test('the office on a home screen is a device of its own, whose session renews once it’s past half its life', () => {
+  const dir = tmp();
+  const accounts = new Accounts(dir);
+  const salt = randomBytes(16);
+  const auth = new Auth(scryptSync('pw', salt, 32), salt, 'secret', accounts);
+  const devices = new Devices(dir);
+  auth.useDevices((id) => devices.live(id));
+  const d = devices.enroll(undefined, 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', 'iPhone (home screen)');
+  assert.equal(devices.list(null)[0].name, 'iPhone (home screen)');
+  const req = (token: string) => ({ headers: { host: '127.0.0.1:4600', cookie: `ao_session_4600=${token}` } }) as unknown as http.IncomingMessage;
+  const fresh = auth.issue(undefined, d.id);
+  assert.equal(auth.refreshDue(req(fresh)), false);
+  const DAY = 24 * 3600_000;
+  assert.equal(auth.refreshDue(req(fresh), Date.now() + 50 * DAY), true, 'past 45 of its 90 days');
+  assert.equal(auth.refreshDue(req(auth.issue()), Date.now() + 13 * DAY), false, 'only a device’s session slides');
+  devices.revoke(d.id);
+  assert.equal(auth.refreshDue(req(fresh), Date.now() + 50 * DAY), false, 'nor one signed out');
+});
+
 test('X-Forwarded-* is believed from Serve on this computer, never from anywhere else', () => {
   const req = (remoteAddress: string, headers: Record<string, string>) => ({ socket: { remoteAddress }, headers }) as unknown as http.IncomingMessage;
   const fwd = { 'x-forwarded-for': '100.64.0.9', 'x-forwarded-proto': 'https', 'x-forwarded-host': HOST, origin: `https://${HOST}`, host: '127.0.0.1:4600' };

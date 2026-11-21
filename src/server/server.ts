@@ -62,6 +62,7 @@ export async function startServer(cfg: Config, opts: StartOptions = {}) {
     tailnet.stop();
     ctx.phone.stop();
     ctx.webhook.stop();
+    ctx.push.stop();
     ctx.machine.stop();
     ctx.sky.stop();
     ctx.themes.stop();

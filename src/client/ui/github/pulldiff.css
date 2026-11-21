@@ -77,3 +77,14 @@
   .pd-side { width: auto; max-height: 38%; border-right: 0; border-bottom: 3px solid var(--ink); }
   .pd-thread { margin-left: 12px; }
 }
+/* A phone: long lines wrap inside their file (never the page), and the line numbers take less room. */
+@media (max-width: 480px) {
+  .pd-main { padding: 0 6px 12px; }
+  .pd-n { width: 34px; padding-right: 4px; font-size: 11px; }
+  .pd-code { padding: 0 6px 0 16px; }
+  .pd-code::before { left: 4px; }
+  .pd-fh { flex-wrap: wrap; }
+  .pd-fold { width: 36px; height: 36px; }
+  .modal label.pd-viewed { min-height: 36px; }
+  .pd-thread { margin: 6px 4px 8px; }
+}

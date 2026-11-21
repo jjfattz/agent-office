@@ -139,7 +139,10 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
   const status = h('span.board-status');
   const refresh = h('button.btn', { title: 'Refresh from GitHub', onclick: () => net.send({ t: 'gh.refresh' }) }, '🔄 Refresh');
   const close = h('button.btn.close', { 'aria-label': 'Close' }, '✕');
-  const el = h('div.modal.board', { role: 'dialog', 'aria-label': kind === 'issues' ? 'Issues board' : 'Pull requests board' }, h('header', {}, h('h2', {}, kind === 'issues' ? '📌 Issues' : '🔀 Pull Requests'), status, refresh, close), body);
+  // On a phone, one column at a time, picked here (boards.css hides these on a wider screen).
+  const tabs = h('div.board-tabs', { role: 'tablist', 'aria-label': 'Columns' });
+  let current: string | null = null;
+  const el = h('div.modal.board', { role: 'dialog', 'aria-label': kind === 'issues' ? 'Issues board' : 'Pull requests board' }, h('header', {}, h('h2', {}, kind === 'issues' ? '📌 Issues' : '🔀 Pull Requests'), status, refresh, close), tabs, body);
 
   const filters = loadFilters(kind);
   /** What each column's filter box holds (column key → text), for as long as the board is open. */
@@ -191,7 +194,7 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
       autocomplete: 'off',
     }) as HTMLInputElement;
     const clear = h('button.col-search-clear', { type: 'button', 'aria-label': 'Clear the title filter', title: 'Clear' }, '✕');
-    const section = h('section.column');
+    const section = h('section.column', { class: col.key === current ? 'current' : '' });
     /** Deals the cards that match both filters. Typing only redoes this column, so the box keeps focus. */
     const fill = () => {
       const words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
@@ -263,6 +266,21 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
       return;
     }
     const all = boardLabels(st.items);
+    const cols: Column<GhIssue | GhPull>[] = kind === 'issues' ? issueColumns(store.issues.items) : pullColumns(store.pulls.items);
+    // Opens on the first column with cards in it (an empty Draft column says little).
+    if (!current || !cols.some((c) => c.key === current)) current = (cols.find((c) => c.items.length) ?? cols[0]).key;
+    tabs.replaceChildren(
+      ...cols.map((c) => {
+        const on = c.key === current;
+        const n = c.items.length;
+        return h(
+          'button.board-tab',
+          { type: 'button', role: 'tab', 'aria-selected': String(on), onclick: () => ((current = c.key), render()) },
+          c.title.replace(/^\S+ /, ''),
+          c.max === undefined || n ? h('span.n', {}, c.max !== undefined && n > c.max ? `${c.max}+` : String(n)) : '',
+        );
+      }),
+    );
     if (kind === 'issues') {
       for (const col of issueColumns(store.issues.items)) {
         body.append(

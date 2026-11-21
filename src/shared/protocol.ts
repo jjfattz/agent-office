@@ -11,6 +11,7 @@ import type { GitHubClientMsg, GitHubServerMsg } from './protocol/github.js';
 import type { MeetingClientMsg, MeetingServerMsg } from './protocol/meetings.js';
 import type { PhoneClientMsg, PhoneServerMsg } from './protocol/phone.js';
 import type { PresenceClientMsg, PresenceServerMsg } from './protocol/presence.js';
+import type { PushClientMsg, PushServerMsg } from './protocol/push.js';
 import type { ProviderAccountsClientMsg, ProviderAccountsServerMsg } from './protocol/provider-accounts.js';
 import type { QueueClientMsg, QueueServerMsg } from './protocol/queue.js';
 import type { RooftopClientMsg, RooftopServerMsg } from './protocol/rooftop.js';
@@ -27,6 +28,7 @@ export * from './protocol/github.js';
 export * from './protocol/meetings.js';
 export * from './protocol/phone.js';
 export * from './protocol/presence.js';
+export * from './protocol/push.js';
 export * from './protocol/provider-accounts.js';
 export * from './protocol/queue.js';
 export * from './protocol/rooftop.js';
@@ -58,7 +60,8 @@ export type ClientMsg =
   | BallClientMsg
   | CarClientMsg
   | DogClientMsg
-  | PhoneClientMsg;
+  | PhoneClientMsg
+  | PushClientMsg;
 
 export type ServerMsg =
   | PresenceServerMsg
@@ -74,4 +77,5 @@ export type ServerMsg =
   | SettingsServerMsg
   | UsageServerMsg
   | ToysServerMsg
-  | PhoneServerMsg;
+  | PhoneServerMsg
+  | PushServerMsg;

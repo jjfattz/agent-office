@@ -87,6 +87,12 @@ export interface WorkerInfo {
   viewerIds: string[];
   /** Latest line of meaningful activity (e.g. last prompt or tool). */
   activity?: string;
+  /**
+   * While it needs input: the numbered choices its prompt offers (Allow, Allow always, Deny…), read
+   * off its screen (see server/workers/choices.ts), to answer from its card or a notification. None
+   * when the office can't tell what they are: then it's answered in its terminal.
+   */
+  choices?: WorkerChoice[];
   /** What its latest tool call is, for the worker to act out while it works. */
   action?: WorkerAction;
   /** Written by a small model from its prompts and recent tool calls (see server/tasks.ts). */
@@ -105,6 +111,12 @@ export interface WorkerInfo {
   workingSince?: number;
   /** Sent out by a map's herald (the castle's Hand of the King), so every browser has it run to its seat from beside them. */
   via?: 'herald';
+}
+
+/** One of the choices a worker's prompt offers: the key that picks it, and what it says. */
+export interface WorkerChoice {
+  key: string;
+  label: string;
 }
 
 /** Where the branch of a worker whose worktree was deleted still is (see WorkerInfo.lost). */
