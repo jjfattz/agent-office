@@ -109,6 +109,26 @@ A new game for the arcade cabinet isn't a feature of its own: it's three modules
 
 The boss's computer (`features/retro/`, with its server side in `src/server/retro.ts` and `retro-db.ts`) has its own map of what's where, and what's easy to break, in [Working on it](retro.md#working-on-it).
 
+## Building things in the 3D office
+
+What the skeeball machine (`features/skeeball/`) ran into, which holds for anything else built on the floor.
+
+- **Flicker is shadows or coplanar faces.**
+  - The sun's single shadow map covers the whole office (64 × 60 m at 2048², about 3 cm a texel), so a tall prop standing close to a wall throws a shadow that crawls and stair-steps on it as the sun moves. Build such a prop with `mesh(…, shadow = false)` and give it a soft contact-shadow plane on the floor instead.
+  - A tall, plain solid facing away from the sun shows shadow acne when you stand right next to it. The stairs' side did this (`stairs.receiveShadow = false` in `world/office/loft.ts`). Turn off `receiveShadow` on the big surface, not on the small parts that need it.
+  - Never put two faces in the same plane. Decals and art panels sit a few millimetres proud of what they're on, or they z-fight.
+- **A camera close behind your head**: an activity with `takesCamera` that looks from just over you hides your own body in a `ctx.view` `update` (`ctx.me.root.visible = false`). That runs after the frame loop sets it, so it sticks for the frame. Everyone else still sees you.
+- **Physics everyone sees.** The skeeball roll is a deterministic fixed-step simulation in `src/shared/skeeball.ts`, so every page runs the same roll from the same inputs. The message carries the inputs (aim, power) and the result (`points`), so every page counts the same score even if a float goes another way somewhere. The server checks the message is a roll anyone could have made (`rollOk`) and passes it on to the floor. The constants at the top of that file tune the feel (speeds, friction, bounces, the lips round the rings), and `tests/skeeball.test.ts` pins the order of the rings up the middle, that every score can be had, and that the 100s need you to aim near an edge. After retuning, print a table of score by aim and power and play it in the sandbox.
+- **Music from a thing in the room** (`features/skeeball/music.ts`, like the DJ's set) goes through a panner into the jukebox's `musicBus`, so the music volume governs it.
+  - Schedule it from a `setInterval` with more than a second of notes ahead, so a hidden tab's slow timer doesn't make it stutter.
+  - Give each run of the tune a gain node of its own, so stopping it silences notes already scheduled.
+  - Start it from the tick, not when its mode is set, because the mode can be set before audio exists. One-shot effects go in the feature's `sound.ts` and play through `OfficeSound`.
+- **Checking it headless.** Use playwright-core with Chrome and the swiftshader flags (see [Touch controls](#touch-controls)), plus `--autoplay-policy=no-user-gesture-required` for sound.
+  - `window.__office` has the player (put yourself somewhere with `player.pos`, `facing` and `camYaw`), the office's fixtures (`office.skeeball`), the store and the renderer.
+  - `window.__sound` has `played` (how many of each sound so far), `level()` and `musicLevel()`.
+  - Hide a fixture's `group` to see whether a glitch is its own.
+  - If you build the steps in a zsh variable, unquoted it's one argument (`${=steps}` splits it).
+
 ## Adding an agent provider
 
 One adapter file in `src/server/providers/`, one entry in `PROVIDERS` in `src/server/providers/index.ts`, and one row in `src/shared/providers.ts` (its id in `AGENT_PROVIDERS`, its entry in `PROVIDER_META`). The typecheck fails until all three are there. Its row says which models and efforts it takes and how the hire dialog asks for them; one whose CLI lists its models gets a lister in `src/server/models.ts` too. What reads them, and the one place that still names providers one by one, are in [Provider seams](dsh-acp-integration.md#provider-seams).
