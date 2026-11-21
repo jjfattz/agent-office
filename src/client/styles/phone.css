@@ -1,0 +1,31 @@
+/* A phone's windows, wherever they open: in the 2D view (lite.html's body has phone-ui), and in the 3D
+   office on a phone or with its touch controls up (features/touch puts phone-ui on the body). The big
+   windows take the whole screen, every window fits above the on-screen keyboard (shared/viewport.ts
+   sets --vv-height and --vv-top), and every button is a thumb's size. body.phone-ui outranks the
+   windows' own sizes and padding, whatever order the sheets load in. */
+
+/* Windows fit the part of the screen the on-screen keyboard leaves. */
+body.phone-ui .backdrop { inset: var(--vv-top, 0px) 0 auto 0; height: var(--vv-height, 100dvh); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+body.phone-ui .modal { max-height: calc(var(--vv-height, 100dvh) - 16px); }
+/* A thumb's size: every button in a window's header and footer, and its ✕. */
+body.phone-ui .modal header .btn, body.phone-ui .modal footer .btn { min-height: 44px; }
+body.phone-ui .modal .btn.close { min-width: 44px; min-height: 44px; justify-content: center; }
+/* No zooming in on a box as you tap it (iOS does, for text under 16px). */
+body.phone-ui :is(.modal textarea, .modal input[type=text], .modal input[type=password], .modal select) { font-size: 16px; }
+
+/* On a phone, the big windows take the whole screen (on its side too); the small ones stay dialogs. */
+@media (max-width: 640px), (max-height: 500px) {
+  body.phone-ui .backdrop { padding: 8px max(8px, env(safe-area-inset-right)) 8px max(8px, env(safe-area-inset-left)); }
+  body.phone-ui .backdrop:has(> .modal.term, > .modal.board, > .modal.gh-window, > .modal.desk-changes, > .modal.meeting-window, > .modal[aria-label="Task queue"]) { padding: 0; }
+  body.phone-ui .modal.term, body.phone-ui .modal.board, body.phone-ui .modal.gh-window, body.phone-ui .modal.desk-changes, body.phone-ui .modal.meeting-window,
+  body.phone-ui .modal[aria-label="Task queue"] { width: 100%; height: var(--vv-height, 100dvh); max-height: var(--vv-height, 100dvh); border: 0; border-radius: 0; box-shadow: none; padding-top: env(safe-area-inset-top); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+  body.phone-ui .modal.term .term-host { padding: 6px 2px 2px 6px; }
+  body.phone-ui .modal.board .body { padding: 10px; }
+  body.phone-ui .modal.board header .board-status { display: none; }
+}
+
+/* A touch screen: every button in a window is a thumb's size (44×44 at least), however small it is with a mouse. */
+@media (pointer: coarse) {
+  body.phone-ui .modal button, body.phone-ui .modal .btn, body.phone-ui .modal a.btn { min-height: 44px; min-width: 44px; }
+  body.phone-ui .modal .btn { justify-content: center; }
+}

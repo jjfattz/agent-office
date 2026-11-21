@@ -22,6 +22,7 @@ export const HELP_ROWS: readonly (readonly [string, string])[] = [
   ['🍸', 'The elevator goes up to the rooftop bar: a DJ playing drum and bass under the lights, and the city all around. Press E at the bar for a drink (it goes to your head for a bit) and at the DJ booth for the air horn'],
   ['🎯', 'Up on the roof, in the corner past the DJ: a dart board and an axe-throwing lane. E at either steps up to the line. The mouse (or the arrow keys) aims, and your hand wanders more after a few drinks. Hold Space (or the mouse button) and let go in the green: three darts a visit, five axes a round, chalked up for everyone up there. E steps back'],
   ['Drag / wheel', 'Orbit and zoom the camera in third person'],
+  ['👆', 'On a phone or a tablet: put your left thumb down and slide it to walk (all the way out runs), drag on the right to look (pinch to zoom in third person), and tap Use to do what the hint says. The keys a desk or a game offers show as buttons above it. ⚙️ Settings turns these touch controls on or off'],
   ['P', 'Prompt: give a task to a new or existing worker at the desk you face'],
   ['C', 'Changes: what the worker at the desk you face changed — files and diff, commit, discard, open a PR'],
   ['B', 'Open a shared shell (dev servers, git, tests) at an empty desk'],

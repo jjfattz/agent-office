@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { ViewMode } from '../state';
+import { stickHolds, type Stick } from './stick';
 
 // Your hands on the controls: the keys you hold, and the mouse, which looks around. In first person a
 // click on the scene captures the mouse (pointer lock); where it won't lock, or in third person, you
@@ -32,7 +33,13 @@ export abstract class PlayerInput {
    */
   onClick: ((ndc: THREE.Vector2) => void) | null = null;
   protected keys = new Set<string>();
-  private drag: { x: number; y: number; moved: number } | null = null;
+  /**
+   * An analog stick, next to the keys (the touch controls' joystick, see stick.ts): where you walk,
+   * how fast, and for what reads keys, W A S D and Shift.
+   */
+  readonly stick: Stick = { x: 0, z: 0, run: false };
+  /** A drag on the scene, by the pointer that started it (another finger doesn't move it). */
+  private drag: { id: number; x: number; y: number; moved: number } | null = null;
   /** Set when this browser won't lock the pointer; first person falls back to drag-to-look. */
   private lockFailed = false;
   private lockPending = false;
@@ -60,6 +67,8 @@ export abstract class PlayerInput {
   enabled = true;
   /** False while the mouse picks something else (an emote on the wheel), so it doesn't turn the camera. */
   mouseLook = true;
+  /** The touch controls have the fingers on the scene (features/touch): a touch there isn't a drag here. */
+  fingers = false;
 
   constructor(private dom: HTMLElement) {
     window.addEventListener('keydown', (e) => {
@@ -92,7 +101,7 @@ export abstract class PlayerInput {
     );
 
     dom.addEventListener('pointerdown', (e) => {
-      if (!this.enabled) return;
+      if (!this.enabled || (this.fingers && e.pointerType !== 'mouse')) return;
       if (this.view === 'first' && e.pointerType === 'mouse' && !this.lockFailed) {
         if (this.locked) {
           if (e.button === 0) this.onClick?.(CENTER);
@@ -101,10 +110,11 @@ export abstract class PlayerInput {
         this.lock();
       }
       // Drag to orbit (third person) or to look around (first person without pointer lock).
-      this.drag = { x: e.clientX, y: e.clientY, moved: 0 };
+      this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 };
     });
     window.addEventListener('pointerup', (e) => {
       const d = this.drag;
+      if (d && d.id !== e.pointerId) return;
       this.drag = null;
       // A click that captured the mouse is not also a click on the world.
       if (!d || d.moved > 5 || !this.enabled || this.locked || this.lockPending || e.target !== dom) return;
@@ -132,17 +142,16 @@ export abstract class PlayerInput {
         this.look(clamp(e.movementX) * LOOK_SPEED, clamp(e.movementY) * LOOK_SPEED);
         return;
       }
-      if (!this.drag) return;
+      if (!this.drag || this.drag.id !== e.pointerId) return;
       const dx = e.clientX - this.drag.x;
       const dy = e.clientY - this.drag.y;
       this.drag.x = e.clientX;
       this.drag.y = e.clientY;
       this.drag.moved += Math.abs(dx) + Math.abs(dy);
-      if (this.view === 'first') this.look(dx * DRAG_LOOK_SPEED, dy * DRAG_LOOK_SPEED);
-      else {
-        this.camYaw -= dx * 0.006;
-        this.camPitch = THREE.MathUtils.clamp(this.camPitch + dy * 0.004, 0.05, 1.3);
-      }
+      this.turn(dx, dy);
+    });
+    window.addEventListener('pointercancel', (e) => {
+      if (this.drag?.id === e.pointerId) this.drag = null;
     });
     document.addEventListener('pointerlockchange', () => {
       this.lockPending = false;
@@ -167,7 +176,7 @@ export abstract class PlayerInput {
     dom.addEventListener(
       'wheel',
       (e) => {
-        if (this.view === 'third') this.camDist = THREE.MathUtils.clamp(this.camDist + e.deltaY * 0.01, 2.5, 16);
+        this.zoom(e.deltaY * 0.01);
         e.preventDefault();
       },
       { passive: false },
@@ -212,9 +221,26 @@ export abstract class PlayerInput {
     this.keys.clear();
   }
 
-  /** Whether any of these keys is held down (and you have the controls). */
+  /** Whether any of these keys is held down, or the stick pushed that way (and you have the controls). */
   holding(...codes: string[]): boolean {
-    return this.enabled && codes.some((c) => this.keys.has(c));
+    return this.enabled && codes.some((c) => this.keys.has(c) || stickHolds(this.stick, c));
+  }
+
+  /**
+   * A drag `dx`, `dy` px across the scene, `speed` times as hard as the mouse's: looks around in
+   * first person, orbits the camera in third.
+   */
+  turn(dx: number, dy: number, speed = 1) {
+    if (this.view === 'first') this.look(dx * DRAG_LOOK_SPEED * speed, dy * DRAG_LOOK_SPEED * speed);
+    else {
+      this.camYaw -= dx * 0.006 * speed;
+      this.camPitch = THREE.MathUtils.clamp(this.camPitch + dy * 0.004 * speed, 0.05, 1.3);
+    }
+  }
+
+  /** Moves the camera out (+) or in (−) by `by` meters, in third person (the mouse wheel, a pinch). */
+  zoom(by: number) {
+    if (this.view === 'third') this.camDist = THREE.MathUtils.clamp(this.camDist + by, 2.5, 16);
   }
 
   /**

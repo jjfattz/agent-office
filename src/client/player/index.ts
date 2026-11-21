@@ -6,6 +6,7 @@ import { HIPS } from '../world/character/rig';
 import { PlayerInput, isTyping } from './pointer';
 import { HEIGHT, STEP, blockerAt, ceilingAt, groundAt, stepTo } from './collide';
 import { EYE_HEIGHT, aimCamera, shakeCamera, type Room } from './camera';
+import { stickPushed } from './stick';
 import { Effects } from './effects';
 
 // You: walking, running, jumping and sitting, bumping into things and climbing stairs, and the camera
@@ -162,7 +163,7 @@ export class PlayerController extends PlayerInput {
       return;
     }
     if (this.seat) {
-      if (!this.enabled || !GET_UP.some((c) => k.has(c))) {
+      if (!this.enabled || !(GET_UP.some((c) => k.has(c)) || stickPushed(this.stick))) {
         this.moving = false;
         this.facing = this.seat.rotY;
         this.jitterT += dt;
@@ -180,9 +181,15 @@ export class PlayerController extends PlayerInput {
       if (k.has('KeyA') || k.has('ArrowLeft')) ix -= 1;
       if (k.has('KeyD') || k.has('ArrowRight')) ix += 1;
     }
+    // No key down, the stick has its say: the way it's pushed, and how far is how fast (see stick.ts).
+    const stick = this.enabled && ix === 0 && iz === 0 && stickPushed(this.stick) ? this.stick : null;
+    if (stick) {
+      ix = stick.x;
+      iz = stick.z;
+    }
     const steering = ix !== 0 || iz !== 0;
     this.moving = steering;
-    this.running = steering && (k.has('ShiftLeft') || k.has('ShiftRight'));
+    this.running = steering && (k.has('ShiftLeft') || k.has('ShiftRight') || !!stick?.run);
     if (this.path && (steering || (this.enabled && k.has('Space')))) {
       this.path = null;
       this.onPathEnd?.('cancelled');
@@ -193,6 +200,8 @@ export class PlayerController extends PlayerInput {
       const len = Math.hypot(ix, iz);
       ix /= len;
       iz /= len;
+      // A stick pushed part of the way walks slower; at a run it's flat out.
+      const push = stick && !this.running ? Math.min(1, len) : 1;
       // Camera-relative: "forward" is where the camera looks.
       // Drunk, your feet wander off to one side and then the other.
       const t = this.jitterT;
@@ -201,7 +210,7 @@ export class PlayerController extends PlayerInput {
       const cos = Math.cos(this.camYaw + stagger);
       const dx = ix * cos + iz * sin;
       const dz = -ix * sin + iz * cos;
-      const speed = (this.running ? RUN : WALK) * this.effects.speed;
+      const speed = (this.running ? RUN : WALK) * this.effects.speed * push;
       this.tryMove(this.pos.x + dx * speed * dt, this.pos.z);
       this.tryMove(this.pos.x, this.pos.z + dz * speed * dt);
       if (this.view === 'third') {

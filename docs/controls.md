@@ -33,7 +33,30 @@ Back to the [README](../README.md).
 
 You can also click a nearby desk to interact with it, or click a worker in the Workers panel (**🤖 Workers**, top right) to open its terminal.
 
-On a phone, use the 2D view at `/lite` instead: a terminal there has a row of keys under it (**1** **2** **3**, the arrows, Enter, Tab, Esc, Ctrl+C) and a box to send a prompt. See [Features](features.md).
+A phone opens the 2D view at `/lite`, made for it: a terminal there has a row of keys under it (**1** **2** **3**, the arrows, Enter, Tab, Esc, Ctrl+C) and a box to send a prompt. See [Features](features.md). To walk around the 3D office on a phone instead, tap **🏢 3D** there and play it with your thumbs (next).
+
+## On a touch screen
+
+On a phone or a tablet with no mouse, the 3D office has touch controls. **⚙️ Settings → You → Touch controls** turns them **On** for a touchscreen laptop, or **Off** for a tablet with a keyboard and mouse of its own (**Auto**, the default, puts them up on a touch screen with no mouse). The first time they're up, a card shows what each thumb does.
+
+![The 3D office on a phone: a worker's desk upright, with Use saying Open terminal and the desk's keys above it, and an empty desk on its side](images/touch-controls.png)
+
+| Touch | Stands for |
+| --- | --- |
+| Left thumb, anywhere on the left 40% of the screen: a stick appears under it, and you walk the way you slide it, faster the further you go | W A S D (it's analog: a little walks slowly, any angle works); in a car, gas, brake and reverse, and steering; at the tee, the oche or the axe line, aiming |
+| Slide it all the way out (the knob turns orange) | Shift: run |
+| Drag on the right (or anywhere a thumb isn't walking) | The mouse: look around, or orbit the camera in third person. **⚙️ Settings → You → Look speed** makes it faster or slower |
+| Pinch | The mouse wheel: zoom the camera in third person |
+| A quick tap on the scene | A click: use what's in the middle of the screen (in third person, what you tapped) |
+| **Use**, the big button bottom right, saying what it'll do (*Hire a worker*, *Open terminal*, *Floors & projects*, *Get out*); grey with nothing in reach | E. Hold it to hold E: wind up a shot with the basketball and let go to shoot |
+| **Jump**, beside it, which takes the name of whatever Space does where you are (*Brake* in a car, *Swing* at the tee, *Throw* at the oche) | Space. Hold it for a swing or a throw and let go, as with the key |
+| The buttons above Use, only the ones that do something here: at a desk **P** Prompt, **C** Changes, **R** Resume, **X** Send home, **O** PR, **L** Sign, **B** Shell; **Q** with an issue card or the ball in your hands; **H** Honk in a car; **K** the Hand of the King on the throne; **Esc** Cancel while hanging a picture | Those keys |
+| **😀** | G: the emote wheel; tap an emote on it |
+| **💬** | T: the chat, with the phone's keyboard |
+| The waiting workers' button on the top bar (*🙋 2 waiting*) | N |
+| **☰**, top right | Tab: every window, and **🗂️ 2D view** to go back to the 2D view |
+
+The hint bar sits above the buttons and leaves out the keys that have one; *🕹️ Stick* in it means the left thumb. Windows open full screen on a phone, a worker's terminal with the keypad the 2D view's has, and closing one (its **✕**) hands the thumbs straight back: there's no mouse to capture, so nothing asks you to tap first.
 
 ## In a terminal
 

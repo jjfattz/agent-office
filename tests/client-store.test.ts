@@ -211,7 +211,7 @@ test('what the browser remembers keeps its keys and shapes', () => {
   assert.deepEqual(state.lastSpot(), { floor: 'f1', name: 'F', x: 1, y: 2, z: 3, facing: 4 });
   assert.ok(storage.has('agent-office.spot'));
   const settings = state.loadSettings();
-  assert.deepEqual(settings, { view: 'first', volume: 0.7, muted: false, music: 0.5, musicMuted: false, pageTurns: true, pushToTalk: false, notify: true, needsYouSound: 'once', hud: state.HUD_DEFAULTS, pins: [] });
+  assert.deepEqual(settings, { view: 'first', volume: 0.7, muted: false, music: 0.5, musicMuted: false, pageTurns: true, pushToTalk: false, notify: true, needsYouSound: 'once', hud: state.HUD_DEFAULTS, pins: [], touch: 'auto', touchLook: 1 });
   state.saveSettings({ ...settings, volume: 2, view: 'third', needsYouSound: 'remind' });
   assert.equal(state.loadSettings().volume, 1);
   assert.equal(state.loadSettings().view, 'third');
@@ -219,6 +219,13 @@ test('what the browser remembers keeps its keys and shapes', () => {
   // A setting saved as something the office doesn't know goes back to how it starts.
   state.saveSettings({ ...settings, needsYouSound: 'loud' as never });
   assert.equal(state.loadSettings().needsYouSound, 'once');
+  // The touch controls: on, off or auto, and a look speed kept between half and twice the usual.
+  state.saveSettings({ ...settings, touch: 'on', touchLook: 9 });
+  assert.equal(state.loadSettings().touch, 'on');
+  assert.equal(state.loadSettings().touchLook, 2);
+  state.saveSettings({ ...settings, touch: 'sometimes' as never, touchLook: 0.1 });
+  assert.equal(state.loadSettings().touch, 'auto');
+  assert.equal(state.loadSettings().touchLook, 0.5);
   store.apply(welcome());
   assert.equal(state.lastFloor(), 'f1');
 });

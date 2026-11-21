@@ -15,6 +15,7 @@ import { openBoard } from '../../ui/boards';
 import { openCharacter } from '../../ui/character';
 import { $ } from '../../ui/dom';
 import { toggleFloorMenu } from '../../ui/floormenu';
+import { leave3d } from '../../ui/litesuggest';
 import { openHelp } from '../../ui/hud';
 import { mountHud } from '../../ui/menu';
 import { openPhone, phoneLive } from '../../ui/phone';
@@ -98,7 +99,7 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
       { id: 'help', icon: '❓', label: 'Controls', section: 'Office', key: 'H', run: openHelp },
       // Up on the top bar as "📱 On" while the office can be reached from phones.
       { id: 'phone', icon: '📱', label: 'Use on your phone', section: 'Office', status: phoneLive, chip: () => 'On', title: () => (phoneLive() ? `Your phone can reach the office: ${store.phone?.url}` : 'Reach the office from your phone, anywhere: a few buttons and a QR code'), run: () => openPhone(net) },
-      { id: 'lite', icon: '🗂️', label: '2D view', section: 'Office', title: () => 'The workers, their terminals and the boards without the 3D: for a phone or a slow computer', run: () => location.assign('/lite') },
+      { id: 'lite', icon: '🗂️', label: '2D view', section: 'Office', title: () => 'The workers, their terminals and the boards without the 3D: for a phone or a slow computer', run: leave3d },
       {
         id: 'upgrade',
         icon: '⬆️',

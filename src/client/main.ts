@@ -57,6 +57,7 @@ import { installSeating } from './features/seating';
 import { installSmoke } from './features/smoke';
 import { installLamplight } from './features/lamplight';
 import { installTelescope } from './features/telescope';
+import { installTouch } from './features/touch';
 import { installTv } from './features/tv';
 import { installVoice } from './features/voice';
 import { installWaiting } from './features/waiting';
@@ -70,9 +71,9 @@ const loading = loadingScreen(onModelsProgress);
 // Came here from the 2D view's 🏢 3D button: it isn't offered straight back.
 const chose3d = new URLSearchParams(location.search).has('3d');
 if (chose3d) history.replaceState(null, '', location.pathname);
-/** Offers the 2D view (/lite) where the 3D is hard going. */
-const offer2d = (why: 'touch' | 'slow') => chose3d || offerLite(why);
-// A phone can't walk around the office: the 2D view is made for it.
+/** Offers the 2D view (/lite) where the 3D is hard going. A phone that chose 3D still hears it's slow. */
+const offer2d = (why: 'touch' | 'slow') => (chose3d && why === 'touch') || offerLite(why);
+// On a phone the 2D view is made for it; the 3D office has touch controls for whoever picks it (features/touch).
 if (touchOnly()) offer2d('touch');
 // The models made in Blender, loaded before the world they're in is built (see world/models.ts).
 await preloadModels();
@@ -179,6 +180,7 @@ parts.talk = installVoice(ctx, { tv: parts.tv });
 installDictation(ctx);
 parts.hud = installHud(ctx, core, parts);
 installPhone(ctx);
+installTouch(ctx);
 
 // ---- Main loop ---------------------------------------------------------------------------------------
 fitWindow(ctx);
