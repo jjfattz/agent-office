@@ -5,7 +5,7 @@ import { ScreenZoom } from '../../core/screen-zoom';
 import { store } from '../../state';
 import { clip, h, openModal, setDoing, timeAgo, toast, type Modal } from '../../ui/dom';
 import { confirmDialog } from '../../ui/prompt';
-import { openAddGames } from './add';
+import { droppedFiles, openAddGames, type Picked } from './add';
 import { CATALOG_GAMES, loadLibrary, romOf, type Game } from './games';
 import { Library, thumb, type From } from './library';
 import { Monitor } from './monitor';
@@ -33,6 +33,9 @@ const tipFor = (s: RetroSystem) => `${TIPS[s] ?? 'Arrows · Z X A S buttons · E
 const START_WAIT = 90_000;
 /** How often a game you're playing is kept, in case the tab goes, in ms. */
 const AUTOSAVE = 60_000;
+/** How soon the library asks again while the office is still recognizing games, in ms, and how many times. */
+const AGAIN = 3000;
+const MAX_TRIES = 40;
 
 export interface RetroDeps {
   /** A worker's terminal: one of yours needing you pauses the game, with a button to it. */
@@ -72,6 +75,9 @@ export class Retro {
   /** The worker whose question paused your game. */
   private waiting: WorkerInfo | null = null;
   private statuses = new Map<string, string>();
+  /** Asking again for the library while the office recognizes games, and how many times it has. */
+  private again = 0;
+  private tries = 0;
 
   constructor(screen: THREE.Mesh, private readonly deps: RetroDeps) {
     this.view = new ScreenZoom(screen);
@@ -110,6 +116,7 @@ export class Retro {
   play() {
     if (this.modal) return;
     this.open(this.current && this.player.loaded ? 'play' : 'library');
+    this.tries = 0;
     void this.refresh();
   }
 
@@ -159,8 +166,7 @@ export class Retro {
     box.addEventListener('drop', (e) => {
       e.preventDefault();
       box.classList.remove('dropping');
-      const files = [...(e.dataTransfer?.files ?? [])];
-      if (files.length) this.add(files);
+      if (e.dataTransfer) void droppedFiles(e.dataTransfer).then((picked) => picked.length && this.add(picked));
     });
     // Clicking the screen while a game's on gives it the keys back.
     area.addEventListener('pointerdown', () => this.player.focus());
@@ -228,7 +234,7 @@ export class Retro {
       }
     } else {
       els.bar.name.textContent = '🕹️ Overtime';
-      els.bar.tip.textContent = `${this.games.length} games · ← → ↑ ↓ choose · Enter play · / search · drop game files here to add them`;
+      els.bar.tip.textContent = `${this.games.length} games · ← → ↑ ↓ choose · Enter play · / search · drop game files or folders here to add them`;
       setDoing(this.modal, '🕹️ browsing retro games');
       this.renderLibrary();
     }
@@ -245,7 +251,10 @@ export class Retro {
 
   /** Fetches the library again (the office's shelf, your own games) and where you left each game. */
   private async refresh(first = false) {
-    const [games, resumes] = await Promise.all([loadLibrary(), saves.resumes().catch(() => [] as SaveRecord[])]);
+    const [{ games, pending }, resumes] = await Promise.all([loadLibrary(), saves.resumes().catch(() => [] as SaveRecord[])]);
+    // The office is still recognizing games: the library fills in their names and boxes as it does.
+    clearTimeout(this.again);
+    if (pending && this.modal && this.tries++ < MAX_TRIES) this.again = window.setTimeout(() => void this.refresh(), AGAIN);
     this.games = games;
     this.resumes = new Map(resumes.map((r) => [r.game, r]));
     this.monitor.library(games.length, systemsOf(games));
@@ -397,9 +406,12 @@ export class Retro {
 
   // ---- Your own games ------------------------------------------------------------------------------
 
-  private add(files: File[]) {
-    openAddGames(files, (n) => {
-      if (n) void this.refresh();
+  private add(picked: Picked[]) {
+    openAddGames(picked, (n) => {
+      if (n) {
+        this.tries = 0;
+        void this.refresh();
+      }
     });
   }
 
