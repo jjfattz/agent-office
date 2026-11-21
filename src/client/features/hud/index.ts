@@ -17,6 +17,7 @@ import { $ } from '../../ui/dom';
 import { toggleFloorMenu } from '../../ui/floormenu';
 import { openHelp } from '../../ui/hud';
 import { mountHud } from '../../ui/menu';
+import { openPhone, phoneLive } from '../../ui/phone';
 import { openProviderAccounts } from '../../ui/provider-accounts';
 import { openServices } from '../../ui/services';
 import { openSettings, type SettingsPane } from '../../ui/settings';
@@ -95,7 +96,9 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
       { id: 'settings', icon: '⚙️', label: 'Settings', section: 'Office', run: showSettings },
       { id: 'providerAccounts', icon: '🪪', label: 'Provider accounts', section: 'Office', shown: () => store.me.admin, title: () => 'More than one Claude or Codex login (work and personal, say), and which one this floor’s workers run on', run: () => openProviderAccounts(net) },
       { id: 'help', icon: '❓', label: 'Controls', section: 'Office', key: 'H', run: openHelp },
-      { id: 'lite', icon: '📱', label: '2D view', section: 'Office', title: () => 'The workers, their terminals and the boards without the 3D: for a phone or a slow computer', run: () => location.assign('/lite') },
+      // Up on the top bar as "📱 On" while the office can be reached from phones.
+      { id: 'phone', icon: '📱', label: 'Use on your phone', section: 'Office', status: phoneLive, chip: () => 'On', title: () => (phoneLive() ? `Your phone can reach the office: ${store.phone?.url}` : 'Reach the office from your phone, anywhere: a few buttons and a QR code'), run: () => openPhone(net) },
+      { id: 'lite', icon: '🗂️', label: '2D view', section: 'Office', title: () => 'The workers, their terminals and the boards without the 3D: for a phone or a slow computer', run: () => location.assign('/lite') },
       {
         id: 'upgrade',
         icon: '⬆️',

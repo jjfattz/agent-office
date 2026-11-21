@@ -4,6 +4,7 @@ import { SignIns } from '../signins.js';
 import { ProviderAccounts } from '../provider-accounts/index.js';
 import { agentProviders, configuredProvider } from '../agents.js';
 import { Tailnet } from '../tailnet.js';
+import { Phone } from '../phone/index.js';
 import { Team } from '../team.js';
 import { Upgrader } from '../upgrade.js';
 import { Services } from '../services.js';
@@ -137,7 +138,7 @@ export function createLateServices(ctx: Ctx): LateServices {
     port: cfg.port,
     deploy: cfg.deployScript,
     ssh: team.ssh,
-    tailnet: cfg.tailnet,
+    tailnet: tailnet.host,
   });
   const services = new Services(
     () => [...floors.values()].flatMap((f) => f.workers.owners()),
@@ -157,5 +158,16 @@ export function createLateServices(ctx: Ctx): LateServices {
       process.kill(process.pid, 'SIGTERM');
     },
   );
-  return { team, tailnet, services, images, upgrader, servicesState };
+  // 📱 Use on your phone: tells each connection that asked what it sees now, whenever that changes.
+  const phone: Phone = new Phone({
+    cfg,
+    auth: ctx.auth,
+    accounts: ctx.accounts,
+    tailnet,
+    workerPorts: () => services.list().map((s) => s.port),
+    changed: () => {
+      for (const c of clients.values()) if (phone.subscribed(c.id)) ctx.sendTo(c, { t: 'phone', state: phone.view(c) });
+    },
+  });
+  return { team, tailnet, services, images, upgrader, phone, servicesState };
 }

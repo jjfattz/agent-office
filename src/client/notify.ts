@@ -23,6 +23,22 @@ export async function askNotifyPermission(): Promise<NotifyPermission> {
   return notifyPermission();
 }
 
+/**
+ * A notification the office sent this device on purpose (📱 Use on your phone's test): it buzzes,
+ * and shows even while the office is in front. Says whether a notification went up; a browser that
+ * only notifies from a service worker (Chrome on Android) doesn't, until web push comes in.
+ */
+export function buzz(title: string, body: string): boolean {
+  navigator.vibrate?.([120, 80, 120]);
+  if (notifyPermission() !== 'granted') return false;
+  try {
+    new Notification(title, { body, tag: 'office-buzz' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Waiting on a person: needs input, or finished its turn and nobody has looked yet. */
 export function waitingOnSomeone(w: WorkerInfo): w is WorkerInfo & { status: 'needs_input' | 'done' } {
   return w.status === 'needs_input' || (w.status === 'done' && !w.acked);

@@ -9,6 +9,7 @@ import type { SignIns, GhAs } from '../signins.js';
 import type { ProviderAccounts } from '../provider-accounts/index.js';
 import type { ModelCatalogue } from '../models.js';
 import type { Tailnet } from '../tailnet.js';
+import type { Phone } from '../phone/index.js';
 import type { Team } from '../team.js';
 import type { Upgrader } from '../upgrade.js';
 import type { Services } from '../services.js';
@@ -87,6 +88,8 @@ export interface LateServices {
   services: Services;
   images: ImageProxy;
   upgrader: Upgrader;
+  /** 📱 Use on your phone: the office on the person's tailnet, phones paired with a QR code (see phone/). */
+  phone: Phone;
   /** A floor's Services board: its own workers' servers. */
   servicesState(floor: Floor | undefined, items?: ServiceInfo[]): ServicesState;
 }
@@ -128,7 +131,7 @@ export interface FloorHelpers {
 export interface People {
   /** Who a connection is: its account's current name and role, or an admin guest on the shared password. */
   meOf(accountId: string | undefined): Me;
-  /** Still signed in: the account wasn't revoked, and the shared password wasn't switched off. */
+  /** Still signed in: the account wasn't revoked, the shared password wasn't switched off, and a paired device wasn't signed out. */
   stillIn(c: Client): boolean;
   signOut(c: Client): void;
   onlineAccounts(): Set<string>;

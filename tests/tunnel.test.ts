@@ -81,6 +81,7 @@ async function setup() {
       list: () => (running.has(port) ? [{ ...svc, port }] : []),
       lookup: (p: number) => (p !== port ? undefined : running.has(port) ? svc : 'gone'),
     },
+    tailnet: { host: undefined },
     workerFloor: (id: string) => (id === 'w1' ? { def: { name: 'acme' }, workers: { get: () => ({ name: 'Byte' }) } } : undefined),
   } as unknown as Ctx;
   const officeServer = http.createServer(requestHandler(ctx, [authRoutes.login, authRoutes.loginOptions, pageRoutes.health, serviceRoutes.forwards]));

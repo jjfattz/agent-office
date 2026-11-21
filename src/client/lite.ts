@@ -25,7 +25,7 @@ import { openMeeting, type MeetingPreset } from './ui/meeting';
 import { openSignIns } from './ui/signins';
 import { modelBadge, providerLabel } from './ui/provider';
 import { byUrgency, waitingInOrder, waitingLabel } from './nextup';
-import { askNotifyPermission, DesktopNotifier, notifyPermission, waitingOnSomeone } from './notify';
+import { askNotifyPermission, buzz, DesktopNotifier, notifyPermission, waitingOnSomeone } from './notify';
 import { repoChoices } from './shared/hiring';
 // The tab title counts the workers waiting on someone, on every floor, as the 3D office's does.
 import { renderTitle } from './shared/title';
@@ -73,6 +73,11 @@ net.onMessage((msg) => {
       break;
     case 'toast':
       toast(msg.text, msg.level);
+      break;
+    // 📱 Use on your phone's test, sent from the office's window to this paired phone.
+    case 'phone.buzz':
+      buzz(msg.title, msg.body);
+      toast(`${msg.title} ${msg.body}`);
       break;
     case 'signins.needed':
       openSignIns(net, msg.why);

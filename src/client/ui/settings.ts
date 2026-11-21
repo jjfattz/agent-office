@@ -12,6 +12,7 @@ import { agentFields, choiceLabel, officeChoice } from './provider';
 import { openPromptEditor, rewrittenPrompts } from './prompts';
 import { outsideSetting } from './settings-sky';
 import { choiceRow } from './settings-rows';
+import { openPhone } from './phone';
 
 const VIEWS: [ViewMode, string, string][] = [
   ['first', '👀 First person', 'See through your own eyes. Click the office to look around with the mouse and click things to use them. Esc frees the mouse.'],
@@ -23,12 +24,13 @@ const THEME_LABEL: Record<ThemePick, string> = { auto: '📅 By the calendar', h
 const WEBHOOK_NAME: Record<WebhookKind, string> = { slack: 'Slack', discord: 'Discord', other: 'a webhook' };
 
 /** The categories down the side of ⚙️ Settings. */
-export type SettingsPane = 'you' | 'sound' | 'notify' | 'building' | 'workers';
+export type SettingsPane = 'you' | 'sound' | 'notify' | 'phone' | 'building' | 'workers';
 
 const PANES: { id: SettingsPane; icon: string; label: string; blurb: string }[] = [
   { id: 'you', icon: '🧍', label: 'You', blurb: 'How you look, how you see the office, and how you’re signed in.' },
   { id: 'sound', icon: '🔊', label: 'Sound & voice', blurb: 'How loud the office is for you, and how voice chat works.' },
   { id: 'notify', icon: '🔔', label: 'Notifications', blurb: 'Hear about a worker that needs someone, or finished, while you’re somewhere else.' },
+  { id: 'phone', icon: '📱', label: 'Phone', blurb: 'Reach the office from your phone, anywhere, over your own private Tailscale network.' },
   { id: 'building', icon: '🏢', label: 'Building', blurb: 'The map, the decorations, the sky, the dog, and where new floors are cloned.' },
   { id: 'workers', icon: '🤖', label: 'Workers', blurb: 'What workers start on, how many run at once, when they go home and what the office tells them.' },
 ];
@@ -458,6 +460,14 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
     notify: [
       setting('Desktop notifications', 'you', notifyRow, notifyNote),
       setting('Team notifications (Slack / Discord)', 'office', h('div.webhook', {}, hookInput, hookSave), hookActions, hookStatus),
+    ],
+    phone: [
+      setting(
+        'Use on your phone',
+        'office',
+        h('div.volume', {}, h('button.btn.primary', { type: 'button', onclick: () => (modal.close(), openPhone(net)) }, '📱 Set up your phone')),
+        h('p.setting-note', {}, 'A few buttons and a QR code put the office on your phone, at home or out: no terminal, no address to type, no password. Only your own devices can reach it, and nothing goes on the public internet.'),
+      ),
     ],
     building: [
       setting('Map', 'office', mapRow, mapNote, mapBad),

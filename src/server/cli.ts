@@ -18,6 +18,10 @@ if (argv[0] === 'setup') {
   const { setupCommand } = await import('./setup.js');
   process.exit(await setupCommand(argv.slice(1)));
 }
+if (argv[0] === 'phone') {
+  const { phoneCommand } = await import('./phone/cli.js');
+  process.exit(await phoneCommand(argv.slice(1)));
+}
 if (argv[0] === 'tunnel') {
   const { tunnelCommand } = await import('./tunnel/index.js');
   process.exit(await tunnelCommand(argv.slice(1)));

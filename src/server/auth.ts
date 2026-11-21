@@ -4,6 +4,8 @@ import type { Account, Accounts } from './accounts.js';
 
 export const COOKIE_NAME = 'ao_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 14;
+/** A phone paired with a QR code stays signed in longer: it can be signed out from the office at any time. */
+const DEVICE_TTL_MS = 1000 * 60 * 60 * 24 * 90;
 
 const MAX_ATTEMPTS = 10;
 const WINDOW_MS = 5 * 60_000;
@@ -13,6 +15,8 @@ const MAX_LINKS = 8;
 /** A signed-in browser: with its own account, or (no account) with the shared office password. */
 export interface Session {
   account?: Account;
+  /** A device paired with a QR code (see phone/pairing.ts), signed out by forgetting it. */
+  device?: string;
 }
 
 export class Auth {
@@ -23,6 +27,8 @@ export class Auth {
   private key: Buffer;
   /** Signs account sessions, which outlive a change of the shared password. */
   private accountKey: Buffer;
+  /** Whether a paired device is still signed in (phone/pairing.ts); none paired until it's set. */
+  private deviceLive: (id: string) => boolean = () => false;
 
   constructor(
     private verifier: Buffer,
@@ -82,9 +88,23 @@ export class Auth {
     return !!key && this.links.delete(linkHash(key));
   }
 
-  /** A session cookie's value: for that account, or for the shared password when there's none. */
-  issue(accountId?: string): string {
-    const body = { exp: Date.now() + SESSION_TTL_MS, n: randomBytes(8).toString('hex'), ...(accountId ? { u: accountId } : {}) };
+  /** Where paired devices are looked up: each request one makes asks whether it's still signed in. */
+  useDevices(live: (id: string) => boolean) {
+    this.deviceLive = live;
+  }
+
+  /** Whether a paired device's session still counts. */
+  deviceIn(id: string): boolean {
+    return this.deviceLive(id);
+  }
+
+  /**
+   * A session cookie's value: for that account, or for the shared password when there's none. With
+   * `device`, it's that paired device's, and lasts until it's signed out (or 90 days).
+   */
+  issue(accountId?: string, device?: string): string {
+    const ttl = device ? DEVICE_TTL_MS : SESSION_TTL_MS;
+    const body = { exp: Date.now() + ttl, n: randomBytes(8).toString('hex'), ...(accountId ? { u: accountId } : {}), ...(device ? { d: device } : {}) };
     const payload = Buffer.from(JSON.stringify(body)).toString('base64url');
     return `${payload}.${this.sign(payload, !!accountId)}`;
   }
@@ -98,7 +118,7 @@ export class Auth {
     const dot = token.indexOf('.');
     if (dot < 1) return undefined;
     const payload = token.slice(0, dot);
-    let body: { exp?: unknown; u?: unknown };
+    let body: { exp?: unknown; u?: unknown; d?: unknown };
     try {
       body = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
     } catch {
@@ -109,9 +129,12 @@ export class Auth {
     const expected = Buffer.from(this.sign(payload, !!accountId));
     if (sig.length !== expected.length || !timingSafeEqual(sig, expected)) return undefined;
     if (typeof body.exp !== 'number' || body.exp <= Date.now()) return undefined;
-    if (!accountId) return this.accounts.sharedPassword ? {} : undefined;
+    const device = typeof body.d === 'string' ? body.d : undefined;
+    if (body.d !== undefined && (!device || !this.deviceLive(device))) return undefined;
+    const on = device ? { device } : {};
+    if (!accountId) return this.accounts.sharedPassword ? on : undefined;
     const account = this.accounts.get(accountId);
-    return account ? { account } : undefined;
+    return account ? { account, ...on } : undefined;
   }
 
   fromRequest(req: IncomingMessage): Session | undefined {
@@ -129,8 +152,8 @@ export class Auth {
     return false;
   }
 
-  cookie(req: IncomingMessage, token: string, secure: boolean): string {
-    return `${cookieName(req)}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}${secure ? '; Secure' : ''}`;
+  cookie(req: IncomingMessage, token: string, secure: boolean, device = false): string {
+    return `${cookieName(req)}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor((device ? DEVICE_TTL_MS : SESSION_TTL_MS) / 1000)}${secure ? '; Secure' : ''}`;
   }
 
   clearCookie(req: IncomingMessage): string {

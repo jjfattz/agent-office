@@ -13,8 +13,8 @@ export function people(ctx: Ctx): People {
     const a = ctx.accounts.get(accountId);
     return a ? { account: { name: a.name, role: a.role }, admin: a.role === 'admin' } : { admin: !accountId };
   };
-  /** Still signed in: the account wasn't revoked, and the shared password wasn't switched off. */
-  const stillIn = (c: Client) => (c.accountId ? !!ctx.accounts.get(c.accountId) : ctx.accounts.sharedPassword);
+  /** Still signed in: the account wasn't revoked, the shared password wasn't switched off, and a paired device wasn't signed out. */
+  const stillIn = (c: Client) => (!c.device || ctx.auth.deviceIn(c.device)) && (c.accountId ? !!ctx.accounts.get(c.accountId) : ctx.accounts.sharedPassword);
   const signOut = (c: Client) => {
     c.out = true;
     c.ws.close(SIGNED_OUT, 'Signed out');

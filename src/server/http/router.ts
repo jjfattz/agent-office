@@ -46,7 +46,7 @@ export function requestHandler(ctx: Ctx, routes: readonly Route[]) {
     const { cfg, auth } = ctx;
     try {
       // A service tunnel (localhost:5173 -> the office): relay to that worker's server.
-      const tunneled = tunneledService(req, cfg.port, cfg.tailnet, (port) => ctx.services.lookup(port));
+      const tunneled = tunneledService(req, cfg.port, ctx.tailnet.host, (port) => ctx.services.lookup(port));
       if (tunneled) {
         if (req.method === 'POST' && req.url === RELAY_LOGIN) return await login(ctx, req, res);
         if (!auth.fromAnyCookie(req)) return signInPage(res, tunneled.port, loginOptions(ctx));

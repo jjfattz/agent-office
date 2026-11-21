@@ -12,6 +12,8 @@ export interface Client {
   peer: PeerInfo;
   /** Signed in with this account; none means the shared office password. */
   accountId?: string;
+  /** A device paired with a QR code (phone/pairing.ts): signing it out closes this socket. */
+  device?: string;
   /** Whether this person was last told they're an admin (see `me`). */
   admin: boolean;
   /** Signed out while connected; whatever it still sends is dropped until the socket closes. */
@@ -30,11 +32,12 @@ export interface Client {
 }
 
 /** A client that just connected, with nothing going on yet. */
-export function newClient(id: string, ws: WebSocket, who: { accountId: string | undefined; admin: boolean }, peer: PeerInfo): Client {
+export function newClient(id: string, ws: WebSocket, who: { accountId: string | undefined; admin: boolean; device?: string }, peer: PeerInfo): Client {
   return {
     id,
     ws,
     accountId: who.accountId,
+    ...(who.device ? { device: who.device } : {}),
     admin: who.admin,
     attached: new Set(),
     stale: new Set(),

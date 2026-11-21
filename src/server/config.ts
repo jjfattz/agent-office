@@ -39,6 +39,11 @@ export interface Config {
   dshProfile: string;
   tls?: { cert: string; key: string };
   trustProxy: boolean;
+  /**
+   * Tailscale Serve, set up by the office for 📱 Use on your phone, is in front of it right now: it
+   * connects from this computer, so X-Forwarded-* from a loopback peer is believed (see trustsProxy).
+   */
+  localProxy?: boolean;
   iceServers: RTCIceServerLike[];
   /** How to run the script that deployed the office, e.g. "deploy/azure.sh --name team2" (set by deploy/provision.sh), for the commands it suggests. */
   deployScript?: string;
@@ -78,6 +83,7 @@ Usage:
   agent-office prune [dir] [--dry-run] [--force]
   agent-office accounts [list|invite|revoke|role|password] ...
   agent-office tunnel [office@address | url]
+  agent-office phone [status|on|off|pair]
 
 Runs the office. Every project is a floor of the building: ride the elevator,
 pick one of the repositories your \`gh\` login can see, and the office clones it
@@ -104,6 +110,10 @@ Commands:
   tunnel                  On your own computer, for an office that runs somewhere
                           else: every web server a worker starts there opens on the
                           same port here, by itself (see tunnel --help)
+  phone                   Reach the office from your phone, anywhere, over
+                          Tailscale: its status, on, off, and a QR code that
+                          signs your phone in (see phone --help; the office's
+                          ☰ → 📱 Use on your phone does the same)
 
 Options:
       --home <dir>        Where the office keeps its data when no [dir] is given
@@ -372,13 +382,22 @@ export function loadConfig(argv: string[]): Config {
   if (project) excludeFromGit(dir);
 
   const cfgPath = path.join(dataDir, 'config.json');
-  let stored: { password?: string; verifier?: string; salt?: string; secret?: string; claimedAt?: number } = {};
+  let stored: { password?: string; verifier?: string; salt?: string; secret?: string; claimedAt?: number; phone?: unknown } = {};
   try {
     stored = JSON.parse(readFileSync(cfgPath, 'utf8'));
   } catch {
     // first run
   }
-  const save = () => writeFileSync(cfgPath, JSON.stringify(stored, null, 2), { mode: 0o600 });
+  // "phone" is 📱 Use on your phone's (phone/saved.ts), which writes it while the office runs: keep what's on disk.
+  const save = () => {
+    try {
+      const disk = JSON.parse(readFileSync(cfgPath, 'utf8'));
+      if (disk?.phone !== undefined) stored.phone = disk.phone;
+    } catch {
+      // first run
+    }
+    writeFileSync(cfgPath, JSON.stringify(stored, null, 2), { mode: 0o600 });
+  };
   if (!stored.secret) stored.secret = randomBytes(32).toString('hex');
   if (!stored.salt) stored.salt = randomBytes(16).toString('hex');
   const salt = Buffer.from(stored.salt, 'hex');
