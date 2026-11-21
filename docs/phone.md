@@ -40,7 +40,11 @@ There's nothing to set up for it. The office makes its own VAPID key pair the fi
 
 ![The 2D view on an iPhone: a worker's choices as buttons, the issues board one column at a time, a terminal with its keys, and 🔔 Notify this phone](images/phone-app.png)
 
-On a phone, the office's own address goes straight to the 2D view, before the 3D office starts to load (**🏢 3D** there, or `/?3d=1`, still opens the 3D office, and that browser stays in 3D after that). Added to the home screen, it opens full screen with its own icon. While the office can't be reached (the computer asleep, Tailscale off), it shows *Reconnecting…* and keeps trying, instead of a browser error. Coming back to it after a while, it reconnects at once and says *Updating…* until the floor is current; pulling the list down does the same.
+On a phone, the office's own address goes straight to the 2D view, before the 3D office starts to load. Added to the home screen, it opens full screen with its own icon. While the office can't be reached (the computer asleep, Tailscale off), it shows *Reconnecting…* and keeps trying, instead of a browser error. Coming back to it after a while, it reconnects at once and says *Updating…* until the floor is current; pulling the list down does the same.
+
+### The 3D office on your phone
+
+**🏢 3D** at the top of the 2D view (or `/?3d=1`) opens the 3D office, and that browser stays in 3D from then on. It has touch controls on a phone: your left thumb walks, dragging on the right looks around, and **Use** does what the hint over it says, so you can walk up to a worker's desk, tap **Use** to open its terminal, close it and walk on, ride the elevator to another floor, or shoot some hoops, all without a keyboard. Landscape gives you the most room. Every control is in [Controls](controls.md#on-a-touch-screen). **☰ → 🗂️ 2D view** takes you back, and forgets the choice to stay in 3D, so the next time you open the office it's the 2D view again. If the 3D office is too slow on the phone, it offers the 2D view too.
 
 ### What it does and doesn't do
 

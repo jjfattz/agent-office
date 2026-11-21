@@ -45,6 +45,10 @@ export const HUD_DEFAULTS: Record<HudPanel, boolean> = { workers: false, people:
 export const NEEDS_YOU_SOUNDS = ['off', 'once', 'remind'] as const;
 export type NeedsYouSound = (typeof NEEDS_YOU_SOUNDS)[number];
 
+/** The touch controls over the 3D office (features/touch): on a touch screen with no mouse, always, or never. */
+export const TOUCH_CONTROLS = ['auto', 'on', 'off'] as const;
+export type TouchControls = (typeof TOUCH_CONTROLS)[number];
+
 export interface Settings {
   view: ViewMode;
   /** Office sounds, 0–1. */
@@ -65,6 +69,10 @@ export interface Settings {
   hud: Record<HudPanel, boolean>;
   /** The ☰ menu's actions you pinned to the top bar, by id. */
   pins: string[];
+  /** The touch controls: by themselves on a touch screen with no mouse, or turned on or off here. */
+  touch: TouchControls;
+  /** How hard dragging a finger turns you, against the usual (0.5–2). */
+  touchLook: number;
 }
 
 const SETTINGS_KEY = 'agent-office.settings';
@@ -127,7 +135,7 @@ export function rememberSpot(s: Spot) {
 }
 
 export function loadSettings(): Settings {
-  const s: Settings = { view: 'first', volume: 0.7, muted: false, music: 0.5, musicMuted: false, pageTurns: true, pushToTalk: false, notify: true, needsYouSound: 'once', hud: { ...HUD_DEFAULTS }, pins: [] };
+  const s: Settings = { view: 'first', volume: 0.7, muted: false, music: 0.5, musicMuted: false, pageTurns: true, pushToTalk: false, notify: true, needsYouSound: 'once', hud: { ...HUD_DEFAULTS }, pins: [], touch: 'auto', touchLook: 1 };
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null');
     if (saved?.view === 'first' || saved?.view === 'third') s.view = saved.view;
@@ -140,6 +148,8 @@ export function loadSettings(): Settings {
     if (typeof saved?.notify === 'boolean') s.notify = saved.notify;
     if (NEEDS_YOU_SOUNDS.includes(saved?.needsYouSound)) s.needsYouSound = saved.needsYouSound;
     for (const k of Object.keys(s.hud) as HudPanel[]) if (typeof saved?.hud?.[k] === 'boolean') s.hud[k] = saved.hud[k];
+    if (TOUCH_CONTROLS.includes(saved?.touch)) s.touch = saved.touch;
+    if (typeof saved?.touchLook === 'number' && Number.isFinite(saved.touchLook)) s.touchLook = Math.max(0.5, Math.min(2, saved.touchLook));
     if (Array.isArray(saved?.pins)) s.pins = saved.pins.filter((p: unknown): p is string => typeof p === 'string').slice(0, 30);
   } catch {
     // storage blocked

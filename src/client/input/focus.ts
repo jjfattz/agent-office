@@ -80,7 +80,8 @@ export function installFocus(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'tele
   function backToGame() {
     if (modalOpen()) return;
     if (!isTyping()) canvas.focus({ preventScroll: true });
-    if (!player.canLock || player.hasMouse) return;
+    // A phone has no mouse to take back: the touch controls work straight away (features/touch).
+    if (!finePointer || !player.canLock || player.hasMouse) return;
     // The browser lets a page re-capture the mouse it let go of itself (see yieldMouse), even on Esc
     // (which it doesn't count as a click or key), and any time after a click, like one on ✕. When it
     // won't (nothing of yours opened the window, or a stricter browser), the next key you press does.

@@ -27,7 +27,7 @@ import { byUrgency, waitingInOrder, waitingLabel } from './nextup';
 import { buzz, DesktopNotifier, waitingOnSomeone } from './notify';
 import { workerCard, type CardActions } from './lite/cards';
 import { installWake } from './lite/wake';
-import { followKeyboard } from './lite/viewport';
+import { followKeyboard } from './shared/viewport';
 import { installPush, pushOn } from './push';
 import { openNotify } from './push/window';
 import { installHint } from './pwa/install';

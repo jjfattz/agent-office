@@ -1,8 +1,11 @@
 // The 2D view on a phone, in headless Chrome: /lite, signing in, ✨ New task, a worker's terminal and
 // its answer buttons, 📌 Issues, 🔀 PRs, 📋 Queue and a PR window, on an iPhone (390×844), an
 // Android phone (360×800) and an iPad (820×1180). Each has no sideways scroll, and every button you
-// can see is a thumb's size (44×44) or more. It runs against the built bundle (npm run build) with
-// Chrome or Chromium, and is skipped without them. MOBILE_SHOTS=<folder> keeps a screenshot of each.
+// can see is a thumb's size (44×44) or more. Then the 3D office on a phone (/?3d=1), upright and on its
+// side, played with the touch controls (features/touch), and with a mouse, which shows none. It runs
+// against the built bundle (npm run build) with Chrome or Chromium, and is skipped without them; the 3D
+// part draws with swiftshader, and is skipped if it can't draw there. MOBILE_SHOTS=<folder> keeps a
+// screenshot of each.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -235,6 +238,174 @@ test('the home-screen app says it’s reconnecting, not a browser error, while t
     // Back once the office answers.
     await page.waitForURL(/\/lite$/);
     await page.waitForFunction(() => (window as any).__lite?.net.up, undefined, { timeout: 15_000 });
+  } finally {
+    await ctx.close();
+  }
+});
+
+// ---- The 3D office on a phone, with its touch controls (features/touch) --------------------------------
+
+const LANDSCAPE = { name: 'iphone-landscape', width: 844, height: 390, mobile: true, ua: DEVICES[0].ua } as const;
+/** Swiftshader draws WebGL without a GPU, as headless Chrome on a CI box has none. */
+const GL_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
+
+/** The 3D office at `/?3d=1`, as a phone (or with a mouse, `touch` false), with a character already picked. Null when it can't draw here. */
+async function office3d(d: { width: number; height: number; mobile: boolean; ua?: string }, opts: { touch?: boolean; intro?: boolean } = {}): Promise<{ ctx: BrowserContext; page: Page } | null> {
+  const touch = opts.touch ?? true;
+  const ctx = await browser3d!.newContext({ viewport: { width: d.width, height: d.height }, isMobile: d.mobile, hasTouch: touch, ...(d.ua ? { userAgent: d.ua } : {}), deviceScaleFactor: 1 });
+  const [name, value] = cookie.split('=');
+  await ctx.addCookies([{ name, value, url: base }]);
+  await ctx.addInitScript('window.__name = (f) => f');
+  await ctx.addInitScript((seen: boolean) => {
+    localStorage.setItem('agent-office.profile', JSON.stringify({ name: 'Tess', color: '#ff8a5b', look: { skin: 0, hair: 0, style: 0 } }));
+    if (seen) localStorage.setItem('agent-office.touch-intro', '1');
+    // A software renderer is slow: the 2D view it would offer for that isn't what's under test.
+    localStorage.setItem('agent-office.lite-declined-slow', '1');
+  }, !opts.intro);
+  const page = await ctx.newPage();
+  await page.goto(`${base}/?3d=1`);
+  // Swiftshader is slow: the first frames take a while.
+  await page.waitForFunction(() => location.pathname.startsWith('/lite') || ((window as any).__office?.store.floor && !document.getElementById('loading')), undefined, { timeout: 90_000 });
+  if (new URL(page.url()).pathname.startsWith('/lite')) {
+    await ctx.close();
+    return null;
+  }
+  return { ctx, page };
+}
+
+/** A finger dragged from `from` to `to` and held there for `hold` ms, by CDP touch events (pointerType 'touch'). */
+async function touchDrag(page: Page, from: { x: number; y: number }, to: { x: number; y: number }, hold = 800) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from.x, y: from.y, id: 1 }] });
+  for (let i = 1; i <= 8; i++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from.x + ((to.x - from.x) * i) / 8, y: from.y + ((to.y - from.y) * i) / 8, id: 1 }] });
+    await page.waitForTimeout(30);
+  }
+  await page.waitForTimeout(hold);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+}
+
+/** No sideways scroll, and every touch control on screen at least 44×44; then a screenshot, if they're kept. */
+async function check3d(page: Page, name: string, what: string) {
+  // A window pops open (scale .96 to 1), slowly on a software renderer: measured once it's done.
+  await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {}))));
+  await page.waitForTimeout(250);
+  const r = await page.evaluate(() => {
+    const small = [...document.querySelectorAll('.touch-pad button, .dock button, .modal button, .modal .btn')]
+      .map((el) => ({ el, b: el.getBoundingClientRect() }))
+      .filter(({ b }) => b.width > 0 && b.height > 0 && (Math.round(b.width) < 44 || Math.round(b.height) < 44))
+      .map(({ el, b }) => `${(el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 30)} ${Math.round(b.width)}×${Math.round(b.height)}`);
+    return { scroll: document.documentElement.scrollWidth, width: innerWidth, small };
+  });
+  if (SHOTS) {
+    mkdirSync(SHOTS, { recursive: true });
+    await page.screenshot({ path: path.join(SHOTS, `3d-${name}-${what}.png`) });
+  }
+  assert.ok(r.scroll <= r.width, `${name} ${what}: the page scrolls sideways (${r.scroll} > ${r.width})`);
+  assert.deepEqual(r.small, [], `${name} ${what}: buttons under 44×44`);
+}
+
+let browser3d: Browser | undefined;
+before(async () => {
+  if (skip) return;
+  const { chromium } = await import('playwright-core');
+  browser3d = await chromium.launch({ executablePath: chrome, args: GL_ARGS });
+});
+after(async () => {
+  await browser3d?.close();
+});
+
+for (const d of [DEVICES[0], LANDSCAPE]) {
+  test(`the 3D office plays with thumbs on ${d.name} (${d.width}×${d.height})`, { skip, timeout: 180_000 }, async (t) => {
+    const portrait = d.height > d.width;
+    const opened = await office3d(d, { intro: portrait });
+    if (!opened) return t.skip('headless Chrome could not draw WebGL here, so the office went to the 2D view');
+    const { ctx, page } = opened;
+    try {
+      assert.ok(await page.evaluate(() => document.body.classList.contains('touch-ui')), 'the touch controls are up');
+      if (portrait) {
+        // The first time: what each thumb does, with its ✕, and only once.
+        await page.waitForSelector('.modal.touch-intro');
+        await check3d(page, d.name, 'intro');
+        await page.locator('.modal.touch-intro .btn.close').click();
+        assert.equal(await page.locator('.modal.touch-intro').count(), 0);
+        assert.equal(await page.evaluate(() => localStorage.getItem('agent-office.touch-intro')), '1');
+      }
+      await page.waitForSelector('.touch-pad .touch-use');
+      // Nothing waits on a mouse that isn't there.
+      assert.equal(await page.locator('.crosshair .look-hint').isVisible(), false, 'no "Click to look around"');
+      await check3d(page, d.name, 'office');
+
+      // The left thumb walks: pushed up the screen, you go somewhere.
+      const before = await page.evaluate(() => ({ ...(window as any).__office.player.pos }));
+      const from = { x: Math.round(d.width * 0.15), y: Math.round(d.height * 0.7) };
+      await touchDrag(page, from, { x: from.x, y: from.y - 60 }, 1200);
+      const after = await page.evaluate(() => ({ ...(window as any).__office.player.pos }));
+      assert.ok(Math.hypot(after.x - before.x, after.z - before.z) > 0.5, `the stick moved you (${JSON.stringify(before)} → ${JSON.stringify(after)})`);
+      // Let go: you stop.
+      const stopped = await page.evaluate(() => (window as any).__office.player.stick);
+      assert.deepEqual(stopped, { x: 0, z: 0, run: false });
+
+      // The right side looks around.
+      const yaw = await page.evaluate(() => (window as any).__office.player.camYaw);
+      await touchDrag(page, { x: Math.round(d.width * 0.7), y: Math.round(d.height * 0.4) }, { x: Math.round(d.width * 0.7) - 80, y: Math.round(d.height * 0.4) }, 100);
+      assert.notEqual(await page.evaluate(() => (window as any).__office.player.camYaw), yaw, 'a drag on the right turned you');
+
+      // Next to an empty desk, Use says what it'll do and does it: the hire window.
+      await page.evaluate(() => {
+        const o = (window as any).__office;
+        const desk = o.office.interactables.find((it: any) => it.kind === 'desk' && it.deskId && !it.off && !o.plan().byId.get(it.deskId)?.room);
+        o.player.setView('third');
+        o.player.pos.set(desk.x, o.player.pos.y, desk.z);
+      });
+      await page.waitForFunction(() => !document.querySelector('.touch-use')?.classList.contains('off'));
+      assert.match((await page.locator('.touch-use').textContent()) ?? '', /Hire a worker/);
+      assert.ok(await page.locator('.touch-fan .touch-key').count(), 'the desk keys fan out above Use');
+      await check3d(page, d.name, 'desk');
+      await page.locator('.touch-use').tap();
+      await page.waitForSelector('.backdrop .modal');
+      await check3d(page, d.name, 'hire');
+      // ✕ hands the thumbs straight back: the next drag walks.
+      await page.locator('.backdrop').last().locator('.btn.close').first().click();
+      await page.waitForFunction(() => !document.querySelector('.backdrop'));
+      const at = await page.evaluate(() => ({ ...(window as any).__office.player.pos }));
+      await touchDrag(page, from, { x: from.x + 60, y: from.y }, 800);
+      const moved = await page.evaluate(() => ({ ...(window as any).__office.player.pos }));
+      assert.ok(Math.hypot(moved.x - at.x, moved.z - at.z) > 0.3, 'walking again straight after the window closed');
+
+      // A worker at that desk: Use opens its terminal, with the phone's keypad, and its keys fan out above Use.
+      await page.evaluate(() => {
+        const o = (window as any).__office;
+        const desk = o.office.interactables.find((it: any) => it.kind === 'desk' && it.deskId && !it.off && !o.plan().byId.get(it.deskId)?.room);
+        o.store.apply({ t: 'worker.update', worker: { id: 'w9', kind: 'agent', provider: 'claude', deskId: desk.deskId, name: 'Byte', color: '#5bc0eb', status: 'needs_input', acked: false, createdBy: 'Tess', createdAt: Date.now(), cols: 80, rows: 24, viewers: [], viewerIds: [], task: { name: 'Fix it', summary: '' } } });
+        o.player.pos.set(desk.x, o.player.pos.y, desk.z);
+      });
+      await page.waitForFunction(() => /Open terminal/.test(document.querySelector('.touch-use')?.textContent ?? ''));
+      assert.deepEqual(await page.locator('.touch-fan .touch-key .key').allTextContents().then((k) => k.sort()), ['C', 'L', 'P', 'X']);
+      // The hint bar clears the buttons, however many rows the fan has.
+      const [hint, pad] = await Promise.all([page.locator('#hint').boundingBox(), page.locator('.touch-pad').boundingBox()]);
+      if (portrait) assert.ok(hint!.y + hint!.height <= pad!.y + 1, `the hint bar (bottom ${hint!.y + hint!.height}) is above the buttons (top ${pad!.y})`);
+      await check3d(page, d.name, 'worker');
+      await page.locator('.touch-use').tap();
+      await page.waitForSelector('.modal.term .term-keypad');
+      await check3d(page, d.name, 'terminal');
+      await page.locator('.backdrop').last().locator('.btn.close').first().click();
+      await page.waitForFunction(() => !document.querySelector('.backdrop'));
+    } finally {
+      await ctx.close();
+    }
+  });
+}
+
+test('the 3D office with a mouse shows no touch controls', { skip, timeout: 120_000 }, async (t) => {
+  const opened = await office3d({ width: 1280, height: 800, mobile: false }, { touch: false });
+  if (!opened) return t.skip('headless Chrome could not draw WebGL here, so the office went to the 2D view');
+  const { ctx, page } = opened;
+  try {
+    assert.equal(await page.evaluate(() => document.body.classList.contains('touch-ui')), false);
+    assert.equal(await page.locator('.touch-pad').isVisible(), false);
+    assert.equal(await page.evaluate(() => document.querySelector('meta[name=viewport]')?.getAttribute('content')), 'width=device-width, initial-scale=1');
   } finally {
     await ctx.close();
   }
