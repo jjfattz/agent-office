@@ -134,6 +134,8 @@ export interface GhIssueDetail {
 
 /** GitHub turns away comments longer than this. */
 export const GH_COMMENT_MAX = 65536;
+/** GitHub turns away issue titles longer than this. */
+export const GH_TITLE_MAX = 256;
 /** Longer than any label name: GitHub stops at 50 characters, and JS counts an emoji as two. */
 export const GH_LABEL_MAX = 100;
 
@@ -146,7 +148,9 @@ export type GitHubClientMsg =
   /** Close an issue, or a pull request without merging it; the answer comes back as gh.closed. */
   | { t: 'gh.close'; kind: 'issue' | 'pull'; number: number; comment?: string; reason?: GhCloseReason; deleteBranch?: boolean }
   /** Put labels on an issue or PR and take others off, as the server's gh account; answered with gh.labeled. */
-  | { t: 'gh.labels'; kind: 'issue' | 'pull'; number: number; add: string[]; remove: string[] };
+  | { t: 'gh.labels'; kind: 'issue' | 'pull'; number: number; add: string[]; remove: string[] }
+  /** Change an issue's title and description, as the server's gh account; answered with gh.edited. */
+  | { t: 'gh.edit'; number: number; title: string; body: string };
 
 export type GitHubServerMsg =
   | { t: 'gh.issues'; state: GhState<GhIssue> }
@@ -158,4 +162,6 @@ export type GitHubServerMsg =
   /** Sent to whoever asked to close it. */
   | { t: 'gh.closed'; kind: 'issue' | 'pull'; number: number; error?: string }
   /** Sent to whoever changed them: the labels it has now, or why they didn't change. */
-  | { t: 'gh.labeled'; kind: 'issue' | 'pull'; number: number; labels?: GhLabel[]; error?: string };
+  | { t: 'gh.labeled'; kind: 'issue' | 'pull'; number: number; labels?: GhLabel[]; error?: string }
+  /** Sent to whoever edited the issue: its title and description as GitHub saved them, or why it didn't. */
+  | { t: 'gh.edited'; number: number; title?: string; body?: string; error?: string };

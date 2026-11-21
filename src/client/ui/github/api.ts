@@ -2,7 +2,7 @@ import type { ServerMsg } from '../../../shared/protocol';
 import { store } from '../../state';
 
 // Talking to the office about GitHub: the reads (over HTTP, for the floor you're on), and the
-// answers to what the dialogs asked for over the socket (merged, commented, closed, labeled).
+// answers to what the dialogs asked for over the socket (merged, commented, closed, labeled, edited).
 
 /** The board windows ask about the floor you're on. */
 function onFloor(url: string): string {
@@ -28,10 +28,14 @@ export const closeWaiters = new Map<string, (msg: Extract<ServerMsg, { t: 'gh.cl
 /** Open label pickers, by "issue:N" or "pull:N". */
 export const labelWaiters = new Map<string, (msg: Extract<ServerMsg, { t: 'gh.labeled' }>) => void>();
 
-/** Main feeds server messages through here so an open merge, close or label dialog or comment box hears back. */
+/** Open issue editors, by issue number. */
+export const editWaiters = new Map<number, (msg: Extract<ServerMsg, { t: 'gh.edited' }>) => void>();
+
+/** Main feeds server messages through here so an open merge, close or label dialog, issue editor or comment box hears back. */
 export function routePullMessage(msg: ServerMsg) {
   if (msg.t === 'gh.merged') mergeWaiters.get(msg.number)?.(msg);
   if (msg.t === 'gh.commented') commentWaiters.get(`${msg.kind}#${msg.number}`)?.(msg);
   if (msg.t === 'gh.closed') closeWaiters.get(`${msg.kind}:${msg.number}`)?.(msg);
   if (msg.t === 'gh.labeled') labelWaiters.get(`${msg.kind}:${msg.number}`)?.(msg);
+  if (msg.t === 'gh.edited') editWaiters.get(msg.number)?.(msg);
 }

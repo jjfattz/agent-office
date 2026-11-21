@@ -174,6 +174,8 @@ export class GitHub {
   private labelList?: { at: number; list: Promise<GhLabel[]> };
   /** Labels just changed from the office, by "issue:N" or "pull:N", and when. */
   private relabeled = new Map<string, { labels: GhLabel[]; at: number }>();
+  /** Issues just edited from the office, by number: their title and description, and when. */
+  private edited = new Map<number, { title: string; body: string; at: number }>();
   private claims = new Claims();
   /** The look at the issues that's under way, if one is. */
   private listing?: Promise<void>;
@@ -403,6 +405,42 @@ export class GitHub {
   }
 
   /**
+   * Changes an issue's title and description, as `as` or else the office. Returns them as GitHub
+   * saved them, or why it couldn't.
+   */
+  async edit(n: number, title: string, body: string, as?: GhAs): Promise<{ title?: string; body?: string; error?: string }> {
+    let saved: { title: string; body: string };
+    try {
+      // -f sends each as a plain string: no @file reading, no {owner} filling in.
+      const out = await this.runGh(['api', '--method', 'PATCH', `repos/{owner}/{repo}/issues/${n}`, '-f', `title=${title}`, '-f', `body=${body}`, '--jq', '{title, body}'], this.dir, undefined, as?.env);
+      const r = JSON.parse(out);
+      saved = { title: String(r.title ?? title), body: String(r.body ?? '') };
+    } catch (err) {
+      return { error: (err as Error).message };
+    }
+    // The board shows it at once, before the next look at GitHub, as with labels.
+    const at = Date.now();
+    this.edited.set(n, { ...saved, at });
+    this.issues = { ...this.issues, items: this.reword(this.issues.items, at) };
+    this.onIssues(this.issues);
+    void this.refreshIssues();
+    return saved;
+  }
+
+  /** As relabel, for the title and description of issues edited here. */
+  private reword(items: GhIssue[], asked: number): GhIssue[] {
+    return items.map((it) => {
+      const e = this.edited.get(it.number);
+      if (!e) return it;
+      if (e.at < asked) {
+        this.edited.delete(it.number);
+        return it;
+      }
+      return { ...it, title: e.title, body: e.body.slice(0, 4000) };
+    });
+  }
+
+  /**
    * A list asked for before a label change made here still has the old labels, so the new ones are
    * kept over it; a list asked for after the change is believed, and the change forgotten.
    */
@@ -476,7 +514,7 @@ export class GitHub {
         body: String(i.body ?? '').slice(0, 4000),
         comments: Array.isArray(i.comments) ? i.comments.length : Number(i.comments ?? 0),
       }));
-      const items = this.claims.mark(this.relabel('issue', fetched, asked), asked);
+      const items = this.claims.mark(this.reword(this.relabel('issue', fetched, asked), asked), asked);
       this.issues = { items, fetchedAt: Date.now(), loading: false };
     } catch (err) {
       this.issues = { ...this.issues, loading: false, error: (err as Error).message, fetchedAt: Date.now() };
