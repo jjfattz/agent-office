@@ -105,9 +105,17 @@ export interface UpgradeState {
   checking?: boolean;
   checkedAt?: number;
   phase: 'idle' | 'building' | 'restarting' | 'failed';
-  /** Who started the upgrade. */
+  /** Who started the upgrade, or the restart. */
   by?: string;
   error?: string;
+  /**
+   * What starts the office again once it exits (⚙️ Settings → Restart Agent Office): the `agent-office`
+   * command, which looks for a newer version as it does, or a service on the same version. Unset when
+   * nothing would, and it can't restart itself.
+   */
+  restarter?: 'launcher' | 'service';
+  /** The 'restarting' phase is a restart someone asked for, not onto a version built here. */
+  restart?: boolean;
 }
 
 export type Weather = 'clear' | 'cloudy' | 'rain' | 'storm' | 'snow' | 'fog';
@@ -179,6 +187,8 @@ export type SettingsClientMsg =
   | { t: 'machine.limit'; limit: number | null }
   | { t: 'upgrade.check' }
   | { t: 'upgrade.start' }
+  /** Admins: restart the office (see UpgradeState.restarter). */
+  | { t: 'office.restart' }
   /** Dress the building up for a holiday, take the decorations down ('off'), or follow the calendar ('auto'). */
   | { t: 'theme.set'; pick: ThemePick }
   /** The sky on the real clock (true), or a whole day and night every hour (false), for everyone. */

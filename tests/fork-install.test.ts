@@ -163,3 +163,31 @@ test('--status says that agent-office looks for updates as it starts', () => {
   assert.match(out, /updates: +looked for each time .*agent-office starts/);
   assert.match(out, /last failed commit:/);
 });
+
+test('an office that exits to restart (⚙️ Settings → Restart Agent Office) is started again, after looking for updates', () => {
+  // The office's side of it is src/server/restart.ts: AGENT_OFFICE_RESTART=launcher says it may, and it exits with 75.
+  const once = path.join(root, 'restart-once');
+  rmSync(path.join(work, 'break-the-build'), { force: true });
+  const version = push('a version that restarts once', {
+    'bin/agent-office.js': `const fs = require('fs');
+console.log('started', require('../package.json').version, process.argv.slice(2).join(' '));
+const once = process.env.RESTART_ONCE;
+if (once && fs.existsSync(once)) {
+  fs.rmSync(once);
+  console.log('restarting', process.env.AGENT_OFFICE_RESTART, process.env.AGENT_OFFICE_RESTARTED ?? '');
+  process.exit(75);
+}
+if (once) console.log('restarted', process.env.AGENT_OFFICE_RESTARTED);
+process.exit(Number(process.env.EXIT_WITH ?? 0));
+`,
+  });
+  writeFileSync(once, '');
+  const r = start(['--port', '4999'], { RESTART_ONCE: once });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(r.out, `started ${version} --port 4999\nrestarting launcher \n\n  🔄 restarting the office…\n\nstarted ${version} --port 4999\nrestarted 1\n`);
+  assert.equal(r.err.match(/Looking for updates/g)?.length, 2, 'it looked for updates both times');
+  second = version;
+  const failed = start([], { EXIT_WITH: '3' });
+  assert.equal(failed.code, 3, 'any other exit ends it, with that code');
+  assert.equal(failed.out, `started ${version} \n`);
+});

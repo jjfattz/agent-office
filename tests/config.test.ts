@@ -46,9 +46,10 @@ test('the office listens on loopback unless --host says otherwise', (t) => {
   assert.equal(load(t, '--host', '0.0.0.0').host, '0.0.0.0');
 });
 
-test('--no-open leaves the browser alone', (t) => {
-  assert.equal(load(t).open, true);
-  assert.equal(load(t, '--no-open').open, false);
+test('the office only opens a browser with --open', (t) => {
+  assert.equal(load(t).open, false);
+  assert.equal(load(t, '--open').open, true);
+  assert.equal(load(t, '--open', '--no-open').open, false);
 });
 
 test('TURN servers come from --turn and from AGENT_OFFICE_TURN', (t) => {

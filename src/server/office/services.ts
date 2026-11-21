@@ -7,6 +7,7 @@ import { Tailnet } from '../tailnet.js';
 import { Phone } from '../phone/index.js';
 import { Team } from '../team.js';
 import { Upgrader } from '../upgrade.js';
+import { restartOffice } from '../restart.js';
 import { Services } from '../services.js';
 import { ImageProxy } from '../decor.js';
 import { Ledger } from '../usage.js';
@@ -167,11 +168,9 @@ export function createLateServices(ctx: Ctx): LateServices {
 
   const upgrader = new Upgrader(
     (state) => ctx.broadcast({ t: 'upgrade', state }),
-    () => {
-      // cli.ts shuts down gracefully, leaving the workers running in their terminal host; systemd
-      // (Restart=always) then starts the new version, which picks them back up.
-      process.kill(process.pid, 'SIGTERM');
-    },
+    // cli.ts shuts down gracefully, leaving the workers running in their terminal host; systemd
+    // (Restart=always) or the agent-office command then starts the office again, which picks them back up.
+    restartOffice,
   );
   // 📱 Use on your phone: tells each connection that asked what it sees now, whenever that changes.
   const phone: Phone = new Phone({

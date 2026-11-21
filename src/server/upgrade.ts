@@ -4,6 +4,7 @@ import { mkdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { UpgradeState, VersionInfo } from '../shared/protocol.js';
+import { restarter } from './restart.js';
 
 /** The install this server runs from (deploy/provision.sh makes it a git checkout). */
 function findAppDir(): string | undefined {
@@ -110,7 +111,7 @@ export class Upgrader {
     // A checkout on a tag (detached HEAD) has no branch to follow.
     const enabled = process.env.AGENT_OFFICE_SELF_UPDATE === '1' && !!branch && branch !== 'HEAD';
     this.branch = enabled ? branch : undefined;
-    this.state = { available: enabled, current, phase: 'idle' };
+    this.state = { available: enabled, current, phase: 'idle', restarter: restarter() };
     if (!enabled) return;
     void rm(STAGE, { recursive: true, force: true }); // what's left of the previous version
     this.timer = setInterval(() => void this.check(), CHECK_EVERY_MS);
@@ -186,6 +187,21 @@ export class Upgrader {
     return undefined;
   }
 
+  /** ⚙️ Settings → Restart Agent Office. Returns why it can't, if it can't. */
+  async restartNow(by: string): Promise<string | undefined> {
+    if (!this.state.restarter) return "This office can't restart itself: nothing would start it again. Restart it where it runs";
+    if (this.busy) return 'The office is already upgrading or restarting';
+    this.set({ phase: 'restarting', by, restart: true, error: undefined });
+    await this.handOver();
+    return undefined;
+  }
+
+  private async handOver() {
+    await keepWorkersThroughRestart().catch((err) => console.warn(`agent-office: workers will be resumed after the restart, not kept running: ${(err as Error).message}`));
+    // Give every browser a moment to hear about it, then hand over to the next office.
+    setTimeout(this.restart, 1500);
+  }
+
   private async build(sha: string) {
     const next = path.join(STAGE, 'next');
     const old = path.join(STAGE, 'old');
@@ -210,9 +226,7 @@ export class Upgrader {
       this.set({ phase: 'failed', error: `The upgrade failed, so the office stays on ${this.state.current?.sha}.\n\n${(err as Error).message}` });
       return;
     }
-    this.set({ phase: 'restarting' });
-    await keepWorkersThroughRestart().catch((err) => console.warn(`agent-office: workers will be resumed after the restart, not kept running: ${(err as Error).message}`));
-    // Give every browser a moment to hear about it, then hand over to the new version.
-    setTimeout(this.restart, 1500);
+    this.set({ phase: 'restarting', restart: false });
+    await this.handOver();
   }
 }

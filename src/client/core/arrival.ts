@@ -124,7 +124,7 @@ export function installArrival(ctx: Ctx, core: CoreState, parts: ArrivalParts) {
     ctx.hud.refresh();
     // Back from a restart on another version: this page's code is stale, so load the new one.
     if (!bootVersion) bootVersion = msg.version;
-    else if (msg.version !== bootVersion || restarting()) showUpgraded(msg.upgrade);
+    else if (msg.version !== bootVersion || restarting()) showUpgraded(msg.upgrade, msg.version !== bootVersion);
     upgradePhase = msg.upgrade.phase;
     voice.syncPeers();
   });

@@ -17,7 +17,9 @@
 #
 # The office's data (~/agent-office: its floors, workers and projects) is never touched. Run by
 # hand while an office is open, it installs without stopping that office: Ctrl+C it and run
-# `agent-office` again to switch. Workers carry on through the restart in their terminal host.
+# `agent-office` again to switch, or use ⚙️ Settings → Restart Agent Office in the office, which
+# has the launcher look for updates and start it again. Workers carry on through the restart in
+# their terminal host.
 # install.sh removes the versions nothing runs from any more, never one still in use.
 #
 # Options:
@@ -49,6 +51,8 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 MARKER="agent-office launcher, written by install.sh"
 # And this marks the ones written here.
 FORK_MARKER="by way of scripts/fork/install-local.sh"
+# The office exits with this to be started again (src/server/restart.ts, RESTART_EXIT_CODE).
+RESTART_CODE=75
 
 # A worker's terminal points these at the office it runs in; the build and tests mustn't.
 unset AGENT_OFFICE_WORKER_ID AGENT_OFFICE_HOOK_URL AGENT_OFFICE_HOOK_TOKEN AGENT_OFFICE_SESSION_ID \
@@ -253,23 +257,37 @@ write_launcher() {
 # Installed last: $tag, from $sha.
 # (upstream's install line would put upstream's newest release back instead.)
 entry=$(sq "$entry")
-case "\${AGENT_OFFICE_NO_UPDATE:-}:\${1:-}" in
-  1:* | *:prune | *:accounts | *:setup | *:tunnel | *:-h | *:--help) ;;
-  *)
-    if [ -f $(sq "$SELF") ]; then
-      # Ctrl+C while it builds stops here, rather than starting the office.
-      trap 'exit 130' INT
-      AGENT_OFFICE_INSTALL_DIR=$(sq "$INSTALL_DIR") AGENT_OFFICE_BIN_DIR=$(sq "$BIN_DIR") \\
-        bash $(sq "$SELF") --on-start --ref $(sq "$REF")$skip
-      trap - INT
-      tag=
-      if [ -f $(sq "$STATE/installed") ]; then read -r _ tag <$(sq "$STATE/installed"); fi
-      next=$(sq "$VERSIONS")/"\$tag/bin/agent-office.js"
-      case "\$tag" in v*) if [ -f "\$next" ]; then entry="\$next"; fi ;; esac
-    fi
-    ;;
-esac
-exec node "\$entry" "\$@"
+# ⚙️ Settings → Restart Agent Office: the office exits with $RESTART_CODE, and this starts it again,
+# looking for a newer $REF first, so restarting it from the office is how to update it.
+AGENT_OFFICE_RESTART=launcher
+export AGENT_OFFICE_RESTART
+while :; do
+  case "\${AGENT_OFFICE_NO_UPDATE:-}:\${1:-}" in
+    1:* | *:prune | *:accounts | *:setup | *:tunnel | *:-h | *:--help) ;;
+    *)
+      if [ -f $(sq "$SELF") ]; then
+        # Ctrl+C while it builds stops here, rather than starting the office.
+        trap 'exit 130' INT
+        AGENT_OFFICE_INSTALL_DIR=$(sq "$INSTALL_DIR") AGENT_OFFICE_BIN_DIR=$(sq "$BIN_DIR") \\
+          bash $(sq "$SELF") --on-start --ref $(sq "$REF")$skip
+        trap - INT
+        tag=
+        if [ -f $(sq "$STATE/installed") ]; then read -r _ tag <$(sq "$STATE/installed"); fi
+        next=$(sq "$VERSIONS")/"\$tag/bin/agent-office.js"
+        case "\$tag" in v*) if [ -f "\$next" ]; then entry="\$next"; fi ;; esac
+      fi
+      ;;
+  esac
+  # Ctrl+C is the office's to handle (it closes, and stops its workers): this only waits to see how it ended.
+  trap : INT
+  code=0
+  node "\$entry" "\$@" || code=\$?
+  trap - INT
+  [ "\$code" -eq $RESTART_CODE ] || exit "\$code"
+  AGENT_OFFICE_RESTARTED=1
+  export AGENT_OFFICE_RESTARTED
+  printf '\n  🔄 restarting the office…\n\n'
+done
 EOF
   chmod 755 "$tmp"
   if cmp -s "$tmp" "$target"; then rm -f "$tmp"; else mv -f "$tmp" "$target"; fi

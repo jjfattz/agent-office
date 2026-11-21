@@ -105,12 +105,22 @@ function restartDialog(title: string, ...content: (Node | string)[]) {
 export function showRestarting(u: UpgradeState, net: Net) {
   net.expectRestart();
   restartPending = true;
-  restartDialog(
-    '🛠️ Upgrading the office',
-    h('div.restart-art', {}, '🏗️'),
-    h('p', {}, `${u.by ? `${u.by} is upgrading` : 'Upgrading'} the office${u.latest ? ` to ${u.latest.sha}: “${u.latest.subject}”` : ''}.`),
-    h('p.upgrade-status.busy', {}, h('span.spinner'), 'Restarting… you’ll be back in a few seconds. No need to do anything.'),
-  );
+  if (u.restart) {
+    // ⚙️ Settings → Restart Agent Office. Through the agent-office command, it may come back on a newer version.
+    restartDialog(
+      '🔄 Restarting the office',
+      h('div.restart-art', {}, '🔄'),
+      h('p', {}, `${u.by ? `${u.by} is restarting` : 'Restarting'} the office${u.restarter === 'launcher' ? ', on the newest version if there is one' : ''}.`),
+      h('p.upgrade-status.busy', {}, h('span.spinner'), `You’ll be back ${u.restarter === 'launcher' ? 'in a few seconds, or a minute or so if there’s a new version to build' : 'in a few seconds'}. No need to do anything.`),
+    );
+  } else {
+    restartDialog(
+      '🛠️ Upgrading the office',
+      h('div.restart-art', {}, '🏗️'),
+      h('p', {}, `${u.by ? `${u.by} is upgrading` : 'Upgrading'} the office${u.latest ? ` to ${u.latest.sha}: “${u.latest.subject}”` : ''}.`),
+      h('p.upgrade-status.busy', {}, h('span.spinner'), 'Restarting… you’ll be back in a few seconds. No need to do anything.'),
+    );
+  }
   clearTimeout(slowTimer);
   slowTimer = setTimeout(
     () =>
@@ -121,9 +131,19 @@ export function showRestarting(u: UpgradeState, net: Net) {
   );
 }
 
-/** Reconnected to a different version than this page was loaded from: load the new client. */
-export function showUpgraded(u: UpgradeState) {
+/**
+ * Reconnected after a restart: on a different version than this page was loaded from (`changed`),
+ * load the new client; on the same one, there's nothing to load, so the window goes.
+ */
+export function showUpgraded(u: UpgradeState, changed = true) {
   clearTimeout(slowTimer);
+  if (!changed) {
+    restartPending = false;
+    restartDialog('✅ The office is back', h('div.restart-art', {}, '👋'), h('p', {}, 'It restarted on the same version, so there was nothing new to pick up.'));
+    const shown = restartModal;
+    setTimeout(() => shown === restartModal && restartModal?.close(), 2000);
+    return;
+  }
   const v = u.current;
   restartDialog(
     '✨ The office has been upgraded',
