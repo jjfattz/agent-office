@@ -386,9 +386,10 @@ test('the toys on a floor, and letting go of them on leaving the floor or the of
   a.send({ t: 'gong' });
   a.send({ t: 'gong' });
   a.send({ t: 'horn' });
-  a.send({ t: 'golf', yaw: 0, loft: 0.5, power: 0.5 });
+  a.send({ t: 'golf', hole: 0, x: 10, z: 63, club: 'iron', yaw: 0.4, loft: 0.6, power: 0.5 });
   a.send({ t: 'act', golf: true });
-  a.send({ t: 'golf', yaw: 0.25, loft: 0.5, power: 0.5 });
+  a.send({ t: 'golf', hole: 0, x: 10, z: 200, club: 'iron', yaw: 0.4, loft: 0.6, power: 0.5 });
+  a.send({ t: 'golf', hole: 0, x: 10, z: 63, club: 'iron', yaw: 0.4, loft: 0.6, power: 0.5 });
   assert.deepEqual(await b.next(3), ['gong', 'peer.act', 'golf']);
 
   a.send({ t: 'wb.open' });

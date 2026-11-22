@@ -2,6 +2,7 @@ import { BALCONY, DANCE_FLOOR, FIRE_PIT, FLOOR, LOFT, MEETING_ROOM, ROOF_BAR, RO
 import type { PeerInfo } from '../../shared/protocol';
 import { ROOF } from '../../shared/rooftop';
 import { CARS, type CarSeat } from '../../shared/garage';
+import { onCourseGround } from '../../shared/course';
 import { seatOn, type MapPlan } from '../../shared/maps';
 import { store } from '../state';
 
@@ -17,9 +18,9 @@ export function whereabouts(p: PeerInfo, car?: { car: number; seat: CarSeat }, p
   if (p.lite) return '📱 on the 2D view';
   // In one of the garage's cars (see Store.carOf).
   const def = car && CARS[car.car];
-  if (def) return `🏎️ ${car.seat === 'driver' ? 'driving' : 'riding in'} the ${def.name}`;
+  if (def) return `${def.kind === 'cart' ? '⛳' : '🏎️'} ${car.seat === 'driver' ? 'driving' : 'riding in'} the ${def.name}`;
   if (p.smoking) return '🚬 on a smoke break';
-  if (p.golfing) return '🏌️ teeing off';
+  if (p.golfing) return '🏌️ playing golf';
   if (p.throwing) return p.throwing === 'darts' ? '🎯 playing darts' : '🪓 throwing axes';
   const office = plan.style === 'office' || p.floor === ROOF;
   const place = p.seat ? (office ? seatAt(p.seat) : seatOn(plan, p.seat)) : undefined;
@@ -36,6 +37,7 @@ export function whereabouts(p: PeerInfo, car?: { car: number; seat: CarSeat }, p
   // Through the north wall in the back office: nobody gets there unless the floor's built out.
   if (p.y > -1 && inWing(p.x, p.z, WING.rows)) return '🏗️ in the back office';
   // Down on the street, or out the back door on the stairs down to it.
+  if (p.y < -1 && onCourseGround(p.x, p.z)) return '⛳ on the golf course';
   if (p.y < -1 || p.x < FLOOR.minX || p.x > FLOOR.maxX || p.z < FLOOR.minZ) return '🚶 outside';
   if (p.z > FLOOR.maxZ) return p.x >= BALCONY.minX && p.x <= BALCONY.maxX ? '🌇 on the balcony' : '🚶 outside';
   if (p.y > LOFT.y - 0.5 && p.x > LOFT.minX && p.z > LOFT.minZ) return "👔 in the boss's office";

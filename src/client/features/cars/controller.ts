@@ -1,4 +1,4 @@
-import { CAR, SEATS, carFits, carPoint, drive, onPavement, type Box, type CarPose, type CarSeat, type Pedals } from '../../../shared/garage';
+import { CARS, SEATS, bodyOf, carFits, carPoint, drive, onPavement, specOf, type Box, type CarKind, type CarPose, type CarSeat, type Pedals } from '../../../shared/garage';
 import { LOOP_PAVED, nearLoop } from '../../../shared/scenic';
 import type { PlayerController } from '../../player';
 import type { Fleet } from './world';
@@ -48,6 +48,11 @@ export class Driver {
     return this.car !== null;
   }
 
+  /** What kind of car you're in. */
+  private get kind(): CarKind | undefined {
+    return this.car === null ? undefined : CARS[this.car]?.kind;
+  }
+
   /** Behind the wheel, rather than beside it. */
   get driving(): boolean {
     return this.seat === 'driver';
@@ -94,15 +99,16 @@ export class Driver {
     const pose = this.fleet.cars[car].pose;
     const y = this.fleet.seatAt(car, seat)!.y;
     const s = SEATS[seat];
+    const body = bodyOf(this.kind);
     // Far enough out to clear the car's boxes at any angle (turned, they stick out past its sides).
-    const out = CAR.width / 2 + 0.8;
+    const out = body.width / 2 + 0.8;
     const side = Math.sign(s.x);
     for (const [lx, lz] of [
       [side * out, s.z],
       [side * out, 0.9],
       [-side * out, s.z],
-      [0, -CAR.length / 2 - 0.6],
-      [0, CAR.length / 2 + 0.6],
+      [0, -body.length / 2 - 0.6],
+      [0, body.length / 2 + 0.6],
     ]) {
       const q = carPoint(pose, lx, lz);
       if (this.player.fits(q.x, q.z, y)) return { x: q.x, y, z: q.z };
@@ -159,7 +165,7 @@ export class Driver {
       };
       this.gas = pedals.gas;
       const from = this.fleet.cars[car].pose;
-      const pose = this.move(from, pedals, dt, this.fleet.solids(car, { x: from.x, z: from.z, r: CAR.length + Math.abs(from.speed) * dt + 1 }));
+      const pose = this.move(from, pedals, dt, this.fleet.solids(car, { x: from.x, z: from.z, r: bodyOf(this.kind).length + Math.abs(from.speed) * dt + 1 }));
       this.fleet.place(car, pose);
       this.send(car, pose);
     }
@@ -175,11 +181,14 @@ export class Driver {
     const n = Math.max(1, Math.ceil((Math.abs(from.speed) * dt) / STEP));
     const h = dt / n;
     // Already in something (someone parked on top of you): drive out of it any way you like.
-    const stuck = !carFits(from, solids);
+    const kind = this.kind;
+    const spec = specOf(kind);
+    const fits = (q: CarPose) => carFits(q, solids, kind);
+    const stuck = !fits(from);
     let pose = from;
     for (let i = 0; i < n; i++) {
-      const next = drive(pose, pedals, h);
-      if (stuck ? onPavement(next) : carFits(next, solids)) {
+      const next = drive(pose, pedals, h, spec);
+      if (stuck ? onPavement(next, kind) : fits(next)) {
         pose = next;
         continue;
       }
@@ -192,7 +201,7 @@ export class Driver {
       const slides: { to: CarPose; keep: number; heading: number; off: { x: number; z: number } }[] = [
         { to: { ...next, z: pose.z }, keep: Math.abs(dx) / want, heading: Math.sign(dx) * (Math.PI / 2), off: { x: 0, z: -Math.sign(dz) } },
         { to: { ...next, x: pose.x }, keep: Math.abs(dz) / want, heading: dz > 0 ? 0 : Math.PI, off: { x: -Math.sign(dx), z: 0 } },
-      ].filter((q) => q.keep > 0.25 && carFits(q.to, solids));
+      ].filter((q) => q.keep > 0.25 && fits(q.to));
       const road = nearLoop(pose.x, pose.z);
       if (road && road.off < LOOP_PAVED + 2) {
         // Along the road here, and in off its edge toward the middle: round the outside of a bend,
@@ -200,7 +209,7 @@ export class Driver {
         const run = dx * road.tx + dz * road.tz;
         const inward = road.off > 1e-6 ? { x: (road.x - pose.x) / road.off, z: (road.z - pose.z) / road.off } : { x: 0, z: 0 };
         const base = { ...next, x: pose.x + road.tx * run, z: pose.z + road.tz * run };
-        const to = [0, 0.04, 0.12, 0.25].map((d) => ({ ...base, x: base.x + inward.x * d, z: base.z + inward.z * d })).find((q) => carFits(q, solids));
+        const to = [0, 0.04, 0.12, 0.25].map((d) => ({ ...base, x: base.x + inward.x * d, z: base.z + inward.z * d })).find(fits);
         const keep = Math.abs(run) / want;
         if (to && keep > 0.25) slides.push({ to, keep, heading: Math.atan2(road.tx * Math.sign(run), road.tz * Math.sign(run)), off: inward });
       }
@@ -213,7 +222,7 @@ export class Driver {
         const rotY = wrap(slid.rotY + wrap(heading - slid.rotY) * 0.3);
         // Swinging round about its middle takes its far end into it: a nudge off it, the way it came.
         const off = along.off;
-        const turned = [0, 0.03, 0.08].map((d) => ({ ...slid, rotY, x: slid.x + off.x * d, z: slid.z + off.z * d })).find((q) => carFits(q, solids));
+        const turned = [0, 0.03, 0.08].map((d) => ({ ...slid, rotY, x: slid.x + off.x * d, z: slid.z + off.z * d })).find(fits);
         pose = turned ?? slid;
         continue;
       }
@@ -228,7 +237,7 @@ export class Driver {
   private bumped(pose: CarPose, speed: number) {
     if (speed < 2 || this.clock - this.bumpedAt < BUMP_EVERY) return;
     this.bumpedAt = this.clock;
-    this.hooks.bump(carPoint(pose, 0, (Math.sign(pose.speed) * CAR.length) / 2), speed);
+    this.hooks.bump(carPoint(pose, 0, (Math.sign(pose.speed) * bodyOf(this.kind).length) / 2), speed);
   }
 
   /** Tells the office where the car is, every so often while it's going (and once more when it stops). */

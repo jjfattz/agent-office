@@ -1,4 +1,4 @@
-import { DRIVE, parked, paved, type CarPose, type CarSeat, type CarState } from '../shared/garage.js';
+import { CARS, parked, paved, specOf, type CarPose, type CarSeat, type CarState } from '../shared/garage.js';
 
 /** How often one person can honk, at most (ms). */
 const HONK_EVERY = 250;
@@ -56,13 +56,15 @@ export class Garage {
     const c = this.cars[car];
     if (!c || c.driver !== id) return undefined;
     const { x, z, rotY, speed, steer } = pose;
-    if (![x, z, rotY, speed, steer].every(Number.isFinite) || !paved(x, z)) return undefined;
+    const kind = CARS[car].kind;
+    const spec = specOf(kind);
+    if (![x, z, rotY, speed, steer].every(Number.isFinite) || !paved(x, z, kind)) return undefined;
     Object.assign(c, {
       x,
       z,
       rotY: Math.atan2(Math.sin(rotY), Math.cos(rotY)),
-      speed: Math.min(DRIVE.top, Math.max(-DRIVE.reverse, speed)),
-      steer: Math.min(DRIVE.steer, Math.max(-DRIVE.steer, steer)),
+      speed: Math.min(spec.top, Math.max(-spec.reverse, speed)),
+      steer: Math.min(spec.steer, Math.max(-spec.steer, steer)),
     });
     return { x: c.x, z: c.z, rotY: c.rotY, speed: c.speed, steer: c.steer };
   }

@@ -10,6 +10,7 @@ import { decorHandlers, decorView } from './decor.js';
 import { dogHandlers, dogView } from './dog.js';
 import { floorHandlers, projectView } from './floors.js';
 import { githubHandlers, issuesView, pullsView } from './github.js';
+import { golfHandlers } from './golf.js';
 import { jukeboxHandlers, jukeboxView } from './jukebox.js';
 import { meetingHandlers, meetingView } from './meetings.js';
 import { phoneHandlers, phoneHooks } from './phone.js';
@@ -39,6 +40,7 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...dogHandlers,
   ...floorHandlers,
   ...githubHandlers,
+  ...golfHandlers,
   ...jukeboxHandlers,
   ...meetingHandlers,
   ...phoneHandlers,

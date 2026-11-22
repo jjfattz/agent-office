@@ -47,6 +47,9 @@ export function installCars(ctx: Ctx, deps: CarsDeps) {
     return { x: p.x, y: ctx.player.street + 0.6, z: p.z };
   }
 
+  /** What a car's called with its icon: "🏎️ Orange Lambo", "⛳ White golf cart". */
+  const label = (i: number) => `${CARS[i].kind === 'cart' ? '⛳' : '🏎️'} ${CARS[i].name}`;
+
   /** E at a car: behind the wheel if nobody's driving it, else beside whoever is. */
   function getIn(i: number) {
     const c = store.cars[i];
@@ -55,7 +58,7 @@ export function installCars(ctx: Ctx, deps: CarsDeps) {
     if (ctx.carrying()) return toast('🗂️ Your hands are full: put the card back first (Q)', 'warn');
     if (ctx.holdingBall()) return toast('🏀 Put the ball down first (Q)', 'warn');
     const seat: CarSeat | null = !c.driver ? 'driver' : !c.passenger ? 'passenger' : null;
-    if (!seat) return toast(`🏎️ The ${def.name} is full`, 'warn');
+    if (!seat) return toast(`${label(i)} is full`, 'warn');
     if (ctx.player.seat) deps.standUp();
     ctx.activities.stopAll('start');
     deps.stopWalking();
@@ -76,9 +79,10 @@ export function installCars(ctx: Ctx, deps: CarsDeps) {
       const name = (id?: string) => (id ? clip(store.peers.get(id)?.name ?? 'Someone', 20) : '');
       const [at, beside] = [name(c.driver), name(c.passenger)];
       const k = `${it.car}|${at}|${beside}`;
-      if (!at) return { k, parts: [hintTitle(`🏎️ ${def.name}`), aside(beside ? `${beside} is waiting in it` : 'keys in the ignition'), key('E', 'Drive it')] };
-      if (!beside) return { k, parts: [hintTitle(`🏎️ ${def.name}`), aside(`${at} is driving`), key('E', 'Hop in')] };
-      return { k, parts: [hintTitle(`🏎️ ${def.name}`), aside(`${at} and ${beside} · full`)] };
+      const title = hintTitle(label(it.car!));
+      if (!at) return { k, parts: [title, aside(beside ? `${beside} is waiting in it` : 'keys in the ignition'), key('E', 'Drive it')] };
+      if (!beside) return { k, parts: [title, aside(`${at} is driving`), key('E', 'Hop in')] };
+      return { k, parts: [title, aside(`${at} and ${beside} · full`)] };
     },
     use: onE((it) => {
       if (it.car !== undefined) getIn(it.car);
@@ -280,11 +284,11 @@ export function installCars(ctx: Ctx, deps: CarsDeps) {
       const lap = done ? ` · 🏁 ${lapTime(done.time)}${done.best ? ' best!' : ''}` : running !== null ? ` · ⏱ ${lapTime(running)}` : '';
       hint = {
         k: `drive|${kmh}|${other}|${where}|${lap}`,
-        parts: [h('span.title', {}, `🏎️ ${CARS[i].name}`), aside(`${kmh} km/h${where}${lap}${other ? ` · with ${clip(other, 20)}` : ''}`), key('W A S D', 'Drive'), key('Space', 'Brake'), key('H', 'Honk'), key('E', 'Get out')],
+        parts: [h('span.title', {}, label(i)), aside(`${kmh} km/h${where}${lap}${other ? ` · with ${clip(other, 20)}` : ''}`), key('W A S D', 'Drive'), key('Space', 'Brake'), key('H', 'Honk'), key('E', 'Get out')],
       };
     } else {
       const at = name(c?.driver);
-      hint = { k: `ride|${at}|${where}`, parts: [h('span.title', {}, `🏎️ ${CARS[i].name}`), aside(`${at ? `${clip(at, 24)} is driving` : 'nobody at the wheel'}${where}`), key('H', 'Honk'), key('E', 'Get out')] };
+      hint = { k: `ride|${at}|${where}`, parts: [h('span.title', {}, label(i)), aside(`${at ? `${clip(at, 24)} is driving` : 'nobody at the wheel'}${where}`), key('H', 'Honk'), key('E', 'Get out')] };
     }
     ctx.hint.draw(el, `car|${hint.k}`, () => hint.parts);
   }

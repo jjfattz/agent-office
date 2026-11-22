@@ -56,7 +56,7 @@ export function installSmoke(ctx: Ctx) {
     }),
   });
 
-  /** Puts it out, if you're on a smoke break: something else is taking you away (the golf tee, another map). */
+  /** Puts it out, if you're on a smoke break: something else is taking you away (a round of golf, another map). */
   function stop() {
     if (smokeBreakUntil) setSmoking(false);
   }

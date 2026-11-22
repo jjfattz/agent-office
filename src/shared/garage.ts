@@ -1,15 +1,25 @@
 import { FLOOR, ROAD, WALL_T } from './layout.js';
+import { CART_PARK, cartGround } from './course.js';
 import { STREET_END, onLoop } from './scenic.js';
 
-// The Lambos and Ferraris in the garage, which anyone can drive: where they're parked, where you can
-// take them (the garage, the lots round it, the street and the scenic loop off either end of it), and
-// the arcade physics a driver's own page runs. Everyone else on the floor sees the car where its
-// driver says it is.
+// The Lambos and Ferraris in the garage, and the golf carts by the course, which anyone can drive:
+// where they're parked, where you can take them (the garage, the lots round it, the street and the
+// scenic loop off either end of it, and for a cart the golf course too), and the arcade physics a
+// driver's own page runs. Everyone else on the floor sees the car where its driver says it is.
 
-export type CarKind = 'lambo' | 'ferrari';
+export type CarKind = 'lambo' | 'ferrari' | 'cart';
 
 /** A car's footprint (nose to tail along its length), and how high its body and its roof come up. */
 export const CAR = { length: 4.6, width: 2, body: 0.82, roof: 1.12 } as const;
+/** A golf cart's: shorter and narrower, and its roof is the canopy up over your head. */
+export const CART = { length: 2.6, width: 1.36, body: 0.7, roof: 1.95 } as const;
+
+export type Body = { readonly length: number; readonly width: number; readonly body: number; readonly roof: number };
+
+/** How big a car of `kind` is. */
+export function bodyOf(kind?: CarKind): Body {
+  return kind === 'cart' ? CART : CAR;
+}
 
 /** The building's footprint, walls included: the garage is under it. */
 const B = { minX: FLOOR.minX - WALL_T, maxX: FLOOR.maxX + WALL_T, minZ: FLOOR.minZ - WALL_T, maxZ: FLOOR.maxZ + WALL_T } as const;
@@ -64,6 +74,9 @@ export const CARS: readonly CarDef[] = [
   { kind: 'ferrari', color: '#e5383b', name: 'Scarlet Ferrari', x: 14.4, z: FRONT, rotY: 0 },
   // Left out front, for everyone upstairs to look at.
   { kind: 'lambo', color: '#00b4d8', name: 'Blue Lambo', x: 9, z: 18.2, rotY: Math.PI / 2 },
+  // The golf carts, parked by the course across the street (see shared/course.ts).
+  { kind: 'cart', color: '#fffaf3', name: 'White golf cart', x: CART_PARK[0].x, z: CART_PARK[0].z, rotY: 0 },
+  { kind: 'cart', color: '#8ac926', name: 'Green golf cart', x: CART_PARK[1].x, z: CART_PARK[1].z, rotY: 0 },
 ];
 
 export type CarSeat = 'driver' | 'passenger';
@@ -103,6 +116,19 @@ export interface Pedals {
   brake: boolean;
 }
 
+/** How a car goes (see DRIVE, and CART_DRIVE for a golf cart's). */
+export interface DriveSpec {
+  top: number;
+  reverse: number;
+  accel: number;
+  reverseAccel: number;
+  brake: number;
+  coast: number;
+  wheelbase: number;
+  steer: number;
+  steerRate: number;
+}
+
 export const DRIVE = {
   /** Flat out, forward and in reverse (m/s). */
   top: 20,
@@ -118,31 +144,39 @@ export const DRIVE = {
   steer: 0.6,
   /** How fast they turn (radians a second). */
   steerRate: 2.8,
-} as const;
+} as const satisfies DriveSpec;
+
+/** A golf cart: an electric whine up to a jog, and round on a sixpence. */
+export const CART_DRIVE = { top: 7.5, reverse: 3.5, accel: 4, reverseAccel: 3, brake: 12, coast: 2, wheelbase: 1.7, steer: 0.62, steerRate: 2.8 } as const satisfies DriveSpec;
+
+/** How a car of `kind` goes. */
+export function specOf(kind?: CarKind): DriveSpec {
+  return kind === 'cart' ? CART_DRIVE : DRIVE;
+}
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /** How far the front wheels can turn at `speed`. */
-export function steerLimit(speed: number): number {
-  return DRIVE.steer / (1 + Math.abs(speed) / 9);
+export function steerLimit(speed: number, spec: DriveSpec = DRIVE): number {
+  return spec.steer / (1 + Math.abs(speed) / 9);
 }
 
 /** The car `dt` seconds on, with these pedals: a bicycle model, no sliding. */
-export function drive(p: CarPose, pedals: Pedals, dt: number): CarPose {
-  const want = clamp(pedals.turn, -1, 1) * steerLimit(p.speed);
-  const steer = p.steer + clamp(want - p.steer, -DRIVE.steerRate * dt, DRIVE.steerRate * dt);
+export function drive(p: CarPose, pedals: Pedals, dt: number, spec: DriveSpec = DRIVE): CarPose {
+  const want = clamp(pedals.turn, -1, 1) * steerLimit(p.speed, spec);
+  const steer = p.steer + clamp(want - p.steer, -spec.steerRate * dt, spec.steerRate * dt);
   let v = p.speed;
   const toward = (target: number, rate: number) => (v += clamp(target - v, -rate * dt, rate * dt));
   const gas = clamp(pedals.gas, -1, 1);
-  if (pedals.brake) toward(0, DRIVE.brake);
+  if (pedals.brake) toward(0, spec.brake);
   else if (gas > 0) {
-    if (v < 0) toward(0, DRIVE.brake);
-    else v = Math.min(DRIVE.top, v + DRIVE.accel * gas * dt);
+    if (v < 0) toward(0, spec.brake);
+    else v = Math.min(spec.top, v + spec.accel * gas * dt);
   } else if (gas < 0) {
-    if (v > 0) toward(0, DRIVE.brake);
-    else v = Math.max(-DRIVE.reverse, v + DRIVE.reverseAccel * gas * dt);
-  } else toward(0, DRIVE.coast);
-  const yaw = (v * Math.tan(steer)) / DRIVE.wheelbase;
+    if (v > 0) toward(0, spec.brake);
+    else v = Math.max(-spec.reverse, v + spec.reverseAccel * gas * dt);
+  } else toward(0, spec.coast);
+  const yaw = (v * Math.tan(steer)) / spec.wheelbase;
   const mid = p.rotY + (yaw * dt) / 2;
   return {
     x: p.x + Math.sin(mid) * v * dt,
@@ -160,15 +194,16 @@ export function carPoint(p: { x: number; z: number; rotY: number }, lx: number, 
   return { x: p.x + lx * c + lz * s, z: p.z - lx * s + lz * c };
 }
 
-/** Whether (x, z) is somewhere a car can be: the garage, the lots, the street or the loop. */
-export function paved(x: number, z: number): boolean {
-  return PAVEMENT.some((b) => x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ) || onLoop(x, z);
+/** Whether (x, z) is somewhere a car can be: the garage, the lots, the street or the loop, and for a golf cart the course. */
+export function paved(x: number, z: number, kind?: CarKind): boolean {
+  return PAVEMENT.some((b) => x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ) || onLoop(x, z) || (kind === 'cart' && cartGround(x, z));
 }
 
 /** Whether the whole car is on the pavement: its corners, and halfway along each side. */
-export function onPavement(p: { x: number; z: number; rotY: number }): boolean {
-  const w = CAR.width / 2;
-  const l = CAR.length / 2;
+export function onPavement(p: { x: number; z: number; rotY: number }, kind?: CarKind): boolean {
+  const { width, length } = bodyOf(kind);
+  const w = width / 2;
+  const l = length / 2;
   for (const [lx, lz] of [
     [w, l],
     [-w, l],
@@ -180,15 +215,15 @@ export function onPavement(p: { x: number; z: number; rotY: number }): boolean {
     [0, -l],
   ]) {
     const at = carPoint(p, lx, lz);
-    if (!paved(at.x, at.z)) return false;
+    if (!paved(at.x, at.z, kind)) return false;
   }
   return true;
 }
 
 /** Whether the car's footprint (a rectangle turned by rotY) overlaps box `b` (separating axes). */
-export function overlaps(p: { x: number; z: number; rotY: number }, b: Box): boolean {
-  const hx = CAR.width / 2;
-  const hz = CAR.length / 2;
+export function overlaps(p: { x: number; z: number; rotY: number }, b: Box, kind?: CarKind): boolean {
+  const hx = bodyOf(kind).width / 2;
+  const hz = bodyOf(kind).length / 2;
   const ex = (b.maxX - b.minX) / 2;
   const ez = (b.maxZ - b.minZ) / 2;
   const dx = (b.minX + b.maxX) / 2 - p.x;
@@ -206,8 +241,8 @@ export function overlaps(p: { x: number; z: number; rotY: number }, b: Box): boo
 }
 
 /** Whether the car can be at `p`: on the pavement, clear of all of `solids`. */
-export function carFits(p: { x: number; z: number; rotY: number }, solids: Iterable<Box>): boolean {
-  if (!onPavement(p)) return false;
-  for (const b of solids) if (overlaps(p, b)) return false;
+export function carFits(p: { x: number; z: number; rotY: number }, solids: Iterable<Box>, kind?: CarKind): boolean {
+  if (!onPavement(p, kind)) return false;
+  for (const b of solids) if (overlaps(p, b, kind)) return false;
   return true;
 }
