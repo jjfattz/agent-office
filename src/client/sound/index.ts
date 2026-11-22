@@ -31,6 +31,7 @@ import { Jukebox, type JukeboxPlay } from '../features/jukebox/sound';
 import { needsYou } from '../features/needsyou/sound';
 import type { Pos } from './places';
 import { pageTurn, paper } from './paper';
+import { pole, type PoleSound } from '../features/pole/sound';
 import { skeeball, type SkeeballSound } from '../features/skeeball/sound';
 import { SkeeballTunes, type SkeeballMusic } from '../features/skeeball/music';
 import { toss, type TossSound } from '../features/bargames/sound';
@@ -186,6 +187,11 @@ export class OfficeSound {
   /** What the skeeball machine's speaker plays (see SkeeballMusic), through your music volume. */
   skeeballMusic(mode: SkeeballMusic) {
     this.skeeTunes.set(mode);
+  }
+
+  /** The fire pole (features/pole): grabbing on and sliding `len` seconds down it, and landing at the bottom. */
+  pole(kind: PoleSound, at: Pos, len = 1) {
+    pole(this.a, kind, at, len);
   }
 
   arcade(kind: ArcadeSound, lines = 1) {

@@ -6,6 +6,7 @@
 
 import { BALCONY, BALCONY_DOOR, BEANBAGS, BOOKSHELF, CABINET, DESK_SIZE, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, GONG, JUKEBOX, KIOSK, LOFT, MEETING_ROOM, MEETING_SEATS, MEETING_TABLE, PARACHUTE, ROAD, STAIRS, STATIONS, WHITEBOARD, WING, builtDesks, plantsAt, wingLevel, wingMinZ, type DeskDef } from './layout.js';
 import { LANE, SKEEBALL } from './skeeball.js';
+import { POLE } from './pole.js';
 
 
 export type Pt = [number, number];
@@ -421,6 +422,15 @@ export function wayHome(seat: DeskDef, wing = 0): Pt[] {
 export function wayToBalcony(seat: DeskDef, wing = 0): Pt[] {
   const inside = wayTo(seat, BALCONY_IN, wing);
   return [...inside, [BALCONY_DOOR.u, BALCONY.minZ + 0.4], [PARACHUTE.jump.x, PARACHUTE.jump.z]];
+}
+
+/**
+ * Or out to the fire pole: through the balcony doors and along the balcony to its west end
+ * (POLE.grab), where it climbs over the railing onto the pole and slides down to the street.
+ */
+export function wayToPole(seat: DeskDef, wing = 0): Pt[] {
+  const inside = wayTo(seat, BALCONY_IN, wing);
+  return [...inside, [BALCONY_DOOR.u, BALCONY.minZ + 0.9], [POLE.grab.x, POLE.grab.z]];
 }
 
 /** From `from`, down on the street, over to the near sidewalk and off along it to the west, where they're gone. */

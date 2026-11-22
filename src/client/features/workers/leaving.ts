@@ -6,6 +6,8 @@ import type { Laptop } from './laptop';
 import type { DeskView } from '../../world/types';
 import type { Ways } from '../../world/world';
 import { mesh, toonUnique } from '../../world/toon';
+import { Slide } from '../pole/slide';
+import { POLE } from '../../../shared/pole';
 
 /** Walking pace on the way out, in m/s: no hurry any more. */
 const PACE = 2.3;
@@ -38,6 +40,7 @@ const TURN = 1.2;
 const POP = 0.45;
 const CRUMPLE = 1.3;
 const JUMPS = ['🪂 geronimo!', '🪂 see ya!', '🪂 wheee!', '🪂 bye bye!', '🪂 I quit!'];
+const SLIDES = ['🚒 woo-hoo!', '🚒 fire drill!', '🚒 always wanted to do this', '🚒 bye bye!', '🚒 see ya!'];
 const CANOPIES = ['#ef476f', '#ffd166', '#06d6a0', '#118ab2', '#8338ec', '#ff8a5b'];
 
 /** Seen from below too, so both sides of the fabric. */
@@ -124,6 +127,9 @@ interface Leaver {
   gone: number;
   /** Off a floor with no exit door: out over the balcony railing by parachute. */
   chute: Chute | null;
+  /** Or down the fire pole: `pole` until it's down, with `slide` going once it's over the railing. */
+  pole: boolean;
+  slide: Slide | null;
 }
 
 interface Closing {
@@ -140,9 +146,10 @@ const pick = <T>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length
  * Workers who've been sent home. Each one packs its things into a cardboard box while its laptop
  * shuts, hops down off its chair, and walks out of the building with the box (see wayHome): out the
  * exit door, down the steps and off along the sidewalk, where it's gone. Only the bottom floor has
- * an exit door, so from the floors above it goes out onto the balcony instead, climbs up on the
- * railing and jumps, and its parachute brings it down onto the lot out front, box and all. Its feet
- * make no sound, walking or landing.
+ * an exit door, so from the floors above it goes out onto the balcony instead, climbs over the
+ * railing onto the fire pole and slides down it to the lot out front, box and all (see features/pole).
+ * Now and then one climbs up on the railing and jumps instead, and its parachute brings it down. Its
+ * feet make no sound, walking or landing.
  */
 export class Departures {
   private leavers: Leaver[] = [];
@@ -177,9 +184,9 @@ export class Departures {
     model.root.scale.setScalar(scale);
     model.leave(pick(FAREWELLS));
     const chair = desk.def.beanbag || from ? null : desk.chair;
-    const { way, chute: up } = this.ways().home(desk.def, from);
-    const chute: Chute | null = up ? { phase: 'walk', t: 0, color: pick(CANOPIES), canopy: null, from: new THREE.Vector3(), vel: new THREE.Vector3(), land: new THREE.Vector3(), angle: 0, radius: 0, height: 1 } : null;
-    this.leavers.push({ model, deskId: desk.def.id, way, next: 0, t: from ? PACK + HOP : 0, seat, heading: model.root.rotation.y, chair, spin: 0, scale, gone: 0, chute });
+    const { way, over } = this.ways().home(desk.def, from);
+    const chute: Chute | null = over === 'chute' ? { phase: 'walk', t: 0, color: pick(CANOPIES), canopy: null, from: new THREE.Vector3(), vel: new THREE.Vector3(), land: new THREE.Vector3(), angle: 0, radius: 0, height: 1 } : null;
+    this.leavers.push({ model, deskId: desk.def.id, way, next: 0, t: from ? PACK + HOP : 0, seat, heading: model.root.rotation.y, chair, spin: 0, scale, gone: 0, chute, pole: over === 'pole', slide: null });
     this.laptops.push({ laptop, deskId: desk.def.id, gone: 0 });
   }
 
@@ -260,6 +267,7 @@ export class Departures {
     }
     const c = l.chute;
     if (c && c.phase !== 'walk' && c.phase !== 'off') return this.jump(l, c, dt);
+    if (l.slide) return this.slideDown(l, l.slide, dt);
     let move = PACE * dt;
     while (move > 0 && l.next < l.way.length) {
       const [x, z] = l.way[l.next];
@@ -284,6 +292,13 @@ export class Departures {
     root.rotation.y += wrap(l.heading - root.rotation.y) * Math.min(1, dt * 8);
     if (l.next < l.way.length) {
       l.model.walking = true;
+      return true;
+    }
+    if (l.pole) {
+      // At the railing by the fire pole: over it and down.
+      l.pole = false;
+      l.slide = new Slide(pos, this.ground(POLE.x + 0.65, POLE.z, -1) - FEET, root.rotation.y);
+      l.model.say(pick(SLIDES));
       return true;
     }
     if (c?.phase === 'walk') {
@@ -391,6 +406,18 @@ export class Departures {
     this.dropChute(c);
     c.phase = 'off';
     l.way = walkOff([pos.x, pos.z]);
+    l.next = 1;
+    return true;
+  }
+
+  /** Over the railing and down the fire pole, then off along the sidewalk from the bottom. */
+  private slideDown(l: Leaver, s: Slide, dt: number): boolean {
+    const { root } = l.model;
+    const going = s.step(root.position, dt);
+    root.rotation.y = s.heading;
+    if (going) return true;
+    l.slide = null;
+    l.way = walkOff([root.position.x, root.position.z]);
     l.next = 1;
     return true;
   }

@@ -346,7 +346,8 @@ export const WINDOWS: Opening[] = [
 
 /**
  * The way out of the bottom floor: a door in the west wall onto a landing, with stairs down to the
- * street. The floors above have no door there; workers leave them off the balcony (see PARACHUTE).
+ * street. The floors above have no door there; workers leave them off the balcony, down the fire pole
+ * (see shared/pole.ts) or now and then by parachute (see PARACHUTE).
  */
 export const EXIT_DOOR: Opening = { wall: 'west', u: 6.5, width: 1.4, y0: 0, y1: 2.4 };
 export const EXIT_STAIRS = {

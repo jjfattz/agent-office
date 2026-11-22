@@ -156,7 +156,7 @@ export function buildCastle(plan: MapPlan): World {
     gong: kit.gong,
     nav,
     ways: {
-      home: (seat, from) => ({ way: [...(from ? nav.route(from, inside) : nav.wayFrom(seat, inside)), threshold, beyond], chute: false }),
+      home: (seat, from) => ({ way: [...(from ? nav.route(from, inside) : nav.wayFrom(seat, inside)), threshold, beyond] }),
       in: (seat) => [beyond, threshold, ...nav.wayTo(inside, seat)],
     },
     rain: [{ area: b, top: () => Math.min(H - 1, 9) }],
