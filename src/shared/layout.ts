@@ -282,7 +282,6 @@ export const PLANTS: readonly (readonly [x: number, z: number, scale: number])[]
   [-17.2, -12.2, 1.4],
   [17.2, -12.2, 1.5],
   [17.2, 12.2, 1.3],
-  [-17.2, 8.5, 1.2],
   [14.2, -12.2, 1.1],
 ];
 
