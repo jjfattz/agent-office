@@ -132,7 +132,7 @@ export function buildStation(plan: MapPlan): World {
     gong: kit.gong,
     nav,
     ways: {
-      home: (seat, from) => ({ way: [...(from ? nav.route(from, inside) : nav.wayFrom(seat, inside)), threshold, beyond], chute: false }),
+      home: (seat, from) => ({ way: [...(from ? nav.route(from, inside) : nav.wayFrom(seat, inside)), threshold, beyond] }),
       in: (seat) => [beyond, threshold, ...nav.wayTo(inside, seat)],
     },
     rain: [{ area: b, top: () => H - 0.5 }],

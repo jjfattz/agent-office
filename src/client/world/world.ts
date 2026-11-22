@@ -2,7 +2,7 @@ import type * as THREE from 'three';
 import type { FloorPalette } from '../../shared/floors';
 import { LOFT, WALL_HEIGHT, WALL_T, FLOOR, type DeskDef } from '../../shared/layout';
 import { OFFICE_PLAN, type BoardKey, type MapPlan, type Spot } from '../../shared/maps';
-import { officeNav, wayHome, wayIn, wayToBalcony, type Bounds, type NavGrid, type Pt } from '../../shared/nav';
+import { officeNav, wayHome, wayIn, wayToBalcony, wayToPole, type Bounds, type NavGrid, type Pt } from '../../shared/nav';
 import type { DungeonView } from './dungeon';
 import type { AirlockView } from './station/airlock';
 import type { Person } from './character';
@@ -23,9 +23,10 @@ import type { SkyLights } from './sky';
 export interface Ways {
   /**
    * Out of the building from `seat`, or from `from` if it's already up and about: the first point
-   * is where it gets down. `chute`: it goes over the balcony railing by parachute at the end.
+   * is where it gets down. `over`: at the end it goes over the balcony railing, down the fire pole
+   * or (now and then, a daredevil) by parachute.
    */
-  home(seat: DeskDef, from?: Pt): { way: Pt[]; chute: boolean };
+  home(seat: DeskDef, from?: Pt): { way: Pt[]; over?: 'pole' | 'chute' };
   /** In to beside `seat`'s chair, from wherever workers come in (the office's elevator, the castle's doors). */
   in(seat: DeskDef): Pt[];
 }
@@ -86,6 +87,9 @@ export interface World {
   dispose?(): void;
 }
 
+/** How many of the workers sent home from a floor above the bottom one parachute off the balcony rather than take the fire pole. */
+const DAREDEVILS = 0.2;
+
 /** Where confetti rains from over (x, z) downstairs in the office: the ceiling, or under the loft, the underside of its floor. */
 function ceilingOver(x: number, z: number): number {
   const loft = x > LOFT.minX && x < LOFT.maxX && z > LOFT.minZ && z < LOFT.maxZ;
@@ -112,7 +116,11 @@ export function officeWorld(office: Office, upstairs: () => boolean, wing: () =>
       return officeNav(wing());
     },
     ways: {
-      home: (seat) => (upstairs() ? { way: wayToBalcony(seat, wing()), chute: true } : { way: wayHome(seat, wing()), chute: false }),
+      home: (seat) => {
+        if (!upstairs()) return { way: wayHome(seat, wing()) };
+        // Most slide down the fire pole; one in five jumps off the balcony with a parachute instead.
+        return Math.random() < DAREDEVILS ? { way: wayToBalcony(seat, wing()), over: 'chute' } : { way: wayToPole(seat, wing()), over: 'pole' };
+      },
       in: (seat) => wayIn(seat, wing()),
     },
     rain: [

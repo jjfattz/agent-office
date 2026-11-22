@@ -16,6 +16,7 @@ import { stack } from '../stack';
 import { tower } from '../tower';
 import { hoop } from '../../features/basketball/world';
 import { skeeball } from '../../features/skeeball/world';
+import { pole } from '../../features/pole/world';
 import { signs } from '../desksigns';
 import type { Collider, DeskView, Interactable, Office, OfficeHandles } from '../types';
 import { PALETTE, floorTexture, paintPlanks, type Looks } from './materials';
@@ -44,6 +45,7 @@ function floorPlan() {
     nightLights,
     walls,
     balcony,
+    pole,
     tee,
     ...downstairs(cars, street, green, scenic),
     plug,

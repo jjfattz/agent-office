@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BALCONY, BALCONY_DOOR, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, MEETING_ROOM, MEETING_SEATS, PARACHUTE, ROAD, SEATS, STATIONS, WING, deskBuilt, wingMinZ, type DeskDef } from '../src/shared/layout.js';
-import { route, walkable, wayHome, wayIn, wayToBalcony, type Pt } from '../src/shared/nav.js';
+import { route, walkable, wayHome, wayIn, wayToBalcony, wayToPole, type Pt } from '../src/shared/nav.js';
+import { POLE } from '../src/shared/pole.js';
 
 /** Every place a worker can be on a floor built out `wing` rows, at each build-out there is. */
 const everywhere = (): [DeskDef, number][] => Array.from({ length: WING.rows + 1 }, (_, wing) => [...SEATS, ...STATIONS, ...MEETING_SEATS].filter((d) => deskBuilt(d, wing)).map((d): [DeskDef, number] => [d, wing])).flat();
@@ -82,6 +83,28 @@ test('upstairs, with no exit door, a worker sent home walks out onto the balcony
     const [jx, jz] = way[way.length - 1];
     assert.deepEqual([jx, jz], [PARACHUTE.jump.x, PARACHUTE.jump.z]);
     assert.ok(jz < BALCONY.maxZ && jz > BALCONY.maxZ - 0.6, `${seat.id} ends up at the railing`);
+  }
+});
+
+test('upstairs, a worker taking the fire pole walks out onto the balcony and along it to the pole', () => {
+  for (const [seat, wing] of everywhere()) {
+    const way = wayToPole(seat, wing);
+    const out = way.findIndex(([, z]) => z > FLOOR.maxZ);
+    assert.ok(out > 1, `${seat.id} goes out onto the balcony`);
+    for (let i = 2; i < out; i++) {
+      const [x0, z0] = way[i - 1];
+      const [x1, z1] = way[i];
+      const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 0.2);
+      for (let k = 0; k <= n; k++) {
+        const x = x0 + ((x1 - x0) * k) / n;
+        const z = z0 + ((z1 - z0) * k) / n;
+        assert.ok(walkable(x, z, wing), `${seat.id} (built out ${wing}) walks into something at (${x.toFixed(2)}, ${z.toFixed(2)})`);
+      }
+    }
+    // Out through the balcony doors, then along the balcony, staying on it, to the pole's end.
+    assert.ok(Math.abs(way[out][0] - BALCONY_DOOR.u) < BALCONY_DOOR.width / 2 - 0.3, `${seat.id} goes through the balcony doors`);
+    for (const [x, z] of way.slice(out)) assert.ok(x > BALCONY.minX + 0.3 && x < BALCONY.maxX - 0.3 && z > BALCONY.minZ + 0.3 && z < BALCONY.maxZ - 0.3, `${seat.id} stays on the balcony`);
+    assert.deepEqual(way[way.length - 1], [POLE.grab.x, POLE.grab.z]);
   }
 });
 
