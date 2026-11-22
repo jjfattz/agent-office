@@ -28,7 +28,7 @@ Back to the [README](../README.md).
 | M | Mute / unmute in voice |
 | Ctrl + Space | Dictate, in a worker's terminal or a prompt box: hold it and talk, and what you said is typed in when you let go. A quick tap leaves it listening until the next tap. The **🎤** does the same |
 | Tab | The ☰ menu: every window, and what shows on screen |
-| On the golf course | **Space** hold and let go to swing, **A**/**D** or the mouse aim, **W**/**S** loft, **C** change club, **X** pick up, **Q** end the round, **E** step away (and **E** at your ball to play it). While the ball flies, **Space** skips to where it stops |
+| On the golf course | **Space** hold and let go to swing, **A**/**D** or the mouse aim, **W**/**S** loft, **C** change club, **X** pick up, **Q** end the round (wherever you are, until it's over), **E** step away (and **E** at your ball to play it). While the ball flies, **Space** skips to where it stops |
 | Esc | Close any window and get back to looking around. In a terminal, **Hide**, **✕** and Esc only hide the terminal; the worker keeps running |
 | Ctrl + [ | Send Esc to a terminal instead, to close a menu like Claude's `/skills` or interrupt Claude. **⎋ Esc** in the terminal's header does the same |
 

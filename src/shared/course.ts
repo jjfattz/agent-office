@@ -173,7 +173,7 @@ export const COURSE_TREES: readonly [number, number, number][] = [
 export const CROWN = { y: 3.4, r: 1.75 } as const;
 export const TRUNK = { r: 0.3, h: 2.2 } as const;
 
-/** Where the course is, past which a ball's out of bounds (and a cart can't go). */
+/** Where the course is, inside its white fence: past it a ball's out of bounds (and a cart can't go). */
 export const COURSE = { minX: -74, maxX: 57, minZ: 53, maxZ: 162 } as const;
 /**
  * The way in off the street: the cart path across the far sidewalk, and the bit between the
@@ -226,16 +226,18 @@ export function inWater(x: number, z: number, grow = 0): boolean {
 }
 
 /** The island green's lake has a footbridge over it from the east shore: [x0, x1] along z, `half` wide. */
-export const BRIDGE = { x0: -23.6, x1: -33.4, z: 143, half: 1 } as const;
+export const BRIDGE = { x0: -23.6, x1: -33.4, z: 143, half: 1.8 } as const;
 
-/** Whether a cart can drive at (x, z): on the course or the way in, but not on a green, in a bunker or the water (bar the footbridge). */
+/**
+ * Whether a cart can drive at (x, z): anywhere inside the course's fence (see COURSE) or the way in
+ * off the street, greens and bunkers and all, but not into the water (bar over the footbridge).
+ */
 export function cartGround(x: number, z: number): boolean {
   if (inBox({ minX: BRIDGE.x1, maxX: BRIDGE.x0, minZ: BRIDGE.z - BRIDGE.half, maxZ: BRIDGE.z + BRIDGE.half }, x, z)) return true;
   if (!onCourseGround(x, z) || inBox(FARM.pasture, x, z)) return false;
-  // Over the far sidewalk, only by the cart path.
-  if (z < ROAD.maxZ + 2.5) return inBox(CART_PATH, x, z);
-  const lie = lieAt(x, z);
-  return lie !== 'green' && lie !== 'sand' && lie !== 'water' && lie !== 'out';
+  // Over the far sidewalk (out of bounds for a ball), anywhere between the neighbours.
+  if (z < ROAD.maxZ + 2.5) return true;
+  return lieAt(x, z) !== 'water';
 }
 
 /** How far it is from hole `h`'s tee to its pin. */

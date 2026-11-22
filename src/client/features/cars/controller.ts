@@ -1,4 +1,4 @@
-import { CARS, SEATS, bodyOf, carFits, carPoint, drive, onPavement, specOf, type Box, type CarKind, type CarPose, type CarSeat, type Pedals } from '../../../shared/garage';
+import { CARS, SEATS, bodyOf, carFits, carPoint, drive, onPavement, specOf, type Box, type CarKind, type CarPose, type CarSeat, type DriveSpec, type Pedals } from '../../../shared/garage';
 import { LOOP_PAVED, nearLoop } from '../../../shared/scenic';
 import type { PlayerController } from '../../player';
 import type { Fleet } from './world';
@@ -20,6 +20,9 @@ const SEND_EVERY = 0.066;
 const BUMP_EVERY = 0.35;
 /** The longest step a car takes in one go (m), so it never jumps a lamp post between two frames. */
 const STEP = 0.25;
+/** Slower than this against something, steering turns the car round on the spot, as if at SCRUB_SPEED (m/s). */
+const SCRUB_BELOW = 3;
+const SCRUB_SPEED = 2;
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
@@ -175,7 +178,8 @@ export class Driver {
   /**
    * The car `dt` on from `from`: in short steps, stopping at whatever's in the way. At an angle to
    * it, the car slides along it (along the scenic loop's edge, the way the road curves); head on,
-   * it bounces back off.
+   * it bounces back off. Up against it and steering away, it scrubs round on the spot until it's
+   * clear, so W with A or D always gets you out, not only reversing.
    */
   private move(from: CarPose, pedals: Pedals, dt: number, solids: Box[]): CarPose {
     const n = Math.max(1, Math.ceil((Math.abs(from.speed) * dt) / STEP));
@@ -192,45 +196,88 @@ export class Driver {
         pose = next;
         continue;
       }
-      // Sliding keeps only the part of the move along what's in the way (the town's things are all
-      // square to the street; the loop's edge goes the way the road does), and only that much of the
-      // speed; the car swings round to run along it. `off` is the way off what it's run into.
-      const dx = next.x - pose.x;
-      const dz = next.z - pose.z;
-      const want = Math.hypot(dx, dz) || 1;
-      const slides: { to: CarPose; keep: number; heading: number; off: { x: number; z: number } }[] = [
-        { to: { ...next, z: pose.z }, keep: Math.abs(dx) / want, heading: Math.sign(dx) * (Math.PI / 2), off: { x: 0, z: -Math.sign(dz) } },
-        { to: { ...next, x: pose.x }, keep: Math.abs(dz) / want, heading: dz > 0 ? 0 : Math.PI, off: { x: -Math.sign(dx), z: 0 } },
-      ].filter((q) => q.keep > 0.25 && fits(q.to));
-      const road = nearLoop(pose.x, pose.z);
-      if (road && road.off < LOOP_PAVED + 2) {
-        // Along the road here, and in off its edge toward the middle: round the outside of a bend,
-        // going straight on along it runs a little off, so it's nudged back in as it goes.
-        const run = dx * road.tx + dz * road.tz;
-        const inward = road.off > 1e-6 ? { x: (road.x - pose.x) / road.off, z: (road.z - pose.z) / road.off } : { x: 0, z: 0 };
-        const base = { ...next, x: pose.x + road.tx * run, z: pose.z + road.tz * run };
-        const to = [0, 0.04, 0.12, 0.25].map((d) => ({ ...base, x: base.x + inward.x * d, z: base.z + inward.z * d })).find(fits);
-        const keep = Math.abs(run) / want;
-        if (to && keep > 0.25) slides.push({ to, keep, heading: Math.atan2(road.tx * Math.sign(run), road.tz * Math.sign(run)), off: inward });
-      }
-      const along = slides.sort((a, b) => b.keep - a.keep)[0];
+      const along = this.slide(pose, next, fits);
       if (along) {
         this.bumped(pose, Math.abs(next.speed) * (1 - along.keep));
-        const slid = { ...along.to, speed: next.speed * along.keep };
-        // Backing along it, it's the tail that leads.
-        const heading = along.heading + (next.speed < 0 ? Math.PI : 0);
-        const rotY = wrap(slid.rotY + wrap(heading - slid.rotY) * 0.3);
-        // Swinging round about its middle takes its far end into it: a nudge off it, the way it came.
-        const off = along.off;
-        const turned = [0, 0.03, 0.08].map((d) => ({ ...slid, rotY, x: slid.x + off.x * d, z: slid.z + off.z * d })).find(fits);
-        pose = turned ?? slid;
+        pose = along.pose;
         continue;
+      }
+      // Up against it and hardly moving: round on the spot, if you're steering.
+      const scrub = Math.abs(pose.speed) < SCRUB_BELOW ? this.scrub(pose, next, pedals, h, spec, fits) : null;
+      if (scrub) {
+        pose = scrub;
+        break;
       }
       this.bumped(pose, Math.abs(pose.speed));
       pose = { ...pose, steer: next.steer, speed: -pose.speed * 0.3 };
       break;
     }
     return pose;
+  }
+
+  /**
+   * Where the car goes instead of `next`, which runs into something: on without the turn (the turn
+   * would swing its tail into it), or sliding along what's in the way, keeping that much (`keep`)
+   * of its speed. Null if there's no way on.
+   */
+  private slide(pose: CarPose, next: CarPose, fits: (q: CarPose) => boolean): { pose: CarPose; keep: number } | null {
+    // Straight on, as it was pointing: turning away from a wall about its middle takes its tail into it.
+    if (Math.abs(wrap(next.rotY - pose.rotY)) > 1e-9) {
+      const ahead = Math.sign(next.speed) * Math.hypot(next.x - pose.x, next.z - pose.z);
+      const straight = { ...next, rotY: pose.rotY, x: pose.x + Math.sin(pose.rotY) * ahead, z: pose.z + Math.cos(pose.rotY) * ahead };
+      if (fits(straight)) return { pose: straight, keep: 1 };
+    }
+    // Sliding keeps only the part of the move along what's in the way (the town's things are all
+    // square to the street; the loop's edge goes the way the road does), and only that much of the
+    // speed; the car swings round to run along it. `off` is the way off what it's run into.
+    const dx = next.x - pose.x;
+    const dz = next.z - pose.z;
+    const want = Math.hypot(dx, dz) || 1;
+    const slides: { to: CarPose; keep: number; heading: number; off: { x: number; z: number } }[] = [
+      { to: { ...next, z: pose.z }, keep: Math.abs(dx) / want, heading: Math.sign(dx) * (Math.PI / 2), off: { x: 0, z: -Math.sign(dz) } },
+      { to: { ...next, x: pose.x }, keep: Math.abs(dz) / want, heading: dz > 0 ? 0 : Math.PI, off: { x: -Math.sign(dx), z: 0 } },
+    ].filter((q) => q.keep > 0.25 && fits(q.to));
+    const road = nearLoop(pose.x, pose.z);
+    if (road && road.off < LOOP_PAVED + 2) {
+      // Along the road here, and in off its edge toward the middle: round the outside of a bend,
+      // going straight on along it runs a little off, so it's nudged back in as it goes.
+      const run = dx * road.tx + dz * road.tz;
+      const inward = road.off > 1e-6 ? { x: (road.x - pose.x) / road.off, z: (road.z - pose.z) / road.off } : { x: 0, z: 0 };
+      const base = { ...next, x: pose.x + road.tx * run, z: pose.z + road.tz * run };
+      const to = [0, 0.04, 0.12, 0.25].map((d) => ({ ...base, x: base.x + inward.x * d, z: base.z + inward.z * d })).find(fits);
+      const keep = Math.abs(run) / want;
+      if (to && keep > 0.25) slides.push({ to, keep, heading: Math.atan2(road.tx * Math.sign(run), road.tz * Math.sign(run)), off: inward });
+    }
+    const along = slides.sort((a, b) => b.keep - a.keep)[0];
+    if (!along) return null;
+    const slid = { ...along.to, speed: next.speed * along.keep };
+    // Backing along it, it's the tail that leads.
+    const heading = along.heading + (next.speed < 0 ? Math.PI : 0);
+    const rotY = wrap(slid.rotY + wrap(heading - slid.rotY) * 0.3);
+    // Swinging round about its middle takes its far end into it: a nudge off it, the way it came.
+    const off = along.off;
+    const turned = [0, 0.03, 0.08].map((d) => ({ ...slid, rotY, x: slid.x + off.x * d, z: slid.z + off.z * d })).find(fits);
+    return { pose: turned ?? slid, keep: along.keep };
+  }
+
+  /**
+   * Nosed (or backed) into something, on the gas with the wheel turned: the car turns as it would at
+   * a crawl, pushed off whatever it's against as little as it takes, so it comes round until it can
+   * drive away. Null if you're not steering, or it can't turn at all.
+   */
+  private scrub(pose: CarPose, next: CarPose, pedals: Pedals, h: number, spec: DriveSpec, fits: (q: CarPose) => boolean): CarPose | null {
+    const way = Math.sign(pedals.gas);
+    if (!way || Math.abs(next.steer) < 0.02) return null;
+    const rotY = wrap(pose.rotY + (way * SCRUB_SPEED * Math.tan(next.steer) * h) / spec.wheelbase);
+    const turned = { ...pose, rotY, steer: next.steer, speed: 0 };
+    for (const d of [0, 0.02, 0.05, 0.1]) {
+      for (let k = 0; k < (d ? 8 : 1); k++) {
+        const a = (k / 8) * Math.PI * 2;
+        const q = { ...turned, x: pose.x + Math.sin(a) * d, z: pose.z + Math.cos(a) * d };
+        if (fits(q)) return q;
+      }
+    }
+    return null;
   }
 
   /** Ran into something, losing `speed` m/s of the car's: a crunch, if it's enough to hear. */

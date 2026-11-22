@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { COURSE_TREES, CROWN, HOLES, holeLength, lieAt, scoreName, toPar, yawTo } from '../src/shared/course.js';
-import { CLUBS, clubFor, fly, fullReach, shotOk, type Club, type Shot } from '../src/shared/golf.js';
+import { CLUBS, CUP, clubFor, fly, fullReach, lieText, puttRoll, shotOk, type Club, type Shot } from '../src/shared/golf.js';
 import { GolfRound, MAX_STROKES } from '../src/client/features/golf/round.js';
 
 /** A shot on hole `hole` from (x, z) at its pin, with `club` at its usual loft. */
@@ -89,6 +89,34 @@ test('a chip and a putt: the wedge gets close from off the green, and a putt rol
   assert.ok(!hard.holed && hard.fromPin > 2);
   const rolled = fly(at(0, { x: h.pin.x - 5, z: h.pin.z - 5 }, 'putter', 0.6));
   assert.ok(rolled.path.length > 10 && fullReach('putter', 0) > 10);
+});
+
+test('the cup: a putt over the middle at a sensible pace drops, one hit hard lips out and says so', () => {
+  // Every hole, from 3 m on a few sides: a good stretch of the meter holes it, dead straight at the cup.
+  for (const [i, h] of HOLES.entries()) {
+    for (const side of [0, 2, 4]) {
+      const from = { x: h.pin.x + Math.sin(side) * 3, z: h.pin.z + Math.cos(side) * 3 };
+      let holed = 0;
+      for (let p = 0.3; p <= 0.8; p += 0.005) {
+        for (const aim of [-0.03, -0.015, 0, 0.015, 0.03]) {
+          if (fly(at(i, from, 'putter', p, aim)).holed) {
+            holed++;
+            break;
+          }
+        }
+      }
+      assert.ok(holed * 0.005 >= 0.12, `hole ${h.n} from side ${side}: holed over ${(holed * 0.5).toFixed(1)}% of the meter`);
+    }
+  }
+  // Rammed at it from 1.5 m on the flattest line there is: over the cup, off round its edge.
+  const h = HOLES[0];
+  const from = { x: h.pin.x, z: h.pin.z - 1.5 };
+  const hard = fly(at(0, from, 'putter', 0.9));
+  assert.ok(!hard.holed && hard.hits.some((x) => x.kind === 'lip'), 'it lips out');
+  assert.match(lieText(hard), /^Lipped out/);
+  // And the guide's length is how far a putt rolls on the flat.
+  assert.ok(Math.abs(puttRoll(1) - fullReach('putter', 0)) < 1e-9 && puttRoll(0.5) < puttRoll(1) / 3);
+  assert.ok(CUP >= 0.15);
 });
 
 test('trees slow a ball and the same shot always goes the same way', () => {

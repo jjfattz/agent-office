@@ -2,6 +2,7 @@ import { streetBelow } from '../../../shared/layout';
 import type { Interactable } from '../../world/types';
 import type { Fixture, StreetSite } from '../../world/office/fixture';
 import { buildCourse } from './course';
+import { buildFence } from './fence';
 import { buildTees } from './tees';
 
 // The golf course across the street, as a fixture of the office floor: built down on the street with
@@ -10,6 +11,8 @@ import { buildTees } from './tees';
 export interface CourseView {
   /** Each hole's tee, by hole: E there tees off. */
   tees: Interactable[];
+  /** Hole `hole`'s flagstick out of the cup and laid on the green, or back in it (see course.ts). */
+  pin(hole: number, out: boolean): void;
 }
 
 declare module '../../world/types' {
@@ -23,9 +26,10 @@ declare module '../../world/types' {
 export const course: Fixture<'course', StreetSite> = (site) => {
   const built = buildCourse(site.ground, site.groundColliders, site.get('night'));
   const tees = buildTees(site.ground, site.groundColliders);
+  buildFence(site.ground, site.groundColliders);
   site.interactables.push(...tees);
   return {
-    handle: { course: { tees } },
+    handle: { course: { tees, pin: (hole, out) => built.pin(hole, out) } },
     update: (t) => built.update(t),
     setLevel: (index) => {
       for (const it of tees) it.y = streetBelow(index);
