@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CAR, CARS, DRIVE, PAVEMENT, carFits, carPoint, drive, onPavement, overlaps, parked, paved, steerLimit, type CarPose, type Pedals } from '../src/shared/garage.js';
+import { CAR, CARS, CART_DRIVE, DRIVE, PAVEMENT, bodyOf, carFits, carPoint, drive, onPavement, overlaps, parked, paved, steerLimit, type CarPose, type Pedals } from '../src/shared/garage.js';
+import { BRIDGE, CART_PARK, HOLES } from '../src/shared/course.js';
 import { ELEVATOR, ELEVATOR_FRONT, FLOOR, ROAD } from '../src/shared/layout.js';
 import { Garage } from '../src/server/garage.js';
 
@@ -18,14 +19,15 @@ const still = (x = 0, z = 0, rotY = 0): CarPose => ({ x, z, rotY, speed: 0, stee
 test('every car is parked on the pavement, clear of the others and of the elevator', () => {
   const lift = { minX: ELEVATOR.x - ELEVATOR.width / 2, maxX: ELEVATOR.x + ELEVATOR.width / 2, minZ: FLOOR.minZ, maxZ: ELEVATOR_FRONT };
   const boxes = CARS.map((c) => {
-    const a = carPoint(c, -CAR.width / 2, -CAR.length / 2);
-    const b = carPoint(c, CAR.width / 2, CAR.length / 2);
+    const { width, length } = bodyOf(c.kind);
+    const a = carPoint(c, -width / 2, -length / 2);
+    const b = carPoint(c, width / 2, length / 2);
     return { minX: Math.min(a.x, b.x), maxX: Math.max(a.x, b.x), minZ: Math.min(a.z, b.z), maxZ: Math.max(a.z, b.z) };
   });
   CARS.forEach((c, i) => {
-    assert.ok(onPavement(c), `${c.name} is on the pavement`);
-    assert.ok(!overlaps(c, lift), `${c.name} is out of the elevator`);
-    boxes.forEach((b, j) => assert.ok(i === j || !overlaps(c, b), `${c.name} is clear of ${CARS[j].name}`));
+    assert.ok(onPavement(c, c.kind), `${c.name} is on the pavement`);
+    assert.ok(!overlaps(c, lift, c.kind), `${c.name} is out of the elevator`);
+    boxes.forEach((b, j) => assert.ok(i === j || !overlaps(c, b, c.kind), `${c.name} is clear of ${CARS[j].name}`));
   });
   assert.equal(new Set(CARS.map((c) => c.name)).size, CARS.length, 'no two cars go by the same name');
 });
@@ -142,4 +144,26 @@ test("the garage: a horn only from inside a car, and not faster than a person ca
   assert.equal(g.honk('ann'), undefined, 'leaning on it');
   now += 300;
   assert.equal(g.honk('ann'), 3);
+});
+
+test('the golf carts are parked by the course, and go round it but never onto a green, into a bunker or the water', () => {
+  const carts = CARS.filter((c) => c.kind === 'cart');
+  assert.equal(carts.length, CART_PARK.length);
+  for (const c of carts) assert.ok(!onPavement(c), `${c.name} isn't somewhere a Lambo could be`);
+  // Out of the cart park, over the sidewalk by the cart path and onto the street.
+  for (let z = CART_PARK[0].z; z >= ROAD.maxZ - 2; z -= 0.5) assert.ok(onPavement({ x: -7, z, rotY: Math.PI }, 'cart'), `the cart path at z ${z}`);
+  assert.ok(!onPavement({ x: -7, z: ROAD.maxZ + 1, rotY: Math.PI }), 'not for a supercar');
+  for (const h of HOLES) {
+    assert.ok(!paved(h.pin.x, h.pin.z, 'cart'), `off the ${h.n} green`);
+    for (const b of h.bunkers) assert.ok(!paved(b.x, b.z, 'cart'), `out of the bunker at (${b.x}, ${b.z})`);
+    for (const w of h.water) assert.ok(!paved(w.x, w.z, 'cart'), `out of the water at (${w.x}, ${w.z})`);
+    assert.ok(paved(h.tee.x - 4, h.tee.z, 'cart') || paved(h.tee.x + 4, h.tee.z, 'cart'), `up beside the ${h.n} tee`);
+  }
+  // Over the footbridge to the island.
+  for (let x = BRIDGE.x0; x >= BRIDGE.x1; x -= 0.5) assert.ok(paved(x, BRIDGE.z, 'cart'), `the bridge at x ${x}`);
+  // A cart is slower than a car, and turns tighter.
+  let p = { x: -7, z: 70, rotY: 0, speed: 0, steer: 0 };
+  for (let t = 0; t < 6; t += 1 / 60) p = drive(p, GAS, 1 / 60, CART_DRIVE);
+  assert.equal(p.speed, CART_DRIVE.top);
+  assert.ok(CART_DRIVE.top < DRIVE.top / 2 && CART_DRIVE.wheelbase < DRIVE.wheelbase);
 });

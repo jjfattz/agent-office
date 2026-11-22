@@ -1,0 +1,12 @@
+/* The scorecard at the top of the screen, out on the golf course between shots (see card.ts). */
+.golf-card { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); width: min(300px, calc(100vw - 32px)); padding: 8px 12px 9px; display: grid; gap: 6px; font-size: 13px; font-weight: 900; text-align: center; pointer-events: none !important; }
+.golf-card-grid { display: grid; grid-template-columns: auto repeat(3, 1fr) auto; gap: 2px 4px; font-variant-numeric: tabular-nums; }
+.golf-card-grid span { padding: 2px 6px; border-radius: 6px; }
+.golf-card-grid span:nth-child(5n + 1) { text-align: left; }
+.golf-card-head { opacity: .7; }
+.golf-card-grid .now { background: #ffd166; opacity: 1; }
+.golf-card-grid .under { background: #caffbf; }
+.golf-card-grid .over { background: #ffd6d9; }
+.golf-card-total { white-space: nowrap; }
+.golf-card-note { font-weight: 800; }
+#hud:has(.golf-card:not(.hidden)) #toasts { translate: 0 118px; }

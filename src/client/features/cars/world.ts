@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { CAR, CARS, SEATS, carPoint, type Box, type CarDef, type CarKind, type CarPose, type CarSeat, type CarState } from '../../../shared/garage';
+import { CAR, CARS, SEATS, bodyOf, carPoint, type Box, type CarDef, type CarKind, type CarPose, type CarSeat, type CarState } from '../../../shared/garage';
+import { golfCart } from './cart';
 import { FLOOR, SLAB, STREET_Y, WALL_T, streetBelow } from '../../../shared/layout';
 import type { Collider, Interactable } from '../../world/types';
 import type { Fixture, StreetSite } from '../../world/office/fixture';
@@ -188,14 +189,15 @@ export interface CarView extends CarModel {
 }
 
 /** Whether the whole car is in under the building (the office's floor over it), rather than out on the lot or the street. */
-function underneath(p: CarPose): boolean {
+function underneath(p: CarPose, kind: CarKind): boolean {
+  const body = bodyOf(kind);
   return [
     [1, 1],
     [1, -1],
     [-1, 1],
     [-1, -1],
   ].every(([sx, sz]) => {
-    const c = carPoint(p, (sx * CAR.width) / 2, (sz * CAR.length) / 2);
+    const c = carPoint(p, (sx * body.width) / 2, (sz * body.length) / 2);
     return c.x > FLOOR.minX - WALL_T && c.x < FLOOR.maxX + WALL_T && c.z > FLOOR.minZ - WALL_T && c.z < FLOOR.maxZ + WALL_T;
   });
 }
@@ -219,7 +221,7 @@ export class Fleet {
     interactables: Interactable[],
   ) {
     this.cars = CARS.map((def, index) => {
-      const model = supercar(def.kind, def.color);
+      const model = def.kind === 'cart' ? golfCart(def.color) : supercar(def.kind, def.color);
       const interactable: Interactable = { kind: 'car', x: def.x, z: def.z, y: this.street, radius: 3.2, car: index };
       model.root.userData.interact = interactable;
       this.group.add(model.root);
@@ -249,7 +251,7 @@ export class Fleet {
     const k = 1 - Math.exp(-dt * 12);
     // From up in the office, the cars in under it can't be seen through its floor: not drawn at all.
     const indoors = eye.y > -SLAB && eye.x > FLOOR.minX && eye.x < FLOOR.maxX && eye.z > FLOOR.minZ && eye.z < FLOOR.maxZ;
-    for (const v of this.cars) v.root.visible = !indoors || !underneath(v.pose);
+    for (const v of this.cars) v.root.visible = !indoors || !underneath(v.pose, v.def.kind);
     for (const v of this.cars) {
       const c = cars[v.index];
       if (!c) continue;
@@ -344,8 +346,9 @@ export class Fleet {
       // Where you are in the car's own frame: across it (+ left), and along it (+ ahead).
       const lx = dx * c - dz * s;
       const lz = dx * s + dz * c;
-      const hx = CAR.width / 2 + r;
-      const hz = CAR.length / 2 + r;
+      const body = bodyOf(v.def.kind);
+      const hx = body.width / 2 + r;
+      const hz = body.length / 2 + r;
       if (Math.abs(lx) >= hx || Math.abs(lz) >= hz) continue;
       const side = hx - Math.abs(lx);
       const end = hz - Math.abs(lz);
@@ -367,27 +370,28 @@ export class Fleet {
     for (const w of v.wheels) w.rotation.y = p.steer;
     const s = Math.abs(Math.sin(p.rotY));
     const c = Math.abs(Math.cos(p.rotY));
-    const hx = CAR.width / 2 - 0.08;
-    const len = (CAR.length - 0.16) / SLICES;
+    const body = bodyOf(v.def.kind);
+    const hx = body.width / 2 - 0.08;
+    const len = (body.length - 0.16) / SLICES;
     // Along the body a slice at a time, each slice's box round it as turned.
     for (let i = 0; i < SLICES; i++) {
-      const mid = carPoint(p, 0, -CAR.length / 2 + 0.08 + len * (i + 0.5));
+      const mid = carPoint(p, 0, -body.length / 2 + 0.08 + len * (i + 0.5));
       const ex = c * hx + (s * len) / 2;
       const ez = s * hx + (c * len) / 2;
-      Object.assign(v.colliders[i], { minX: mid.x - ex, maxX: mid.x + ex, minZ: mid.z - ez, maxZ: mid.z + ez, bottom: this.street, top: this.street + CAR.body });
+      Object.assign(v.colliders[i], { minX: mid.x - ex, maxX: mid.x + ex, minZ: mid.z - ez, maxZ: mid.z + ez, bottom: this.street, top: this.street + body.body });
     }
     // The roof, over the cabin; with it off, only the body's there to stand on.
     const roof = carPoint(p, 0, -0.6);
     const rx = c * 0.6 + s * 0.7;
     const rz = s * 0.6 + c * 0.7;
-    Object.assign(v.colliders[SLICES], { minX: roof.x - rx, maxX: roof.x + rx, minZ: roof.z - rz, maxZ: roof.z + rz, bottom: this.street, top: this.street + (v.occupied ? CAR.body : CAR.roof) });
+    Object.assign(v.colliders[SLICES], { minX: roof.x - rx, maxX: roof.x + rx, minZ: roof.z - rz, maxZ: roof.z + rz, bottom: this.street, top: this.street + (v.occupied ? body.body : body.roof) });
     Object.assign(v.interactable, { x: p.x, z: p.z, y: this.street });
   }
 }
 
 declare module '../../world/types' {
   interface OfficeHandles {
-    /** The Lambos and Ferraris in the garage, which anyone can drive (see controller.ts). */
+    /** The Lambos and Ferraris in the garage and the golf carts by the course, which anyone can drive (see controller.ts). */
     cars: Fleet;
   }
 }

@@ -8,6 +8,7 @@ import type { AccountsClientMsg, AccountsServerMsg, SignInsClientMsg, TeamClient
 import type { ChangesClientMsg, ChangesServerMsg } from './protocol/changes.js';
 import type { FloorClientMsg, FloorServerMsg, PlanClientMsg } from './protocol/floors.js';
 import type { GitHubClientMsg, GitHubServerMsg } from './protocol/github.js';
+import type { GolfClientMsg, GolfServerMsg } from './protocol/golf.js';
 import type { MeetingClientMsg, MeetingServerMsg } from './protocol/meetings.js';
 import type { PhoneClientMsg, PhoneServerMsg } from './protocol/phone.js';
 import type { PresenceClientMsg, PresenceServerMsg } from './protocol/presence.js';
@@ -26,6 +27,7 @@ export * from './protocol/agents.js';
 export * from './protocol/changes.js';
 export * from './protocol/floors.js';
 export * from './protocol/github.js';
+export * from './protocol/golf.js';
 export * from './protocol/meetings.js';
 export * from './protocol/phone.js';
 export * from './protocol/presence.js';
@@ -64,7 +66,8 @@ export type ClientMsg =
   | DogClientMsg
   | PhoneClientMsg
   | PushClientMsg
-  | SkeeballClientMsg;
+  | SkeeballClientMsg
+  | GolfClientMsg;
 
 export type ServerMsg =
   | PresenceServerMsg
@@ -82,4 +85,5 @@ export type ServerMsg =
   | ToysServerMsg
   | PhoneServerMsg
   | PushServerMsg
-  | SkeeballServerMsg;
+  | SkeeballServerMsg
+  | GolfServerMsg;

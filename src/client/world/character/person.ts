@@ -98,7 +98,7 @@ export class Person {
   /** 0 standing … 1 sitting, eased between so sitting down and getting up take a moment. */
   private sitK = 0;
   /**
-   * At the golf tee with a club (see setGolf): the club's swing, how far back it's been taken (and
+   * Over a golf ball with a club (see setGolf): the club's swing, how far back it's been taken (and
    * `want`, where it's going), and a swing under way (`swingT` seconds in, from `top`), or -1.
    * `autoT` is a whole swing playing by itself (golfSwing), taken back to `power`.
    */
@@ -478,7 +478,7 @@ export class Person {
     this.pose = hips === null ? 'stand' : 'sit';
   }
 
-  /** At the golf tee with a club in both hands, over the ball (the ball in front of their feet, the hole off to their left), or not. */
+  /** Over a golf ball with a club in both hands, over the ball (the ball in front of their feet, the hole off to their left), or not. */
   setGolf(on: boolean) {
     if (on === !!this.golf) return;
     if (!on) {

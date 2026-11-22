@@ -206,7 +206,7 @@ export class Ticks {
 // ---- Activities -----------------------------------------------------------------------------------
 
 /**
- * Something you can be in the middle of that takes over the controls (hanging a picture, the golf tee,
+ * Something you can be in the middle of that takes over the controls (hanging a picture, a golf shot,
  * a car…). `Why` names what's making you stop (see Activities.stopAll), `E` is a key press and
  * `El` is where the hint bar draws.
  */

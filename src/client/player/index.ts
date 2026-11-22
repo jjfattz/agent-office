@@ -63,7 +63,7 @@ export class PlayerController extends PlayerInput {
   /** A walk along a path ended: at its end, by a key of yours, or up against something. */
   onPathEnd: ((why: 'arrived' | 'cancelled' | 'stuck') => void) | null = null;
   /**
-   * Something that has hold of you instead of your legs (a car, the golf tee): it moves you each
+   * Something that has hold of you instead of your legs (a car, a golf shot): it moves you each
    * frame, with no walking, falling or bumping into things, and the camera follows.
    */
   rig: ((dt: number) => void) | null = null;

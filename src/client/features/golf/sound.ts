@@ -2,15 +2,15 @@ import type { AudioCore } from '../../sound/core';
 import { biquad, envelope, pick, rand } from '../../sound/dsp';
 import type { Pos } from '../../sound/places';
 
-// ---- Golf off the balcony ------------------------------------------------------------------------
+// ---- Golf on the course across the street ---------------------------------------------------------
 
-export type GolfSound = 'hit' | 'bounce' | 'thud' | 'rail' | 'wall' | 'cup' | 'cheer';
+export type GolfSound = 'hit' | 'putt' | 'bounce' | 'thud' | 'tree' | 'splash' | 'wall' | 'cup' | 'cheer';
 
 /**
- * A golf ball: the club through it (`hit`), coming down on grass or the road (`bounce`, `speed`
- * in m/s) or dying in sand or rough (`thud`), off the railing's glass (`rail`) or a wall, rattling
- * into the cup, and a fanfare for a hole in one. `at` is where, for someone else's ball; your own
- * you hear wherever it is, since the camera's following it.
+ * A golf ball: the club through it (`hit`, or a putter's `putt`), coming down on grass or the road
+ * (`bounce`, `speed` in m/s) or dying in sand or rough (`thud`), through the leaves of a tree, into
+ * the water, off a wall or a trunk, rattling into the cup, and a fanfare for a birdie or better. `at`
+ * is where, for someone else's ball; your own you hear wherever it is, since the camera's following it.
  */
 export function golf(a: AudioCore, kind: GolfSound, at?: Pos, speed = 5) {
   const ctx = a.ctx;
@@ -44,10 +44,39 @@ export function golf(a: AudioCore, kind: GolfSound, at?: Pos, speed = 5) {
     case 'thud':
       a.play(pick(a.buf.steps), { gain: 0.08 + hard * 0.2, rate: rand(1.1, 1.3), dest: out });
       break;
-    case 'rail':
-      // A knock on the glass.
-      a.clink(out, t0, rand(1250, 1400), 0.05 + hard * 0.08);
-      a.play(pick(a.buf.steps), { gain: 0.25, rate: 2.2, dest: out });
+    case 'putt':
+      // A soft tick off the putter's face.
+      a.blip(out, t0, 1400, 0.5, 0.04, 0.18, 'triangle');
+      break;
+    case 'tree':
+      // A rustle through the leaves, and a knock off a branch.
+      {
+        const leaves = a.noise(a.buf.white);
+        const g = ctx.createGain();
+        envelope(g.gain, t0, [
+          [0.04, 0.05 + hard * 0.08],
+          [0.45, 0],
+        ]);
+        leaves.connect(biquad(ctx, 'highpass', 3200, 0.7)).connect(g).connect(out);
+        leaves.start(t0);
+        leaves.stop(t0 + 0.5);
+        a.play(pick(a.buf.steps), { gain: 0.12, rate: rand(1.4, 1.7), dest: out });
+      }
+      break;
+    case 'splash':
+      // Plop, and the water closing over it.
+      a.blip(out, t0, 380, 0.25, 0.12, 0.2, 'sine');
+      {
+        const water = a.noise(a.buf.white);
+        const g = ctx.createGain();
+        envelope(g.gain, t0, [
+          [0.02, 0.18],
+          [0.6, 0],
+        ]);
+        water.connect(biquad(ctx, 'lowpass', 1500, 0.8)).connect(g).connect(out);
+        water.start(t0);
+        water.stop(t0 + 0.7);
+      }
       break;
     case 'wall':
       a.play(pick(a.buf.steps), { gain: 0.15 + hard * 0.3, rate: 1.9, dest: out });

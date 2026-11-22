@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CAR, DRIVE, onPavement, paved, steerLimit } from '../src/shared/garage.js';
-import { FLOOR, GOLF_HOLE, ROAD, WALL_T } from '../src/shared/layout.js';
+import { FLOOR, ROAD, WALL_T } from '../src/shared/layout.js';
+import { COURSE } from '../src/shared/course.js';
 import { CHECKPOINTS, FARM, FOOTHILLS, LAKE, LIGHTHOUSE, LOOP, LOOP_HALF, LOOP_LENGTH, LOOP_PAVED, MOUNTAINS, STREET_END, STREET_Z, TUNNEL, nearLoop, placeAt, shoreX } from '../src/shared/scenic.js';
 import { LapTimer, lapTime } from '../src/client/features/cars/laps.js';
 import { Garage } from '../src/server/garage.js';
@@ -78,14 +79,14 @@ test('nearLoop finds the nearest bit of the loop, as looking at every point woul
   assert.equal(nearLoop(STREET_END + 10, STREET_Z + 2)!.side, -1);
 });
 
-test('the loop keeps clear of the building, the golf hole, the mountains, the lake, the farm and the sea', () => {
+test('the loop keeps clear of the building, the golf course, the mountains, the lake, the farm and the sea', () => {
   const dist = (x: number, z: number) => Math.min(...LOOP.map((p) => Math.hypot(p.x - x, p.z - z)));
   for (const [x, z, r] of [...MOUNTAINS, ...FOOTHILLS]) assert.ok(dist(x, z) > r + 8, `the mountain at (${x}, ${z})`);
   for (const p of LOOP) {
     assert.ok(Math.hypot((p.x - LAKE.x) / (LAKE.rx + 12), (p.z - LAKE.z) / (LAKE.rz + 12)) > 1, 'the lake');
     assert.ok(p.x - shoreX(p.z) > 20, `the sea at z ${p.z.toFixed(0)}`);
     assert.ok(!(p.x > FLOOR.minX - WALL_T - 10 && p.x < FLOOR.maxX + WALL_T + 10 && p.z < ROAD.maxZ + 30), 'the building');
-    assert.ok(Math.hypot(p.x - GOLF_HOLE.x, p.z - GOLF_HOLE.z) > 40, 'the golf hole');
+    assert.ok(!(p.x > COURSE.minX - 30 && p.x < COURSE.maxX + 30 && p.z > COURSE.minZ - 10 && p.z < COURSE.maxZ + 30), 'the golf course');
     for (const f of [...FARM.fields, FARM.pasture]) assert.ok(!(p.x > f.minX - LOOP_PAVED && p.x < f.maxX + LOOP_PAVED && p.z > f.minZ - LOOP_PAVED && p.z < f.maxZ + LOOP_PAVED), 'the fields');
   }
   for (const b of [FARM.barn, FARM.silo, FARM.windmill]) assert.ok(dist(b.x, b.z) > 20, 'the farm buildings');
