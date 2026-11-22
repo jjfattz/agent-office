@@ -1,6 +1,6 @@
 /**
- * Office sounds, synthesized with Web Audio so there are no audio files to ship: the room's air and a
- * humming fridge, workers typing while they work, the coffee machine, birds outside the windows by
+ * Office sounds, synthesized with Web Audio so there are no audio files to ship: the room's air,
+ * workers typing while they work, the coffee pouring, birds outside the windows by
  * day and crickets at night, rain and thunder, the odd rustle, the gong, the dog barking, and the
  * dings when a worker needs you. And the lounge jukebox, whose tunes are in music.ts,
  * and up on the roof, the wind, the city far below and the DJ's drum and bass (../dnb.ts).
@@ -14,7 +14,7 @@
  * (features/golf/sound.ts, features/dog/sound.ts and so on), and this class only hands them the core.
  */
 import type { GongWhy } from '../../shared/protocol';
-import { birdsong, Fridge, nightCrickets, startWind } from './ambience';
+import { birdsong, nightCrickets, startWind } from './ambience';
 import { ding } from './alerts';
 import { arcade } from '../features/cabinet/sound';
 import type { ArcadeSound } from '../features/cabinet/cart';
@@ -44,7 +44,6 @@ export class OfficeSound {
   private readonly skeeTunes = new SkeeballTunes(this.a);
   private readonly typing = new Typing(this.a);
   private readonly motors = new Motors(this.a);
-  private readonly fridge = new Fridge(this.a);
   private readonly rain = new Rain(this.a);
   private readonly birds = birdsong(this.a);
   private readonly crickets = nightCrickets(this.a);
@@ -58,7 +57,6 @@ export class OfficeSound {
     // What the room does every frame, in this order (it's the order the random numbers are drawn in).
     this.a.every((now) => this.music.hearJukebox(now));
     this.a.every((now) => this.typing.scheduleTyping(now));
-    this.a.every((now) => this.fridge.tickFridge(now));
     this.a.every((now) => this.birds.tick(now));
     this.a.every((now) => this.crickets.tick(now));
     this.a.every((now) => this.rain.tickRain(now));
@@ -74,7 +72,6 @@ export class OfficeSound {
     this.music.applyMusicVolume();
     this.music.applyJukebox();
     this.a.applyVisibility();
-    this.fridge.startFridge();
     startWind(this.a);
     this.a.applyOutdoors();
     this.dj.applyDj();
@@ -129,7 +126,7 @@ export class OfficeSound {
     this.a.hall = hall;
   }
 
-  /** Up on the roof (true), or inside on a floor: the office's hum gives way to the wind and the city. */
+  /** Up on the roof (true), or inside on a floor: the wind and the city come up. */
   setOutdoors(on: boolean) {
     this.a.setOutdoors(on);
   }
@@ -213,7 +210,7 @@ export class OfficeSound {
     crash(this.a, at, speed);
   }
 
-  // ---- The kitchen, the dog, the weather, the gong, the dings --------------------------------------
+  // ---- The coffee, the dog, the weather, the gong, the dings --------------------------------------
 
   coffee() {
     coffee(this.a);

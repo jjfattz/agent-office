@@ -34,7 +34,7 @@ export const PROP_KINDS = {
   hearth: 'A fireplace',
   /** The gong a merged pull request rings (one per map). */
   gong: 'The merge gong',
-  /** Casks of ale on a rack: a drink perks you up, like the office's coffee. */
+  /** Casks of ale on a rack: a drink perks you up (see features/coffee). */
   cask: 'Casks of ale (the coffee)',
   /** A table with nothing to sit at, `width` by `length`. */
   table: 'A table without seats',

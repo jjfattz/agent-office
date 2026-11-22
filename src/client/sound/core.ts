@@ -11,7 +11,7 @@ export interface Listener extends Pos {
 
 /**
  * On a map of its own (the castle): the room it is, where its gong hangs and where its windows are,
- * with nothing of the office's in it (no fridge). `vacuum`: there's nothing outside it to hear at
+ * with nothing of the office's in it. `vacuum`: there's nothing outside it to hear at
  * all (the space station): no rain, no thunder, no birds.
  */
 export interface Hall {
@@ -42,9 +42,7 @@ export class AudioCore {
   ambience!: GainNode;
   /** Worker dings, which you still want to hear from another tab. */
   alerts!: GainNode;
-  /** The office's own hum (the fridge), left behind going up on the roof… */
-  indoors!: GainNode;
-  /** …where there's wind, and the city far below. */
+  /** Up on the roof: the wind, and the city far below. */
   outside!: GainNode;
   outdoors = false;
   /** On a map of its own (the castle), the room it is (see Hall). Null in the office. */
@@ -125,8 +123,6 @@ export class AudioCore {
     this.ambience.connect(this.master);
     this.alerts = ctx.createGain();
     this.alerts.connect(this.master);
-    this.indoors = ctx.createGain();
-    this.indoors.connect(this.ambience);
     this.outside = ctx.createGain();
     this.outside.gain.value = 0;
     this.outside.connect(this.ambience);
@@ -200,7 +196,7 @@ export class AudioCore {
     return this.hall?.windows.length ? this.hall.windows : WINDOWS;
   }
 
-  /** Up on the roof (true), or inside on a floor: the office's hum gives way to the wind and the city. */
+  /** Up on the roof (true), or inside on a floor: the wind and the city come up. */
   setOutdoors(on: boolean) {
     this.outdoors = on;
     this.applyOutdoors();
@@ -209,7 +205,6 @@ export class AudioCore {
   applyOutdoors() {
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
-    this.indoors.gain.setTargetAtTime(this.outdoors ? 0 : 1, now, 0.3);
     this.outside.gain.setTargetAtTime(this.outdoors ? 1 : 0, now, 0.3);
   }
 

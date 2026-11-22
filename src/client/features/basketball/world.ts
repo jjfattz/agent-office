@@ -128,7 +128,7 @@ declare module '../../world/types' {
   }
 }
 
-/** The basketball hoop, on the west wall between the exit door and the kitchen. */
+/** The basketball hoop, on the west wall by the exit door. */
 export const hoop: Fixture<'hoop'> = (site) => {
   const built = buildHoop();
   site.wall('west', HOOP.z, (HOOP.board.bottom - 0.6 + HOOP.board.top + 0.1) / 2, HOOP.board.width + 0.2, HOOP.board.top - HOOP.board.bottom + 0.7);

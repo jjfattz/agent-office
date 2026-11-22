@@ -284,9 +284,6 @@ export const PLANTS: readonly (readonly [x: number, z: number, scale: number])[]
   [17.2, 12.2, 1.3],
   [-17.2, 8.5, 1.2],
   [14.2, -12.2, 1.1],
-  [-6, 0, 1],
-  [3.5, 0, 0.9],
-  [8.5, 5, 1.1],
 ];
 
 /** A plant by the north wall east of the gong, in the way into the back office: put away once it's built. */

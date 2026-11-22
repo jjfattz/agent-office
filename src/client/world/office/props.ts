@@ -11,7 +11,7 @@ import { PALETTE } from './materials';
 // copy of one species in plants.glb (see piece()). A species is its pot, named after it, with everything that
 // grows out of the pot hung under it as `<species>_leaves` (see plantLeaves()). The colors are the old
 // code-built plants' pot and greens, the Christmas tree's trunk brown for the soil, the street trees'
-// trunk brown for the ficus's, and the kitchen cupboards' blue for the snake plant's glazed pot.
+// trunk brown for the ficus's, and a light blue for the snake plant's glazed pot.
 export type PlantSpecies = 'monstera' | 'snake_plant' | 'ficus' | 'succulent';
 /** The species that stand on the floor, which a row of plants takes turns with (see floorPlant()). */
 export const FLOOR_PLANTS = ['monstera', 'snake_plant', 'ficus'] as const satisfies readonly PlantSpecies[];

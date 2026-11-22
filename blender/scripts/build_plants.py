@@ -38,7 +38,7 @@ from aokit import TAU
 
 # Preview colours only: world/office/props.ts paints every material by name with the same colours (the old
 # code-built plants' pot and greens, the Christmas tree's trunk brown for the soil, the street trees'
-# trunk brown for the ficus's, and the kitchen cupboards' blue for the snake plant's glazed pot).
+# trunk brown for the ficus's, and a light blue for the snake plant's glazed pot).
 COLORS = {
     "Pot": "#e76f51",
     "Glaze": "#8ecae6",
