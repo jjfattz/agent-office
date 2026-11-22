@@ -1,55 +1,7 @@
 import { NowAndThen, type AudioCore } from './core';
 import { biquad, pick, rand, randInt } from './dsp';
-import { FRIDGE } from './places';
 
 // ---- Around the room --------------------------------------------------------------------------
-
-/** The kitchen's fridge, humming away (not in a castle). */
-export class Fridge {
-  private fridge: { gain: GainNode; on: boolean; next: number } | null = null;
-
-  constructor(private readonly a: AudioCore) {}
-
-  startFridge() {
-    const ctx = this.a.ctx!;
-    const hum = ctx.createOscillator();
-    hum.type = 'sawtooth';
-    hum.frequency.value = 50;
-    const whine = ctx.createOscillator();
-    whine.frequency.value = 120;
-    const whineG = ctx.createGain();
-    whineG.gain.value = 0.3;
-    const gain = ctx.createGain();
-    gain.gain.value = 0;
-    const tone = biquad(ctx, 'lowpass', 220, 0.7);
-    hum.connect(tone);
-    whine.connect(whineG).connect(tone);
-    const out = this.a.panner(FRIDGE, 1, 1.6);
-    tone.connect(gain).connect(out).connect(this.a.indoors);
-    hum.start();
-    whine.start();
-    this.fridge = { gain, on: false, next: ctx.currentTime + rand(3, 12) };
-  }
-
-  /** The compressor kicks on for a while, then clunks off. */
-  tickFridge(now: number) {
-    const f = this.fridge;
-    if (!f || now < f.next) return;
-    // No fridge in a castle: it goes quiet, and doesn't clunk.
-    if (this.a.hall) {
-      f.on = false;
-      f.gain.gain.setTargetAtTime(0, now, 0.3);
-      f.next = now + 20;
-      return;
-    }
-    f.on = !f.on;
-    f.gain.gain.setTargetAtTime(f.on ? 0.06 : 0, now, f.on ? 0.6 : 0.3);
-    f.next = now + (f.on ? rand(25, 50) : rand(20, 45));
-    this.a.play(pick(this.a.buf.steps), { at: FRIDGE, gain: 0.25, rate: 0.6, ref: 1, rolloff: 1.6, dest: this.a.indoors });
-    this.a.count(f.on ? 'fridgeOn' : 'fridgeOff');
-  }
-
-}
 
 /** A few chirps from outside one of the windows. */
 function birds(a: AudioCore, now: number) {

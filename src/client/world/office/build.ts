@@ -16,7 +16,6 @@ import { stack } from '../stack';
 import { tower } from '../tower';
 import { hoop } from '../../features/basketball/world';
 import { skeeball } from '../../features/skeeball/world';
-import { kitchen } from '../kitchen';
 import { signs } from '../desksigns';
 import type { Collider, DeskView, Interactable, Office, OfficeHandles } from '../types';
 import { PALETTE, floorTexture, paintPlanks, type Looks } from './materials';
@@ -60,7 +59,6 @@ function floorPlan() {
     jukebox,
     cabinet,
     bookshelf,
-    kitchen,
     plants,
     lamps,
     wing,

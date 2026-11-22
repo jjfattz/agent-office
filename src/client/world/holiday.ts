@@ -42,8 +42,8 @@ const DESK_SPOTS: Spot[] = DESKS.map((d, i) => {
 /** Jack-o'-lanterns: everywhere. */
 function pumpkinSpots(): Spot[] {
   const spots: Spot[] = [...DESK_SPOTS];
-  // The kitchen counter, and the lounge's coffee table.
-  spots.push([-13, 1.03, 12.2, 0.14, FACE.north], [-16.65, 1.03, 12.25, 0.11, FACE.north], [13, 0.46, 0.25, 0.17, FACE.west]);
+  // The lounge's coffee table.
+  spots.push([13, 0.46, 0.25, 0.17, FACE.west]);
   // On the window sills, looking in.
   for (const o of WINDOWS) {
     if (o.y0 > 2) continue;

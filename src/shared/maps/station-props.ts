@@ -27,7 +27,7 @@ export const STATION_PROP_KINDS = {
   crate: 'Cargo crates',
   /** The gong a merged pull request rings (one per map). */
   gong: 'The merge gong',
-  /** A drinks dispenser: a cup perks you up, like the office's coffee. */
+  /** A drinks dispenser: a cup perks you up (see features/coffee). */
   dispenser: 'A drinks dispenser (the coffee)',
   /** A console table with nothing to sit at, `width` by `length`. */
   table: 'A console table without seats',

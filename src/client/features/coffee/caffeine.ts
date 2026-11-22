@@ -1,5 +1,5 @@
 /**
- * Coffee from the kitchen machine: a minute of quicker walking and higher jumps. Keep drinking
+ * A cup of coffee (or ale): a minute of quicker walking and higher jumps. Keep drinking
  * before the last cup wears off and you get the jitters for a few seconds.
  * Times are seconds, on whichever clock the caller passes in as `now`.
  */

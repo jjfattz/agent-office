@@ -16,7 +16,7 @@ A long stone hall with a timber roof, pillars and pointed arches down both sides
 - **The tables.** Two long tables down each side of the hall, benches along them. The workers work at open tomes, whose pages show their terminals. The seats toward the middle of the hall fill first; the ones along the walls come out when they're all taken, as the office's bean bags do.
 - **Wear and tear.** Workers here dress as peasants, and the longer one works the more worn out it looks: a beard that grows out and goes from brown to grey to white, down to the floor, dirt and patched clothes, bags under its eyes, a hunch and a slower walk. It's fully spent after 30 minutes of work (`agents.ageMinutes`). Only time spent working counts, over the worker's whole stay, and the office keeps it through a restart.
 - **The dungeon.** Send a worker home (**X**) and it doesn't walk out: the **Kingsguard**, on watch down in the dungeon, comes running up the stairs to its seat, says his piece, waits while it packs its things into a box, and marches it off with a hand on its shoulder, down the carpet, down the stairs by the east wall, to a cell. The door swings open, he throws it in, and the door slams. It stays there for good. Everyone ever sent home is kept, and wastes away: thinner and paler by the hour, until after a day it starves to death (☠️ on its name tag) and keels over on the straw. Then it rots, its bones showing through, down to a bare skeleton (💀) half a day later. You can walk down the stairs (behind the rail south of the east tables) and look in on them; the living ones mutter at you now and then. There are 67 seats in the 9 cells, filled round the cells one each: once they're all taken, the oldest are thrown on the heap of bones at the west end. It's the same for workers that go home on their own when their pull request merges, ones another worker sends home, and ones the task queue sends home to make room; a meeting's workers, let go when it's over, still just walk out. Each floor has its own dungeon (kept in the project's `.agent-office/jail.json`).
-- **The boards** hang on the side walls, with a scribe at a lectern under each of the issues, queue and PR boards (the board agents). The **small council**'s round table, near the dais, is the meeting room: **E** at it calls a meeting, and its easel shows what the meeting writes. The gong is by the dais, and there's ale by the hearth (it works like the office's coffee).
+- **The boards** hang on the side walls, with a scribe at a lectern under each of the issues, queue and PR boards (the board agents). The **small council**'s round table, near the dais, is the meeting room: **E** at it calls a meeting, and its easel shows what the meeting writes. The gong is by the dais, and there's ale by the hearth: **E** for a drink and a minute of quicker walking and higher jumps.
 
 ## The space station
 
@@ -160,7 +160,7 @@ A castle's:
 | `shield` | A shield and crossed swords, hung at `y`. |
 | `hearth` | A fireplace against a wall, `width` wide, facing `rotY`. |
 | `gong` | The merge gong (one at most). |
-| `cask` | Casks of ale: **E** for a drink that perks you up, like the office's coffee. |
+| `cask` | Casks of ale: **E** for a drink that perks you up: a minute of quicker walking and higher jumps. |
 | `table` | A table with nothing to sit at, `width` by `length`. |
 | `candles` | A tall iron candle stand. |
 
@@ -179,7 +179,7 @@ A station's:
 | `planter` | A hydroponics planter, `width` wide. |
 | `crate` | Cargo crates. |
 | `gong` | The merge gong (one at most). |
-| `dispenser` | A drinks dispenser: **E** for a cup that perks you up, like the office's coffee. |
+| `dispenser` | A drinks dispenser: **E** for a cup that perks you up: a minute of quicker walking and higher jumps. |
 | `table` | A console table with nothing to sit at, `width` by `length`. |
 
 Give a `lamp` `"light": true` and it lights the deck for real (the first six do; the rest glow).

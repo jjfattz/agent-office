@@ -5,7 +5,7 @@
 import { BALCONY, FLOOR, LOFT, WALL_HEIGHT } from './layout.js';
 
 /**
- * The hoop, on the west wall between the exit door and the kitchen, facing into the room (+x).
+ * The hoop, on the west wall by the exit door, facing into the room (+x).
  * `face` is the backboard's front, `rim` the middle of the ring (`r` to the middle of its tube).
  */
 const HOOP_Z = 10.1;

@@ -165,7 +165,7 @@ function crate(kit: Kit, p: PropConfig) {
   collide(kit, p.x, p.z, size * s, size * s, p.rotY ?? 0, 99);
 }
 
-/** A drinks dispenser against a wall: a cup from it perks you up, like the office's coffee. */
+/** A drinks dispenser against a wall: a cup from it perks you up (see features/coffee). */
 function dispenser(kit: Kit, p: PropConfig): Interactable {
   const s = p.scale ?? 1;
   const { width: w, depth: d } = STATION_SIZE.dispenser;
