@@ -91,6 +91,33 @@ test('at an angle into a wall, the car slides along it rather than stopping dead
   }
 });
 
+test('nosed into the edge of the road, W with A turns the car round on the spot and away, no reversing', (t) => {
+  const s = street(t);
+  // Heading north (+z) a little east, right up against the far edge of the road.
+  s.fleet.place(BLUE, { x: 40, z: ROAD.maxZ - 3, rotY: 0.2, speed: 0, steer: 0 });
+  s.driver.enter(BLUE, 'driver');
+  s.keys('KeyW');
+  s.frames(60);
+  const against = { ...s.car() };
+  assert.ok(against.speed < 1 && against.z > ROAD.maxZ - 3, `up against it (z ${against.z.toFixed(2)})`);
+  s.keys('KeyW', 'KeyA');
+  s.frames(150);
+  const away = s.car();
+  assert.ok(onPavement(away), 'still on the road');
+  assert.ok(away.rotY > 1.2 && away.x > against.x + 5, `round and off along it (heading ${away.rotY.toFixed(2)}, x ${away.x.toFixed(1)})`);
+});
+
+test('turning away from a wall it is running along, the tail doesn\'t catch on it', (t) => {
+  const s = street(t);
+  // Along the far edge, heading east, as close as it goes; then off to the left, away from it.
+  s.fleet.place(BLUE, { x: 0, z: ROAD.maxZ - CAR.width / 2 - 0.02, rotY: Math.PI / 2, speed: 6, steer: 0 });
+  s.driver.enter(BLUE, 'driver');
+  s.keys('KeyW', 'KeyA');
+  s.frames(90);
+  const car = s.car();
+  assert.ok(car.speed > 5 && car.z < ROAD.maxZ - 3, `away from it (z ${car.z.toFixed(1)}, ${car.speed.toFixed(1)} m/s)`);
+});
+
 test('E gets you out by your door, the car stopped; with no room anywhere round it, you stay in', (t) => {
   const s = street(t);
   s.driver.enter(BLUE, 'driver');

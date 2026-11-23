@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CAR, CARS, CART_DRIVE, DRIVE, PAVEMENT, bodyOf, carFits, carPoint, drive, onPavement, overlaps, parked, paved, steerLimit, type CarPose, type Pedals } from '../src/shared/garage.js';
-import { BRIDGE, CART_PARK, HOLES } from '../src/shared/course.js';
+import { BRIDGE, CART_PARK, COURSE, HOLES, lieAt } from '../src/shared/course.js';
 import { ELEVATOR, ELEVATOR_FRONT, FLOOR, ROAD } from '../src/shared/layout.js';
 import { Garage } from '../src/server/garage.js';
 
@@ -146,19 +146,25 @@ test("the garage: a horn only from inside a car, and not faster than a person ca
   assert.equal(g.honk('ann'), 3);
 });
 
-test('the golf carts are parked by the course, and go round it but never onto a green, into a bunker or the water', () => {
+test('the golf carts are parked by the course, and go anywhere on it but into the water', () => {
   const carts = CARS.filter((c) => c.kind === 'cart');
   assert.equal(carts.length, CART_PARK.length);
   for (const c of carts) assert.ok(!onPavement(c), `${c.name} isn't somewhere a Lambo could be`);
   // Out of the cart park, over the sidewalk by the cart path and onto the street.
   for (let z = CART_PARK[0].z; z >= ROAD.maxZ - 2; z -= 0.5) assert.ok(onPavement({ x: -7, z, rotY: Math.PI }, 'cart'), `the cart path at z ${z}`);
   assert.ok(!onPavement({ x: -7, z: ROAD.maxZ + 1, rotY: Math.PI }), 'not for a supercar');
+  // Nowhere on the course is fenced off but the water: greens, bunkers and the island too.
   for (const h of HOLES) {
-    assert.ok(!paved(h.pin.x, h.pin.z, 'cart'), `off the ${h.n} green`);
-    for (const b of h.bunkers) assert.ok(!paved(b.x, b.z, 'cart'), `out of the bunker at (${b.x}, ${b.z})`);
-    for (const w of h.water) assert.ok(!paved(w.x, w.z, 'cart'), `out of the water at (${w.x}, ${w.z})`);
+    assert.ok(paved(h.pin.x + 2, h.pin.z, 'cart'), `onto the ${h.n} green`);
+    for (const b of h.bunkers) if (lieAt(b.x, b.z) === 'sand') assert.ok(paved(b.x, b.z, 'cart'), `into the bunker at (${b.x}, ${b.z})`);
+    for (const w of h.water) {
+      const [x, z] = [w.x + w.rx * 0.6, w.z - w.rz * 0.6];
+      assert.ok(!paved(x, z, 'cart'), `out of the water at (${x}, ${z})`);
+    }
     assert.ok(paved(h.tee.x - 4, h.tee.z, 'cart') || paved(h.tee.x + 4, h.tee.z, 'cart'), `up beside the ${h.n} tee`);
   }
+  // Never out past the fence.
+  assert.ok(!paved(COURSE.maxX + 1, 100, 'cart') && !paved(0, COURSE.maxZ + 1, 'cart') && !paved(COURSE.minX - 1, 100, 'cart'));
   // Over the footbridge to the island.
   for (let x = BRIDGE.x0; x >= BRIDGE.x1; x -= 0.5) assert.ok(paved(x, BRIDGE.z, 'cart'), `the bridge at x ${x}`);
   // A cart is slower than a car, and turns tighter.

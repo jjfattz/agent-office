@@ -5,8 +5,8 @@
  * scorecard keeps the round, and your best round and your holes in one are kept in this browser.
  * Everyone on your floor sees you swing and your ball fly, landing in the same spot.
  */
-import { HOLES, toPar } from '../../../shared/course';
-import { clubFor, fly, pinText, type Flight, type Shot } from '../../../shared/golf';
+import { HOLES, lieAt, toPar } from '../../../shared/course';
+import { clubFor, fly, pinText, puttRoll, type Flight, type Shot } from '../../../shared/golf';
 import type { Ctx } from '../../core/context';
 import { aside, hintTitle, key, onE } from '../../core/hint';
 import { DESK_KEYS } from '../../interaction';
@@ -18,6 +18,7 @@ import type { Interactable } from '../../world/types';
 import { GolfBalls } from './balls';
 import { Scorecard } from './card';
 import { Golfer } from './controller';
+import { PuttGuide } from './guide';
 import { BallMarker } from './marker';
 import { GolfRound, type Outcome } from './round';
 
@@ -75,6 +76,10 @@ export function installGolf(ctx: Ctx, deps: GolfDeps) {
   const marker = new BallMarker();
   ctx.scene.add(marker.group);
   const card = new Scorecard();
+  const guide = new PuttGuide();
+  ctx.scene.add(guide.group);
+  /** The hole whose flagstick you've had out to putt, if you have. */
+  let flagOut: number | null = null;
   /** The neighbours' buildings, which a ball comes off. */
   const obstacles = neighbourBoxes();
   /** The round you're playing, if you are. */
@@ -110,6 +115,24 @@ export function installGolf(ctx: Ctx, deps: GolfDeps) {
     },
     () => (round ? `⛳ Hole ${HOLES[round.hole].n} · ${HOLES[round.hole].name} · Par ${HOLES[round.hole].par} · Shot ${round.strokes + 1}` : '⛳ Golf'),
   );
+
+  /** Q: the round's over, wherever you are in it, and your ball's picked up. */
+  function endRound() {
+    if (!round) return;
+    const was = round;
+    golf.stop();
+    round = null;
+    pending = null;
+    balls.pickUp(store.you);
+    if (!was.done) toast(`⛳ Round ended${was.played ? ` after ${was.played} hole${was.played === 1 ? '' : 's'}: ${was.total} (${toPar(was.toPar)})` : ''} · the clubs are back in the bag`, 'info');
+  }
+
+  // Q ends your round from anywhere, not only over the ball (unless your hands are full: Q's for putting that down).
+  ctx.keys.add('activity', (e) => {
+    if (e.code !== 'KeyQ' || !round || round.done || golf.active || ctx.carrying() || ctx.holdingBall()) return false;
+    if (!e.repeat) endRound();
+    return true;
+  });
 
   /** Over your ball, with the club it wants. */
   function address() {
@@ -216,11 +239,7 @@ export function installGolf(ctx: Ctx, deps: GolfDeps) {
         const out = round.pickUp();
         golf.stop();
         tell(out);
-      } else if (e.code === 'KeyQ' && round && !pending && golf.doing === 'aim') {
-        golf.stop();
-        round = null;
-        toast('⛳ Round over: the clubs are back in the bag', 'info');
-      }
+      } else if (e.code === 'KeyQ') endRound();
       return true;
     },
     hint: (el) => renderGolfHint(el),
@@ -247,6 +266,21 @@ export function installGolf(ctx: Ctx, deps: GolfDeps) {
     const near = !!lying && (golf.active || Math.hypot(lying.x - p.x, lying.z - p.z) < 2.5);
     const label = lying && round ? `⛳ Your ball · hole ${HOLES[round.hole].n} · shot ${round.strokes + 1}` : '';
     marker.place(ctx.inOffice() && !ctx.upTop() ? lying : null, street(), label, near);
+    // Putting: the flag's out of the cup while your ball's on the green (or you've the putter out), and a line shows your aim.
+    const putting = golf.active && golf.club === 'putter';
+    const out = round && !round.done && (putting || lieAt(round.ball.x, round.ball.z) === 'green') ? round.hole : null;
+    if (out !== flagOut) {
+      if (flagOut !== null) ctx.office.course.pin(flagOut, false);
+      if (out !== null) ctx.office.course.pin(out, true);
+      flagOut = out;
+    }
+    const lining = putting && round && (golf.doing === 'aim' || golf.doing === 'charge');
+    if (lining && round) {
+      const b = golf.ball;
+      const pin = HOLES[round.hole].pin;
+      const charging = golf.doing === 'charge';
+      guide.show(b, street(), golf.aim, charging ? puttRoll(golf.power) : Math.hypot(pin.x - b.x, pin.z - b.z), charging);
+    } else guide.show(null, 0, 0, 0, false);
     card.show(round && !golf.active && (outside() || round.done) ? round : null, cardNote());
   });
   ctx.usables.add({ usable: () => (marker.interactable.off ? [] : [marker.interactable]), pickable: () => marker.group });
@@ -263,13 +297,14 @@ export function installGolf(ctx: Ctx, deps: GolfDeps) {
     const p = ctx.player.pos;
     const far = Math.round(Math.hypot(round.ball.x - p.x, round.ball.z - p.z));
     const where = round.ball.teed ? `Tee off on the ${nth(h.n)}` : `Your ball's ${pinText(Math.hypot(h.pin.x - round.ball.x, h.pin.z - round.ball.z))} from the pin`;
-    return far > 3 ? `${where} · ${far} m away · E at it to play` : `${where} · E to play it`;
+    return far > 3 ? `${where} · ${far} m away · E at it to play · Q ends the round` : `${where} · E to play it · Q ends the round`;
   }
 
   balls.onHit = (hit, mine) => {
     // Your own ball's heard wherever it lands (the camera's following it); anyone else's from where it is.
     const at = mine ? undefined : { x: hit.at.x, y: hit.at.y + street(), z: hit.at.z };
     if (hit.kind === 'bounce') ctx.sound.golf(hit.lie === 'sand' || hit.lie === 'rough' ? 'thud' : 'bounce', at, hit.speed);
+    else if (hit.kind === 'lip') ctx.sound.golf('wall', at, hit.speed);
     else ctx.sound.golf(hit.kind, at, hit.speed);
   };
   balls.onRest = (f, who, mine) => {
@@ -303,7 +338,7 @@ export function installGolf(ctx: Ctx, deps: GolfDeps) {
       if (!round) return { k: '', parts: [] };
       const h = HOLES[round.hole];
       const pin = pinText(Math.hypot(h.pin.x - round.ball.x, h.pin.z - round.ball.z));
-      return { k: `${round.hole}|${round.strokes}|${pin}`, parts: [hintTitle(`⛳ Your ball · hole ${h.n}`), aside(`shot ${round.strokes + 1} · ${pin} from the pin`), key('E', 'Play it')] };
+      return { k: `${round.hole}|${round.strokes}|${pin}`, parts: [hintTitle(`⛳ Your ball · hole ${h.n}`), aside(`shot ${round.strokes + 1} · ${pin} from the pin`), key('E', 'Play it'), key('Q', 'End round')] };
     },
     use: onE(() => playBall()),
   });
@@ -328,7 +363,7 @@ export function installGolf(ctx: Ctx, deps: GolfDeps) {
     const stage = golf.doing;
     ctx.hint.draw(el, `golf|${stage}|${golf.club}`, () =>
       stage === 'watch'
-        ? [title('⛳ Fore!'), key('Space', 'Skip'), key('E', 'Step away')]
+        ? [title('⛳ Fore!'), key('Space', 'Skip'), key('E', 'Step away'), key('Q', 'End round')]
         : stage === 'charge' || stage === 'swing'
           ? [title('⛳ Let go to hit it'), aside('the fuller the meter, the further it goes')]
           : [key('Space', 'Hold to swing'), key('A D', 'Aim'), ...(golf.club === 'putter' ? [] : [key('W S', 'Loft')]), key('C', 'Club'), key('X', 'Pick up'), key('Q', 'End round'), key('E', 'Step away')],

@@ -16,7 +16,9 @@ export function golfCart(color: string): CarModel {
   const trim = toon('#2b2d42');
   const seat = toon('#f1e4d3');
   const steel = toon('#ced4da');
-  const glass = toon('#bfe3ff');
+  // See-through, so you can see where you're going from the seat (no outline round it, either).
+  const glass = new THREE.MeshBasicMaterial({ color: '#dff3ff', transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
+  glass.userData.outlineParameters = { visible: false };
   const tire = toon('#1f1f26');
   const hub = toon('#d9dbe3');
   const L = CART.length / 2;
@@ -38,13 +40,19 @@ export function golfCart(color: string): CarModel {
   back.rotation.x = -0.12;
   g.add(back);
   // The canopy on its four posts, and the windshield between the front two.
+  // The front two out at the corners and back by your knees, so they're off to the side as you drive.
   const top = 1.92;
+  const FRONT = 0.12;
   for (const sx of [-1, 1]) {
-    for (const z of [0.42, s.z - 0.42]) g.add(mesh(new THREE.CylinderGeometry(0.025, 0.025, top - 0.5, 6), steel, sx * (W / 2 - 0.1), 0.5 + (top - 0.5) / 2, z, false));
+    for (const z of [FRONT, s.z - 0.42]) g.add(mesh(new THREE.CylinderGeometry(0.022, 0.022, top - 0.5, 6), steel, sx * (W / 2 - 0.03), 0.5 + (top - 0.5) / 2, z, false));
   }
   g.add(mesh(new THREE.BoxGeometry(W + 0.1, 0.07, 1.75), paint, 0, top, -0.08));
   g.add(mesh(new THREE.BoxGeometry(W + 0.14, 0.04, 1.8), trim, 0, top - 0.05, -0.08, false));
-  const screen = mesh(new THREE.BoxGeometry(W - 0.22, 0.95, 0.02), glass, 0, 1.32, 0.44, false);
+  // The windshield: clear glass in a thin frame.
+  const screen = new THREE.Group();
+  screen.add(mesh(new THREE.PlaneGeometry(W - 0.08, 0.9), glass, 0, 0, 0, false));
+  for (const y of [-0.46, 0.46]) screen.add(mesh(new THREE.BoxGeometry(W - 0.06, 0.03, 0.03), trim, 0, y, 0, false));
+  screen.position.set(0, 1.32, FRONT + 0.02);
   screen.rotation.x = -0.06;
   g.add(screen);
   // The wheel in front of the driver.

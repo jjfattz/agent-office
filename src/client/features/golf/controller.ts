@@ -122,6 +122,11 @@ export class Golfer {
     return this.stage !== null;
   }
 
+  /** The ball you're over. */
+  get ball(): Readonly<Ball> {
+    return this.at;
+  }
+
   /** What you're doing over the ball, or null when you're not at it. */
   get doing(): GolfStage | null {
     return this.stage;

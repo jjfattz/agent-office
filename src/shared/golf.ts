@@ -27,9 +27,14 @@ export const CLUB_ORDER: readonly Club[] = ['iron', 'wedge', 'putter'];
 export const BALL_R = 0.05;
 /** How high a tee holds the ball up off the grass. */
 export const TEE_H = 0.03;
-/** How far from the pin a ball drops in: rolling in slower than CUP_SPEED, or landing straight in. */
-export const CUP = 0.13;
-const CUP_SPEED = 1.9;
+/** The cup's radius: a ball whose middle comes over it drops in, landing straight in or rolling in slowly enough. */
+export const CUP = 0.15;
+/**
+ * How fast a rolling ball can be going and still drop: right over the middle of the cup, up to
+ * CUP_FAST (it hits the back of the cup and falls in); clipping its edge, only CUP_SLOW.
+ */
+const CUP_FAST = 4;
+const CUP_SLOW = 1.4;
 
 /** A shot: hole `hole` (0 is the first), from (x, z), with `club`. Heading 0 is +z, turning toward +x. */
 export interface Shot {
@@ -58,7 +63,8 @@ export interface Obstacle {
 export interface Hit {
   /** Seconds after the shot. */
   t: number;
-  kind: 'bounce' | 'wall' | 'tree' | 'cup' | 'splash';
+  /** `lip`: over the cup too fast to drop, and off round its edge. */
+  kind: 'bounce' | 'wall' | 'tree' | 'cup' | 'splash' | 'lip';
   at: { x: number; y: number; z: number };
   /** How hard, in m/s. */
   speed: number;
@@ -124,6 +130,16 @@ export function shotOk(s: { hole: unknown; x: unknown; z: unknown; club: unknown
   return Number.isInteger(s.hole) && s.hole >= 0 && s.hole < HOLES.length && onCourseGround(s.x, s.z) && Math.abs(s.yaw) <= 7 && s.loft >= lo - 1e-6 && s.loft <= hi + 1e-6 && s.power >= 0 && s.power <= 1;
 }
 
+/**
+ * How slowly a ball rolling at (vx, vz), the pin (dx, dz) from it, has to be going to drop: by how
+ * near the middle of the cup its line passes.
+ */
+function dropsBelow(dx: number, dz: number, vx: number, vz: number): number {
+  const speed = Math.hypot(vx, vz) || 1;
+  const miss = Math.min(1, Math.abs(dx * vz - dz * vx) / speed / CUP);
+  return CUP_FAST - (CUP_FAST - CUP_SLOW) * miss * miss;
+}
+
 /** Where a shot goes (see the top of this file). The same shot always goes the same way. */
 export function fly(input: Shot, obstacles: readonly Obstacle[] = []): Flight {
   const shot = fairShot(input);
@@ -144,6 +160,8 @@ export function fly(input: Shot, obstacles: readonly Obstacle[] = []): Flight {
   let holed = false;
   let lie: Rest = lieAt(x, z);
   let step = 0;
+  /** Over the cup now, too fast to drop: it lips out once, not every step it's over it. */
+  let lipped = false;
   /** The crowns the ball's in now, so going through one only rustles once. */
   const inCrown = new Set<number>();
   const hit = (kind: Hit['kind'], speed: number, at?: Rest) => hits.push({ t: step * dt, kind, at: { x, y, z }, speed, lie: at });
@@ -261,10 +279,17 @@ export function fly(input: Shot, obstacles: readonly Obstacle[] = []): Flight {
           vz += sloped.slope.z * dt;
         }
         const speed = Math.hypot(vx, vz);
-        if (on === 'green' && fromPin < CUP && speed < CUP_SPEED) {
-          holed = true;
-          break;
-        }
+        if (on === 'green' && fromPin < CUP && !lipped) {
+          if (speed < dropsBelow(pin.x - x, pin.z - z, vx, vz)) {
+            holed = true;
+            break;
+          }
+          // Too firm: it catches the back of the cup and spins out, slower, a little off its line.
+          lipped = true;
+          hit('lip', speed, on);
+          const turn = (pin.x - x) * vz - (pin.z - z) * vx > 0 ? -0.3 : 0.3;
+          [vx, vz] = [(vx * Math.cos(turn) - vz * Math.sin(turn)) * 0.6, (vx * Math.sin(turn) + vz * Math.cos(turn)) * 0.6];
+        } else if (fromPin >= CUP) lipped = false;
         const slow = g.roll * dt;
         if (speed <= slow) break;
         vx *= (speed - slow) / speed;
@@ -317,6 +342,12 @@ export function fullReach(club: Club, loft: number): number {
   return x;
 }
 
+/** How far a putt hit with `power` (0–1) rolls on a flat green. */
+export function puttRoll(power: number): number {
+  const v = CLUBS.putter.speed * power;
+  return (v * v) / (2 * GROUND.green.roll);
+}
+
 /** The club a ball lying at (x, z) on hole `hole` is played with to begin with: the putter on the green, a wedge near it, else the iron. */
 export function clubFor(hole: number, x: number, z: number): Club {
   const h = HOLES[hole];
@@ -343,7 +374,7 @@ export function lieText(f: Flight): string {
     case 'sand':
       return `In the bunker · ${pinText(f.fromPin)}`;
     case 'green':
-      return `On the green · ${pinText(f.fromPin)}`;
+      return `${f.hits.some((x) => x.kind === 'lip') ? 'Lipped out' : 'On the green'} · ${pinText(f.fromPin)}`;
     case 'rough':
       return `In the rough · ${pinText(f.fromPin)}`;
     default:

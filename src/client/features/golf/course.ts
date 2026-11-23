@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { BRIDGE, COURSE_TREES, FRINGE, HOLES, TRUNK, type Pond } from '../../../shared/course';
+import { CUP } from '../../../shared/golf';
 import { STREET_Y } from '../../../shared/layout';
 import type { Collider } from '../../world/types';
 import { bulb, streetLamp, tree, type NightParts } from '../../world/outside';
@@ -107,7 +108,12 @@ function round(w: Pond, out: number, step: number): { x: number; z: number }[] {
 export interface Course {
   /** The flags flap and the water drifts. */
   update(t: number): void;
+  /** Hole `hole`'s flagstick out of the cup and laid on the green beside it, for putting, or back in. */
+  pin(hole: number, out: boolean): void;
 }
+
+/** Where a flagstick that's out lies: this far from the cup, and turned this way. */
+const LAID = { x: 1.1, z: 0.9, yaw: 0.6 } as const;
 
 /** The course, built into the street's `ground` (with what's in the way there). */
 export function buildCourse(ground: THREE.Group, colliders: Collider[], night: NightParts): Course {
@@ -124,10 +130,11 @@ export function buildCourse(ground: THREE.Group, colliders: Collider[], night: N
     for (const w of h.water) {
       parts.add(new THREE.Mesh(disc(w.x, w.z, w.rx + 0.5, LAYER.bank, w.rz + 0.5, 56), toon('#6b9b4f')));
       ponds.push(worldUV(disc(w.x, w.z, w.rx, LAYER.water, w.rz, 56), 9));
-      // A ring of posts round it you can't walk through, but for the bridge over to the island.
-      for (const p of round(w, 0.3, 1.1)) {
+      // A ring of posts round it you can't walk through, all on its muddy bank (so nothing stops you
+      // short of it on the grass), but for the bridge over to the island.
+      for (const p of round(w, 0.15, 0.6)) {
         if (Math.abs(p.z - BRIDGE.z) < BRIDGE.half + 0.3 && p.x > BRIDGE.x1 - 1 && p.x < BRIDGE.x0 + 1) continue;
-        colliders.push({ minX: p.x - 0.45, maxX: p.x + 0.45, minZ: p.z - 0.45, maxZ: p.z + 0.45, bottom: G, top: G + 0.9 });
+        colliders.push({ minX: p.x - 0.3, maxX: p.x + 0.3, minZ: p.z - 0.3, maxZ: p.z + 0.3, bottom: G, top: G + 0.9 });
       }
     }
   }
@@ -135,9 +142,9 @@ export function buildCourse(ground: THREE.Group, colliders: Collider[], night: N
   for (const h of HOLES) {
     if (!h.water.some((w) => Math.hypot(w.x - h.pin.x, w.z - h.pin.z) < 1)) continue;
     const r = h.green + FRINGE + 0.6;
-    for (const p of round({ x: h.pin.x, z: h.pin.z, rx: r, rz: r }, 0.3, 1.1)) {
+    for (const p of round({ x: h.pin.x, z: h.pin.z, rx: r, rz: r }, 0.35, 0.6)) {
       if (Math.abs(p.z - BRIDGE.z) < BRIDGE.half + 0.3 && p.x > BRIDGE.x1 - 1 && p.x < BRIDGE.x0 + 1) continue;
-      colliders.push({ minX: p.x - 0.45, maxX: p.x + 0.45, minZ: p.z - 0.45, maxZ: p.z + 0.45, bottom: G, top: G + 0.9 });
+      colliders.push({ minX: p.x - 0.3, maxX: p.x + 0.3, minZ: p.z - 0.3, maxZ: p.z + 0.3, bottom: G, top: G + 0.9 });
     }
   }
   const waterMesh = flatMesh(ponds, new THREE.MeshToonMaterial({ map: water, gradientMap: gradient() }));
@@ -166,7 +173,7 @@ export function buildCourse(ground: THREE.Group, colliders: Collider[], night: N
   }
 
   // The greens, each with its collar, cup and flagstick, and the bunkers.
-  const flags: { geo: THREE.PlaneGeometry; rest: Float32Array; mesh: THREE.Mesh }[] = [];
+  const flags: { geo: THREE.PlaneGeometry; rest: Float32Array; mesh: THREE.Mesh; pole: THREE.Group; stick: Collider; out: boolean }[] = [];
   for (const h of HOLES) {
     const { x, z } = h.pin;
     const island = h.water.length > 0 && h.water.some((w) => Math.hypot(w.x - x, w.z - z) < 1);
@@ -177,11 +184,17 @@ export function buildCourse(ground: THREE.Group, colliders: Collider[], night: N
       parts.add(new THREE.Mesh(disc(b.x, b.z, b.r + 0.14, LAYER.lip, undefined, 32), toon('#d9c48a')));
       parts.add(new THREE.Mesh(disc(b.x, b.z, b.r, LAYER.sand, undefined, 32), toon('#f3e3b3')));
     }
-    parts.add(new THREE.Mesh(disc(x, z, 0.19, LAYER.cup, undefined, 20), toon('#fffaf3')));
-    parts.add(new THREE.Mesh(disc(x, z, 0.14, LAYER.cup + 0.003, undefined, 20), toon('#1d1d1d')));
-    parts.add(mesh(new THREE.CylinderGeometry(0.035, 0.035, STICK, 8), toon('#fffaf3'), x, G + STICK / 2, z));
-    parts.add(mesh(new THREE.SphereGeometry(0.06, 10, 8), toon('#ffd166'), x, G + STICK + 0.03, z));
-    colliders.push({ minX: x - 0.05, maxX: x + 0.05, minZ: z - 0.05, maxZ: z + 0.05, bottom: G, top: G + STICK });
+    parts.add(new THREE.Mesh(disc(x, z, CUP + 0.05, LAYER.cup, undefined, 24), toon('#fffaf3')));
+    parts.add(new THREE.Mesh(disc(x, z, CUP, LAYER.cup + 0.003, undefined, 24), toon('#1d1d1d')));
+    // The flagstick, its knob and its flag, together so it can come out of the cup.
+    const pole = new THREE.Group();
+    pole.rotation.order = 'YXZ';
+    pole.add(mesh(new THREE.CylinderGeometry(0.035, 0.035, STICK, 8), toon('#fffaf3'), 0, STICK / 2, 0));
+    pole.add(mesh(new THREE.SphereGeometry(0.06, 10, 8), toon('#ffd166'), 0, STICK + 0.03, 0));
+    pole.position.set(x, G, z);
+    ground.add(pole);
+    const stick: Collider = { minX: x - 0.05, maxX: x + 0.05, minZ: z - 0.05, maxZ: z + 0.05, bottom: G, top: G + STICK };
+    colliders.push(stick);
     // The flag: off the top of the stick, rippling.
     const geo = new THREE.PlaneGeometry(1.2, 0.75, 8, 1);
     geo.translate(0.6, 0, 0);
@@ -190,10 +203,10 @@ export function buildCourse(ground: THREE.Group, colliders: Collider[], night: N
     const back = front.clone();
     back.wrapS = THREE.RepeatWrapping;
     back.repeat.x = -1;
-    const flag = mesh(geo, new THREE.MeshToonMaterial({ map: front, gradientMap: gradient() }), x + 0.03, G + STICK - 0.42, z, false);
+    const flag = mesh(geo, new THREE.MeshToonMaterial({ map: front, gradientMap: gradient() }), 0.03, STICK - 0.42, 0, false);
     flag.add(mesh(geo, new THREE.MeshToonMaterial({ map: back, side: THREE.BackSide, gradientMap: gradient() }), 0, 0, 0, false));
-    ground.add(flag);
-    flags.push({ geo, rest: Float32Array.from(geo.getAttribute('position').array), mesh: flag });
+    pole.add(flag);
+    flags.push({ geo, rest: Float32Array.from(geo.getAttribute('position').array), mesh: flag, pole, stick, out: false });
   }
 
   // The footbridge out to the island: planks on two beams, a rail either side.
@@ -233,6 +246,8 @@ export function buildCourse(ground: THREE.Group, colliders: Collider[], night: N
     update(t: number) {
       water.offset.set(Math.sin(t * 0.15) * 0.05, t * 0.01);
       for (const f of flags) {
+        // Lying on the green, it lies still.
+        if (f.out) continue;
         const pos = f.geo.getAttribute('position') as THREE.BufferAttribute;
         for (let i = 0; i < pos.count; i++) {
           const u = f.rest[i * 3];
@@ -244,6 +259,21 @@ export function buildCourse(ground: THREE.Group, colliders: Collider[], night: N
         f.geo.computeVertexNormals();
         f.mesh.rotation.y = -0.5 + Math.sin(t * 0.7) * 0.25;
       }
+    },
+    pin(hole: number, out: boolean) {
+      const f = flags[hole];
+      if (!f || f.out === out) return;
+      f.out = out;
+      const { x, z } = HOLES[hole].pin;
+      // Laid flat on its side on the green, flag and all; or standing in the cup.
+      f.pole.position.set(out ? x + LAID.x : x, G + (out ? 0.04 : 0), out ? z + LAID.z : z);
+      f.pole.rotation.set(out ? -Math.PI / 2 : 0, out ? LAID.yaw : 0, 0);
+      if (out) {
+        f.mesh.rotation.y = 0;
+        (f.geo.getAttribute('position') as THREE.BufferAttribute).copyArray(f.rest).needsUpdate = true;
+        f.geo.computeVertexNormals();
+      }
+      f.stick.top = (f.stick.bottom ?? 0) + (out ? 0 : STICK);
     },
   };
 }
