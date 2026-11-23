@@ -323,23 +323,52 @@ export function fly(input: Shot, obstacles: readonly Obstacle[] = []): Flight {
   };
 }
 
-/** About how far a full swing of `club` at `loft` goes: through the air for the iron and the wedge, along a green for the putter. */
-export function fullReach(club: Club, loft: number): number {
-  const v = CLUBS[club].speed;
-  if (club === 'putter') return (v * v) / (2 * GROUND.green.roll);
+/**
+ * The ball through still air off `club` at `loft` and `power` (0–1), with no tree or wall in the way,
+ * until it comes back down to the height it was hit from: how far along the line it carries, and,
+ * with `points`, where it is every 1/20 s on the way, as (along, up) pairs.
+ */
+export function carry(club: Club, loft: number, power: number, points?: number[]): number {
+  const v = CLUBS[club].speed * power;
   let x = 0;
   let y = 0;
   let vx = v * Math.cos(loft);
   let vy = v * Math.sin(loft);
   const dt = 1 / 120;
+  points?.push(0, 0);
   for (let i = 0; i < 2400 && (vy > 0 || y > 0); i++) {
     vy -= GRAVITY * dt;
     vx *= 1 - DRAG * dt;
     vy *= 1 - DRAG * dt;
+    const wasY = y;
     x += vx * dt;
     y += vy * dt;
+    // Back to just where it came down through the ground, so a touch harder is always a touch further.
+    if (y < 0 && wasY >= 0) x -= (vx * dt * -y) / (wasY - y);
+    if (points && (i % 6 === 5 || y <= 0)) points.push(x, Math.max(0, y));
   }
   return x;
+}
+
+/** About how far a full swing of `club` at `loft` goes: through the air for the iron and the wedge, along a green for the putter. */
+export function fullReach(club: Club, loft: number): number {
+  return club === 'putter' ? puttRoll(1) : carry(club, loft, 1);
+}
+
+/** How hard (0–1) to hit `club` at `loft` for it to carry `dist` meters (roll that far, for the putter): all of it, if it can't. */
+export function powerFor(club: Club, loft: number, dist: number): number {
+  if (dist <= 0) return 0;
+  if (club === 'putter') return Math.min(1, Math.sqrt(2 * GROUND.green.roll * dist) / CLUBS.putter.speed);
+  if (carry(club, loft, 1) <= dist) return 1;
+  // Further the harder it's hit, so halve the gap till it's close enough.
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 22; i++) {
+    const mid = (lo + hi) / 2;
+    if (carry(club, loft, mid) < dist) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
 }
 
 /** How far a putt hit with `power` (0–1) rolls on a flat green. */

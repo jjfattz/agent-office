@@ -1,16 +1,20 @@
 import * as THREE from 'three';
 import { HOLES, yawTo } from '../../../shared/course';
-import { BALL_R, CLUBS, CLUB_ORDER, TEE_H, fullReach, pinText, type Club, type Flight, type Shot } from '../../../shared/golf';
+import { BALL_R, CLUBS, CLUB_ORDER, TEE_H, carry, pinText, type Club, type Flight, type Shot } from '../../../shared/golf';
 import { isTyping, type PlayerController } from '../../player';
 import { $, h, modalOpen } from '../../ui/dom';
 import { IMPACT, type Person } from '../../world/character';
+import type { Landing } from './landing';
 import type { Ball } from './round';
+import { ShotTarget } from './target';
 
 // Over your ball on the course (E at it, or at a tee): you stand square to the line with a club, and
 // the camera goes down low behind the ball, looking down the line at the pin. The mouse (or A and D)
 // aims, W and S pick the loft, C changes club, and holding Space takes the club back while the power
-// meter runs up and down: let go to hit it. The camera follows the ball out to wherever it stops,
-// then the round says what's next (see index.ts). E steps away from the ball.
+// meter runs up and down: let go to hit it. A circle out on the course marks where you mean it to
+// land, and the meter's notch how hard to hit it for that; holding the right mouse button (or Z) lifts
+// the view up over the circle to move it (see target.ts). The camera follows the ball out to wherever
+// it stops, then the round says what's next (see index.ts). E steps away from the ball.
 
 /** The power meter runs from nothing to full in this long, then back down again. */
 const METER = 1.3;
@@ -35,6 +39,9 @@ const BEHIND: Record<Club, { back: number; side: number; up: number; ahead: numb
   wedge: { back: 3.1, side: 0.8, up: 1.7, ahead: 20 },
   putter: { back: 2.5, side: 0.6, up: 1.35, ahead: 6 },
 };
+
+/** Up over where it lands: back from the circle toward the ball, and up, a bit more of each the further out it is. */
+const AERIAL = { back: 5, backPer: 0.2, up: 9, upPer: 0.3 };
 
 export type GolfStage = 'aim' | 'charge' | 'swing' | 'watch';
 
@@ -93,10 +100,12 @@ export class Golfer {
   /** Covers the meter from the right, down to how hard you'd hit it. */
   private readonly rest: HTMLElement;
   private readonly mark: HTMLElement;
+  /** On the meter: how far up it to let go for the ball to land in the circle. */
+  private readonly notch: HTMLElement;
   private readonly info: HTMLElement;
   private shown = '';
-  /** How far a full swing goes with the club and loft you've got, worked out when either changes. */
-  private reach = { key: '', m: 0 };
+  /** Where you mean it to land, and the view up over it. */
+  private readonly target: ShotTarget;
 
   constructor(
     private readonly player: PlayerController,
@@ -109,8 +118,10 @@ export class Golfer {
     this.title = h('div.golf-title');
     this.rest = h('span.golf-rest');
     this.mark = h('span.golf-last');
+    this.notch = h('span.golf-notch');
     this.info = h('div.golf-info');
-    this.panel = h('div.golf.panel.hidden', { id: 'golf', 'aria-label': 'Golf' }, this.title, h('div.golf-meter', {}, this.rest, this.mark), this.info);
+    this.panel = h('div.golf.panel.hidden', { id: 'golf', 'aria-label': 'Golf' }, this.title, h('div.golf-meter', {}, this.rest, this.notch, this.mark), this.info);
+    this.target = new ShotTarget(player, () => this.active);
     $('hud').append(this.panel);
     window.addEventListener('keydown', (e) => this.key(e, true));
     window.addEventListener('keyup', (e) => this.key(e, false));
@@ -132,6 +143,27 @@ export class Golfer {
     return this.stage;
   }
 
+  /** Whether the view's up over where it lands (the right mouse button or Z held). */
+  get aerial(): boolean {
+    return this.target.aerial;
+  }
+
+  /** Where a full shot's meant to land, for the circle on the course; null for a putt, or once it's hit. */
+  get landing(): Landing | null {
+    if (this.club === 'putter' || (this.stage !== 'aim' && this.stage !== 'charge')) return null;
+    const power = this.target.powerFor(this.club, this.loft);
+    return {
+      at: this.at,
+      y: BALL_R + (this.at.teed ? TEE_H : 0),
+      yaw: this.aim,
+      dist: this.target.dist,
+      club: this.club,
+      loft: this.loft,
+      power,
+      now: this.stage === 'charge' ? carry(this.club, this.loft, this.power) : null,
+    };
+  }
+
   /** How far the power meter is up right now (0–1), while Space is held. */
   get power(): number {
     if (this.stage !== 'charge') return 0;
@@ -147,6 +179,7 @@ export class Golfer {
     this.hole = hole;
     this.setClub(club);
     this.aim = yawTo(ball, HOLES[hole].pin);
+    this.target.reset(this.club, this.loft, Math.hypot(HOLES[hole].pin.x - ball.x, HOLES[hole].pin.z - ball.z));
     this.lastPower = -1;
     const p = this.player;
     p.rig = () => this.stand();
@@ -165,6 +198,7 @@ export class Golfer {
   /** The club back in the bag, and you back on your feet beside the ball. */
   stop(): void {
     if (!this.stage) return;
+    this.target.leave();
     this.stage = null;
     this.shot = null;
     const p = this.player;
@@ -199,10 +233,12 @@ export class Golfer {
       if (p.holding('KeyA', 'ArrowLeft')) aim += TURN * dt;
       if (p.holding('KeyD', 'ArrowRight')) aim -= TURN * dt;
       this.aim = aim;
+      // Up over where it lands, W and S move it (see target.ts); down behind the ball, they pick the loft.
+      this.target.update(dt, this.club, this.loft, this.club !== 'putter');
       const [lo, hi] = CLUBS[this.club].loft;
-      if (p.holding('KeyW', 'ArrowUp')) this.loft = Math.min(hi, this.loft + LOFT_RATE * dt);
-      if (p.holding('KeyS', 'ArrowDown')) this.loft = Math.max(lo, this.loft - LOFT_RATE * dt);
-    }
+      if (!this.target.aerial && p.holding('KeyW', 'ArrowUp')) this.loft = Math.min(hi, this.loft + LOFT_RATE * dt);
+      if (!this.target.aerial && p.holding('KeyS', 'ArrowDown')) this.loft = Math.max(lo, this.loft - LOFT_RATE * dt);
+    } else this.target.leave();
     p.camYaw = this.aim + Math.PI;
     // A putt's only a little way back.
     if (this.stage === 'charge') this.me.golfBack(this.club === 'putter' ? this.power * 0.35 : this.power);
@@ -278,6 +314,14 @@ export class Golfer {
       const far = b.flight.shot.club === 'putter' ? 0.55 : 1;
       want.set(b.at.x - Math.sin(yaw) * CHASE_BACK * far, street + b.at.y + CHASE_UP * far, b.at.z - Math.cos(yaw) * CHASE_BACK * far);
       target.set(b.at.x, street + b.at.y, b.at.z);
+    } else if (this.target.aerial) {
+      // Up over where it's meant to land, looking down on the circle.
+      const d = this.target.dist;
+      const sin = Math.sin(this.aim);
+      const cos = Math.cos(this.aim);
+      target.set(this.at.x + sin * d, street, this.at.z + cos * d);
+      const back = AERIAL.back + d * AERIAL.backPer;
+      want.set(target.x - sin * back, street + AERIAL.up + d * AERIAL.upPer, target.z - cos * back);
     } else {
       // Down low behind the ball, looking down the line: the ball low in the view, the pin further up it.
       const c = BEHIND[this.club];
@@ -303,15 +347,18 @@ export class Golfer {
     this.rest.style.width = `${(1 - Math.max(0, power)) * 100}%`;
     this.mark.style.left = `${this.lastPower * 100}%`;
     this.mark.classList.toggle('hidden', this.lastPower < 0);
+    const putt = this.club === 'putter';
+    const reach = this.target.reach(this.club, this.loft);
+    if (!putt) this.notch.style.left = `${this.target.powerFor(this.club, this.loft) * 100}%`;
+    this.notch.classList.toggle('hidden', putt);
     const h = HOLES[this.hole];
     const off = THREE.MathUtils.radToDeg(wrap(this.aim - yawTo(this.at, h.pin)));
     const aim = Math.abs(off) < 0.5 ? 'at the pin' : `${Math.abs(off).toFixed(0)}° ${off > 0 ? 'left' : 'right'}`;
-    const key = `${this.club}|${this.loft.toFixed(2)}`;
-    if (this.reach.key !== key) this.reach = { key, m: fullReach(this.club, this.loft) };
     const club = CLUBS[this.club];
     const pin = pinText(Math.hypot(h.pin.x - this.at.x, h.pin.z - this.at.z));
     const loft = this.club === 'putter' ? '' : ` · ${THREE.MathUtils.radToDeg(this.loft).toFixed(0)}°`;
-    const text = `${club.name}${loft} · full ≈ ${Math.round(this.reach.m)} m · pin ${pin} · aim ${aim}${this.club === 'putter' ? this.breaks() : ''}`;
+    const to = putt ? `full ≈ ${Math.round(reach)} m` : `to land ${Math.round(this.target.dist)} m of ${Math.round(reach)}`;
+    const text = `${club.name}${loft} · ${to} · pin ${pin} · aim ${aim}${putt ? this.breaks() : ''}`;
     const title = this.heading();
     if (text === this.shown && title === this.title.textContent) return;
     this.shown = text;

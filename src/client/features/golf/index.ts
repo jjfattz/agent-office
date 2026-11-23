@@ -19,6 +19,7 @@ import { GolfBalls } from './balls';
 import { Scorecard } from './card';
 import { Golfer } from './controller';
 import { PuttGuide } from './guide';
+import { LandingMark } from './landing';
 import { BallMarker } from './marker';
 import { GolfRound, type Outcome } from './round';
 
@@ -78,6 +79,8 @@ export function installGolf(ctx: Ctx, deps: GolfDeps) {
   const card = new Scorecard();
   const guide = new PuttGuide();
   ctx.scene.add(guide.group);
+  const landing = new LandingMark();
+  ctx.scene.add(landing.group);
   /** The hole whose flagstick you've had out to putt, if you have. */
   let flagOut: number | null = null;
   /** The neighbours' buildings, which a ball comes off. */
@@ -281,6 +284,7 @@ export function installGolf(ctx: Ctx, deps: GolfDeps) {
       const charging = golf.doing === 'charge';
       guide.show(b, street(), golf.aim, charging ? puttRoll(golf.power) : Math.hypot(pin.x - b.x, pin.z - b.z), charging);
     } else guide.show(null, 0, 0, 0, false);
+    landing.show(golf.landing, street());
     card.show(round && !golf.active && (outside() || round.done) ? round : null, cardNote());
   });
   ctx.usables.add({ usable: () => (marker.interactable.off ? [] : [marker.interactable]), pickable: () => marker.group });
@@ -361,12 +365,18 @@ export function installGolf(ctx: Ctx, deps: GolfDeps) {
   function renderGolfHint(el: HTMLElement) {
     const title = (text: string) => h('span.title', {}, text);
     const stage = golf.doing;
-    ctx.hint.draw(el, `golf|${stage}|${golf.club}`, () =>
+    const putt = golf.club === 'putter';
+    const up = golf.aerial;
+    // The Z cap gives a phone its button for the view up over where it lands (see features/touch).
+    const look = putt ? [] : [key('Z / Right mouse', 'Hold: where it lands')];
+    ctx.hint.draw(el, `golf|${stage}|${golf.club}|${up}`, () =>
       stage === 'watch'
         ? [title('⛳ Fore!'), key('Space', 'Skip'), key('E', 'Step away'), key('Q', 'End round')]
         : stage === 'charge' || stage === 'swing'
-          ? [title('⛳ Let go to hit it'), aside('the fuller the meter, the further it goes')]
-          : [key('Space', 'Hold to swing'), key('A D', 'Aim'), ...(golf.club === 'putter' ? [] : [key('W S', 'Loft')]), key('C', 'Club'), key('X', 'Pick up'), key('Q', 'End round'), key('E', 'Step away')],
+          ? [title('⛳ Let go to hit it'), aside(putt ? 'the fuller the meter, the further it goes' : 'at the blue notch, it lands in the circle'), ...(stage === 'charge' ? look : [])]
+          : up
+            ? [title('⛳ Where it lands'), key('Mouse', 'Move the circle'), key('A D', 'Left / right'), key('W S', 'Nearer / further'), key('Space', 'Hold to swing')]
+            : [key('Space', 'Hold to swing'), key('A D', 'Aim'), ...(putt ? [] : [key('W S', 'Loft')]), ...look, key('C', 'Club'), key('X', 'Pick up'), key('Q', 'End round'), key('E', 'Step away')],
     );
   }
 

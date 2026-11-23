@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { COURSE_TREES, CROWN, HOLES, holeLength, lieAt, scoreName, toPar, yawTo } from '../src/shared/course.js';
-import { CLUBS, CUP, clubFor, fly, fullReach, lieText, puttRoll, shotOk, type Club, type Shot } from '../src/shared/golf.js';
+import { CLUBS, CUP, carry, clubFor, fly, fullReach, lieText, powerFor, puttRoll, shotOk, type Club, type Shot } from '../src/shared/golf.js';
 import { GolfRound, MAX_STROKES } from '../src/client/features/golf/round.js';
 
 /** A shot on hole `hole` from (x, z) at its pin, with `club` at its usual loft. */
@@ -174,4 +174,38 @@ test('a round: strokes, penalties, holing out, and on round the loop to the end'
   assert.equal(toPar(r.toPar), `+${5 + 1 + MAX_STROKES - 9}`);
   assert.equal(scoreName(2, 3), 'Birdie');
   assert.equal(scoreName(3, 3), 'Par');
+});
+
+test('the landing circle: the power the meter notch asks for lands the ball about where it is aimed', () => {
+  // Off each tee, straight at the pin and a little either side, with both clubs at a few lofts.
+  for (const [i, h] of HOLES.entries()) {
+    const toPin = Math.hypot(h.pin.x - h.tee.x, h.pin.z - h.tee.z);
+    for (const club of ['iron', 'wedge'] as Club[]) {
+      const [lo, hi] = CLUBS[club].loft;
+      for (const loft of [lo, (lo + hi) / 2, hi]) {
+        const full = fullReach(club, loft);
+        for (const dist of [full * 0.3, Math.min(full, toPin) * 0.8, full]) {
+          const power = powerFor(club, loft, dist);
+          assert.ok(power > 0 && power <= 1);
+          assert.ok(Math.abs(carry(club, loft, power) - dist) < 0.05, `${club} at ${loft.toFixed(2)} carries ${dist.toFixed(1)} m`);
+          const yaw = Math.atan2(h.pin.x - h.tee.x, h.pin.z - h.tee.z);
+          const f = fly({ hole: i, x: h.tee.x, z: h.tee.z, club, yaw, loft, power });
+          const first = f.hits[0];
+          // A tree in the way is a tree in the way; otherwise it comes down inside the circle.
+          if (!first || first.kind === 'tree' || first.kind === 'wall') continue;
+          const landed = Math.hypot(first.at.x - h.tee.x, first.at.z - h.tee.z);
+          assert.ok(Math.abs(landed - dist) < Math.max(1, dist * 0.05), `hole ${h.n}, ${club}: aimed ${dist.toFixed(1)} m, landed ${landed.toFixed(1)} m`);
+        }
+      }
+    }
+  }
+  // Further than the club goes is a full swing; nothing is nothing; and a putt's power rolls it that far.
+  assert.equal(powerFor('iron', CLUBS.iron.start, 1000), 1);
+  assert.equal(powerFor('wedge', CLUBS.wedge.start, 0), 0);
+  assert.ok(Math.abs(puttRoll(powerFor('putter', 0, 5)) - 5) < 1e-9);
+  // The arc's points start at the ball and come back down at the carry.
+  const pts: number[] = [];
+  const c = carry('iron', CLUBS.iron.start, 0.7, pts);
+  assert.deepEqual(pts.slice(0, 2), [0, 0]);
+  assert.ok(pts.length > 20 && Math.abs(pts[pts.length - 2] - c) < 1 && Math.max(...pts.filter((_, k) => k % 2)) > 5);
 });
