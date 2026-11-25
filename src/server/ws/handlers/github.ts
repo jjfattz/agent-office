@@ -1,5 +1,5 @@
-// The floor's GitHub boards: refreshing them, and merging, commenting on, closing, labeling and
-// editing issues and pull requests, as whoever asks (see withGitHub).
+// The floor's GitHub boards: refreshing them, opening issues, and merging, commenting on, closing,
+// labeling and editing issues and pull requests, as whoever asks (see withGitHub).
 import type { GitHubClientMsg } from '../../../shared/protocol.js';
 import { GH_COMMENT_MAX, GH_LABEL_MAX, GH_TITLE_MAX } from '../../../shared/protocol.js';
 import { num, str } from '../../office/input.js';
@@ -120,6 +120,30 @@ export const githubHandlers = {
           if (!r.error) ctx.toastFloor(floor, `✏️ ${who} edited issue #${n}`);
         }),
       (error) => ctx.sendTo(c, { t: 'gh.edited', number: n, error }),
+    );
+  },
+  'gh.create'(ctx, c, msg) {
+    const who = c.peer.name;
+    const floor = here(ctx, c);
+    const id = str(msg.id, 64);
+    if (!floor || !id) return;
+    const title = typeof msg.title === 'string' ? msg.title.trim() : '';
+    const body = typeof msg.body === 'string' ? msg.body : '';
+    const labels = [...new Set((Array.isArray(msg.labels) ? msg.labels : []).map((l) => str(l, GH_LABEL_MAX + 1)).filter((l) => l && l.length <= GH_LABEL_MAX))].slice(0, 100);
+    // Refused rather than cut short, as an edit is.
+    const invalid = !title ? 'The issue needs a title' : title.length > GH_TITLE_MAX ? `GitHub takes titles of up to ${GH_TITLE_MAX} characters` : body.length > GH_COMMENT_MAX ? `GitHub takes descriptions of up to ${GH_COMMENT_MAX} characters` : '';
+    if (invalid) {
+      ctx.sendTo(c, { t: 'gh.created', id, error: invalid });
+      return;
+    }
+    ctx.withGitHub(
+      c,
+      (as) =>
+        void floor.github.create(title, body, labels, as).then((r) => {
+          ctx.sendTo(c, { t: 'gh.created', id, ...r });
+          if (r.issue) ctx.toastFloor(floor, `📝 ${who} opened issue #${r.issue.number}: ${r.issue.title}`);
+        }),
+      (error) => ctx.sendTo(c, { t: 'gh.created', id, error }),
     );
   },
 } satisfies HandlerMap<GitHubClientMsg>;

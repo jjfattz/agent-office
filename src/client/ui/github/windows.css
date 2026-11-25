@@ -91,6 +91,19 @@ article.gh-card > header { display: flex; align-items: center; gap: 8px; padding
 /* .modal.gh-labeler outranks the frame's .modal footer .grow, whatever order the sheets load in. */
 .modal.gh-labeler footer .grow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
 .gh-labeler .gh-quiet a { color: #1d6fd6; font-weight: 800; }
+/* The new issue window (openNewIssue) */
+.gh-new-issue input[type='text'] { display: block; width: 100%; font-weight: 800; }
+.gh-new-issue textarea { display: block; min-height: 180px; }
+.gh-new-issue .gh-compose-preview { min-height: 180px; max-height: 40vh; overflow: auto; padding: 0 12px; }
+.gh-new-tabs { display: flex; justify-content: flex-end; margin-bottom: -4px; }
+.gh-new-labels { display: flex; flex-wrap: wrap; gap: 6px; max-height: 120px; overflow: auto; }
+.gh-new-label { padding: 2px; border: 2px solid transparent; border-radius: 999px; background: none; cursor: pointer; opacity: .45; }
+.gh-new-label:hover { opacity: .8; }
+.gh-new-label[aria-pressed='true'] { opacity: 1; border-color: var(--ink); }
+.gh-new-label .label { font-size: 12px; }
+.gh-new-labels .gh-error { margin: 0; }
+/* .modal.gh-new-issue outranks the frame's .modal footer .grow, whatever order the sheets load in. */
+.modal.gh-new-issue footer .grow { font-size: 12px; color: var(--muted); }
 /* A phone: the tabs scroll on their own row, and the buttons that act (Merge, Approve…) are a thumb's size. */
 @media (max-width: 640px) {
   .gh-tabs { overflow-x: auto; scrollbar-width: none; }
@@ -98,4 +111,6 @@ article.gh-card > header { display: flex; align-items: center; gap: 8px; padding
   .gh-meta { padding: 8px 10px; }
   .gh-conv { padding: 12px 8px 18px; }
   .modal.gh-window footer .btn, .gh-foot .btn, .gh-mergebox-go .btn { min-height: 44px; }
+  .gh-new-label { min-height: 44px; min-width: 44px; }
+  .modal.gh-new-issue footer .grow { font-size: 0; }
 }

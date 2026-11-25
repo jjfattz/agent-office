@@ -1,6 +1,9 @@
 import { execFile } from 'node:child_process';
 import type { GhCheck, GhCloseReason, GhComment, GhIssue, GhIssueDetail, GhLabel, GhMergeMethod, GhPull, GhPullDetail, GhRepoInfo, GhReviewComment, GhState } from '../shared/protocol.js';
+import { Claims } from './github-marks.js';
 import type { GhAs } from './signins.js';
+
+export { Claims, MergeWatch } from './github-marks.js';
 
 const REFRESH_MS = 90_000;
 /** How long the repo's list of labels is kept before the label picker asks GitHub again. */
@@ -104,67 +107,6 @@ function unsupportedJsonField(message: string): string | undefined {
   return /^Unknown JSON field: "([^"]+)"/i.exec(message.trim())?.[1];
 }
 
-/**
- * Spots pull requests that merged between two looks at the list, so the gong rings however they
- * merged: from the PR window, by a worker's `gh pr merge`, by auto-merge, or on GitHub itself.
- */
-export class MergeWatch {
-  /** Open at the last look; unset until the first, so starting the office up rings for nothing. */
-  private open?: Set<number>;
-  /** Rang for already (merged from the PR window), so the next look doesn't ring them again. */
-  private rang = new Set<number>();
-
-  /** The gong rings for `n`: false if it already has. */
-  ring(n: number): boolean {
-    if (this.rang.has(n)) return false;
-    this.rang.add(n);
-    return true;
-  }
-
-  /** A fresh list from GitHub: the pull requests that merged since the last look and haven't rung yet. */
-  look(pulls: GhPull[]): GhPull[] {
-    const open = this.open;
-    const merged = open ? pulls.filter((p) => p.state === 'MERGED' && open.has(p.number) && !this.rang.has(p.number)) : [];
-    // Once GitHub says it merged, it never shows as open again to ring twice.
-    for (const p of pulls) if (p.state === 'MERGED') this.rang.delete(p.number);
-    this.open = new Set(pulls.filter((p) => p.state === 'OPEN').map((p) => p.number));
-    return merged;
-  }
-}
-
-/**
- * The issues workers just took. Assigning one on GitHub and listing the issues again takes seconds,
- * so each is marked `taken` on the board from the moment it's handed over until a list has its assignee.
- */
-export class Claims {
-  /** By issue number: when GitHub had it assigned (Infinity until it answers). */
-  private claimed = new Map<number, { at: number }>();
-
-  /** A worker took issue `n`. Call what it returns once GitHub has answered, with whether it's assigned now. */
-  take(n: number): (assigned: boolean, now?: number) => void {
-    const claim = { at: Infinity };
-    this.claimed.set(n, claim);
-    return (assigned, now = Date.now()) => {
-      if (assigned) claim.at = now;
-      // Unless someone handed it over again meanwhile, and GitHub hasn't answered them yet.
-      else if (this.claimed.get(n) === claim) this.claimed.delete(n);
-    };
-  }
-
-  has(n: number): boolean {
-    return this.claimed.has(n);
-  }
-
-  /**
-   * `items` with the taken ones marked. A list asked for (`asked`) before an issue was assigned doesn't
-   * have its assignee yet, so it stays marked over it; one asked for after is believed, and the claim forgotten.
-   */
-  mark(items: GhIssue[], asked = 0): GhIssue[] {
-    for (const [n, claim] of this.claimed) if (claim.at < asked) this.claimed.delete(n);
-    return items.map(({ taken, ...it }) => (this.claimed.has(it.number) ? { ...it, taken: true } : it));
-  }
-}
-
 export class GitHub {
   issues: GhState<GhIssue> = { items: [], fetchedAt: 0, loading: false };
   pulls: GhState<GhPull> = { items: [], fetchedAt: 0, loading: false };
@@ -176,6 +118,8 @@ export class GitHub {
   private relabeled = new Map<string, { labels: GhLabel[]; at: number }>();
   /** Issues just edited from the office, by number: their title and description, and when. */
   private edited = new Map<number, { title: string; body: string; at: number }>();
+  /** Issues just opened from the office, by number, and when. */
+  private opened = new Map<number, { issue: GhIssue; at: number }>();
   private claims = new Claims();
   /** The look at the issues that's under way, if one is. */
   private listing?: Promise<void>;
@@ -427,6 +371,52 @@ export class GitHub {
     return saved;
   }
 
+  /**
+   * Opens a new issue, as `as` or else the office, with labels if any (GitHub drops them for someone
+   * who can't triage). Returns it as GitHub saved it, or why it couldn't.
+   */
+  async create(title: string, body: string, labelNames: string[], as?: GhAs): Promise<{ issue?: GhIssue; error?: string }> {
+    let issue: GhIssue;
+    try {
+      // -f sends each as a plain string, and labels[]=… a JSON array of them: no @file reading, no {owner} filling in.
+      const jq = '{number, title, state, url: .html_url, author: .user.login, labels: [.labels[] | {name, color}], assignees: [.assignees[].login], createdAt: .created_at, updatedAt: .updated_at, body, comments}';
+      const args = ['api', '--method', 'POST', 'repos/{owner}/{repo}/issues', '-f', `title=${title}`, '-f', `body=${body}`, ...labelNames.flatMap((l) => ['-f', `labels[]=${l}`]), '--jq', jq];
+      const i = JSON.parse(await this.runGh(args, this.dir, undefined, as?.env));
+      issue = {
+        number: Number(i.number),
+        title: String(i.title ?? title),
+        state: String(i.state ?? 'open').toUpperCase(),
+        url: String(i.url ?? ''),
+        author: String(i.author ?? ''),
+        labels: labels(i.labels),
+        assignees: (i.assignees ?? []).map(String),
+        createdAt: String(i.createdAt ?? ''),
+        updatedAt: String(i.updatedAt ?? i.createdAt ?? ''),
+        body: String(i.body ?? '').slice(0, 4000),
+        comments: Number(i.comments ?? 0),
+      };
+    } catch (err) {
+      return { error: (err as Error).message };
+    }
+    // On the board at once, before the next look at GitHub, as with an edit.
+    const at = Date.now();
+    this.opened.set(issue.number, { issue, at });
+    this.issues = { ...this.issues, items: this.addOpened(this.issues.items) };
+    this.onIssues(this.issues);
+    void this.refreshIssues();
+    return { issue };
+  }
+
+  /** `items` with the issues opened here that a list asked for (`asked`) before they were doesn't have yet. */
+  private addOpened(items: GhIssue[], asked = 0): GhIssue[] {
+    const missing: GhIssue[] = [];
+    for (const [n, o] of this.opened) {
+      if (o.at < asked) this.opened.delete(n);
+      else if (!items.some((it) => it.number === n)) missing.push(o.issue);
+    }
+    return missing.length ? [...missing, ...items] : items;
+  }
+
   /** As relabel, for the title and description of issues edited here. */
   private reword(items: GhIssue[], asked: number): GhIssue[] {
     return items.map((it) => {
@@ -514,7 +504,7 @@ export class GitHub {
         body: String(i.body ?? '').slice(0, 4000),
         comments: Array.isArray(i.comments) ? i.comments.length : Number(i.comments ?? 0),
       }));
-      const items = this.claims.mark(this.reword(this.relabel('issue', fetched, asked), asked), asked);
+      const items = this.claims.mark(this.reword(this.relabel('issue', this.addOpened(fetched, asked), asked), asked), asked);
       this.issues = { items, fetchedAt: Date.now(), loading: false };
     } catch (err) {
       this.issues = { ...this.issues, loading: false, error: (err as Error).message, fetchedAt: Date.now() };
