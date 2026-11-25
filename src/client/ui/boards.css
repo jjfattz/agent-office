@@ -57,6 +57,7 @@
 /* A phone: one column at a time, picked from a row of tabs (Open 12 · In progress 3 · Closed), instead of columns side by side. */
 .board-tabs { display: none; }
 @media (max-width: 700px) {
+  .board-new-word { display: none; }
   .board-tabs { display: flex; gap: 4px; padding: 8px 10px; overflow-x: auto; background: var(--paper); border-bottom: 3px solid var(--ink); scrollbar-width: none; }
   .board-tab { flex: 1 0 auto; min-height: 44px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 2px solid var(--ink); border-radius: 12px; background: #fff; color: var(--ink); font: inherit; font-weight: 900; font-size: 14px; white-space: nowrap; cursor: pointer; }
   .board-tab[aria-selected="true"] { background: var(--ink); color: #fff; }

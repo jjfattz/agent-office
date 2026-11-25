@@ -165,3 +165,51 @@ test("an edit GitHub turns away says why and leaves the board as it was", async 
   github.issues = { items: [], fetchedAt: 0, loading: false };
   assert.deepEqual(await github.edit(4, 'New', ''), { error: 'HTTP 403: Must have admin rights to Repository.' });
 });
+
+test('an issue opened from the office is on the board at once, and stays over a list asked for before it was', async () => {
+  const sent: string[][] = [];
+  let release = () => {};
+  const made = { number: 9, title: 'Crash on start', state: 'open', url: 'https://github.com/acme/app/issues/9', author: 'ada', labels: [{ name: 'bug', color: 'd73a4a' }], assignees: [], createdAt: 't', updatedAt: 't', body: 'It crashes', comments: 0 };
+  const runner = async (args: string[]) => {
+    sent.push(args);
+    if (args[0] === 'api') return JSON.stringify(made);
+    if (args[args.indexOf('--state') + 1] !== 'open') return '[]';
+    // The look at GitHub that was under way when the issue was opened doesn't have it yet.
+    await new Promise<void>((r) => (release = r));
+    return '[]';
+  };
+  let issues: GhState<GhIssue> | undefined;
+  const github = new GitHub('/repo', (s) => (issues = s), () => {}, runner);
+  const listing = (github as unknown as { refreshIssues(): Promise<void> }).refreshIssues();
+
+  const r = await github.create('Crash on start', 'It crashes', ['bug']);
+  assert.equal(r.error, undefined);
+  assert.equal(r.issue?.number, 9);
+  assert.equal(r.issue?.state, 'OPEN');
+  assert.deepEqual(r.issue?.labels, [{ name: 'bug', color: '#d73a4a' }]);
+  const post = sent.find((a) => a[0] === 'api')!;
+  assert.deepEqual(post.slice(0, 4), ['api', '--method', 'POST', 'repos/{owner}/{repo}/issues']);
+  assert.ok(post.includes('title=Crash on start') && post.includes('body=It crashes') && post.includes('labels[]=bug'));
+  assert.deepEqual(issues?.items.map((i) => i.number), [9]);
+
+  release();
+  await listing;
+  assert.deepEqual(issues?.items.map((i) => i.number), [9], 'a list asked for before it was opened keeps it');
+
+  // A list asked for afterwards is believed: here GitHub lists it itself.
+  const later = new GitHub('/repo', (s) => (issues = s), () => {}, async (args) => (args[0] === 'api' ? JSON.stringify(made) : '[]'));
+  await later.create('Crash on start', 'It crashes', []);
+  await new Promise((r) => setTimeout(r, 5));
+  await (later as unknown as { refreshIssues(): Promise<void> }).refreshIssues();
+  assert.deepEqual(issues?.items.map((i) => i.number), [], 'forgotten once a list asked for after it has had its say');
+});
+
+test('an issue GitHub turns away says why and leaves the board as it was', async () => {
+  let issues: GhState<GhIssue> | undefined;
+  const github = new GitHub('/repo', (s) => (issues = s), () => {}, async () => {
+    throw new Error('HTTP 410: Issues are disabled for this repo');
+  });
+  github.issues = { items: [], fetchedAt: 0, loading: false };
+  assert.deepEqual(await github.create('A title', '', []), { error: 'HTTP 410: Issues are disabled for this repo' });
+  assert.equal(issues, undefined);
+});

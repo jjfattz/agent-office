@@ -3,6 +3,7 @@ import type { GhIssue, GhLabel, GhPull, WorkerInfo } from '../../shared/protocol
 import type { Net } from '../net';
 import { store, workerForPull } from '../state';
 import { h, openModal, timeAgo } from './dom';
+import { openNewIssue } from './github/issue-new';
 import { openIssue } from './github/issue-window';
 import { labelChip, openLabels } from './github/labels';
 import { inProgress } from './github/progress';
@@ -139,10 +140,12 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
   const status = h('span.board-status');
   const refresh = h('button.btn', { title: 'Refresh from GitHub', onclick: () => net.send({ t: 'gh.refresh' }) }, '🔄 Refresh');
   const close = h('button.btn.close', { 'aria-label': 'Close' }, '✕');
+  // Opens the new issue's window once GitHub has it, so you can queue it or hand it to a worker straight away.
+  const create = kind === 'issues' ? h('button.btn.primary', { type: 'button', title: 'Open a new issue on GitHub', onclick: () => openNewIssue(net, (it) => openIssue(it, net, actions)) }, '➕ New', h('span.board-new-word', {}, ' issue')) : null;
   // On a phone, one column at a time, picked here (boards.css hides these on a wider screen).
   const tabs = h('div.board-tabs', { role: 'tablist', 'aria-label': 'Columns' });
   let current: string | null = null;
-  const el = h('div.modal.board', { role: 'dialog', 'aria-label': kind === 'issues' ? 'Issues board' : 'Pull requests board' }, h('header', {}, h('h2', {}, kind === 'issues' ? '📌 Issues' : '🔀 Pull Requests'), status, refresh, close), tabs, body);
+  const el = h('div.modal.board', { role: 'dialog', 'aria-label': kind === 'issues' ? 'Issues board' : 'Pull requests board' }, h('header', {}, h('h2', {}, kind === 'issues' ? '📌 Issues' : '🔀 Pull Requests'), status, create, refresh, close), tabs, body);
 
   const filters = loadFilters(kind);
   /** What each column's filter box holds (column key → text), for as long as the board is open. */

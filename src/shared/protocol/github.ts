@@ -150,7 +150,9 @@ export type GitHubClientMsg =
   /** Put labels on an issue or PR and take others off, as the server's gh account; answered with gh.labeled. */
   | { t: 'gh.labels'; kind: 'issue' | 'pull'; number: number; add: string[]; remove: string[] }
   /** Change an issue's title and description, as the server's gh account; answered with gh.edited. */
-  | { t: 'gh.edit'; number: number; title: string; body: string };
+  | { t: 'gh.edit'; number: number; title: string; body: string }
+  /** Open a new issue, as the server's gh account; answered with gh.created carrying the same `id`. */
+  | { t: 'gh.create'; id: string; title: string; body: string; labels?: string[] };
 
 export type GitHubServerMsg =
   | { t: 'gh.issues'; state: GhState<GhIssue> }
@@ -164,4 +166,6 @@ export type GitHubServerMsg =
   /** Sent to whoever changed them: the labels it has now, or why they didn't change. */
   | { t: 'gh.labeled'; kind: 'issue' | 'pull'; number: number; labels?: GhLabel[]; error?: string }
   /** Sent to whoever edited the issue: its title and description as GitHub saved them, or why it didn't. */
-  | { t: 'gh.edited'; number: number; title?: string; body?: string; error?: string };
+  | { t: 'gh.edited'; number: number; title?: string; body?: string; error?: string }
+  /** Sent to whoever opened it: the issue as GitHub saved it, or why it wasn't. */
+  | { t: 'gh.created'; id: string; issue?: GhIssue; error?: string };
