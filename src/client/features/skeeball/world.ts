@@ -15,6 +15,8 @@ import { paintDisplay, type DisplayState } from './paint';
 
 const INK = '#14112b';
 const BALL = '#f4f1de';
+/** How far the mark on the target reaches out from its middle. */
+const MARK_R = 0.078;
 
 export interface SkeeballMachine {
   group: THREE.Group;
@@ -26,8 +28,11 @@ export interface SkeeballMachine {
   toWorld(s: number, u: number, y: number, out: THREE.Vector3): THREE.Vector3;
   /** How many balls wait in the trough at the front; more than there were roll in from the side. */
   setTrough(n: number): void;
-  /** The guide up the lane, and the mark on the target, for aiming at `aimU` across it (null: none). */
-  aim(aimU: number | null): void;
+  /**
+   * The guide up the lane for aiming at `aimU` across the target (null: none), and the mark on the
+   * target: where that line reaches the rings, or `at` (d up the target, u across) if given.
+   */
+  aim(aimU: number | null, at?: { d: number; u: number }): void;
   /** The next ball sitting at the foot of the lane, ready to roll. */
   ready(on: boolean): void;
   /** What the score display says. */
@@ -84,7 +89,7 @@ export function buildSkeeball(): SkeeballMachine {
   const dots = Array.from({ length: 13 }, () => new THREE.Mesh(new THREE.CircleGeometry(0.016, 12).rotateX(-Math.PI / 2), dotMat));
   guide.add(...dots);
   const mark = new THREE.Mesh(new THREE.RingGeometry(0.045, 0.068, 32), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.95, depthWrite: false }));
-  mark.add(new THREE.Mesh(new THREE.RingGeometry(0.068, 0.078, 32), new THREE.MeshBasicMaterial({ color: INK, transparent: true, opacity: 0.8, depthWrite: false })));
+  mark.add(new THREE.Mesh(new THREE.RingGeometry(0.068, MARK_R, 32), new THREE.MeshBasicMaterial({ color: INK, transparent: true, opacity: 0.8, depthWrite: false })));
   mark.renderOrder = 2;
   cab.faceFrame.add(mark);
   guide.visible = mark.visible = false;
@@ -122,7 +127,7 @@ export function buildSkeeball(): SkeeballMachine {
       });
       shown = n;
     },
-    aim(aimU) {
+    aim(aimU, at) {
       guide.visible = mark.visible = aimU !== null;
       if (aimU === null) return;
       const a = aimAngle(aimU);
@@ -133,9 +138,11 @@ export function buildSkeeball(): SkeeballMachine {
         dot.position.set(s, laneY(s) + 0.004, THREE.MathUtils.clamp(run * Math.sin(a), -half, half));
         dot.visible = s < LANE.foot.s;
       });
-      // Where the line reaches the rings, up the target.
+      // Where it's told, or where the line reaches the rings, up the target.
       const target = onFace(RINGS.d, 0);
-      mark.position.set((target.s - start.s) * Math.tan(a), RINGS.d, 0.02);
+      // (Kept clear of the target's top edge, and of its bottom one behind the gutter's lip, so it's all in sight.)
+      if (at) mark.position.set(at.u, THREE.MathUtils.clamp(at.d, MARK_R + 0.04, LANE.face.long - MARK_R), 0.02);
+      else mark.position.set((target.s - start.s) * Math.tan(a), RINGS.d, 0.02);
       mark.scale.setScalar(1 + 0.12 * Math.sin(clock.t * 6));
     },
     ready(on) {

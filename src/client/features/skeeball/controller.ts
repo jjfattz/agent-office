@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { meterAt } from '../../../shared/bargames';
-import { AIM_MAX, BALLS, aimSweep } from '../../../shared/skeeball';
+import { AIM_MAX, BALLS, aimSweep, landingGauge } from '../../../shared/skeeball';
 import { isTyping, type PlayerController } from '../../player';
 import { $, h, modalOpen } from '../../ui/dom';
 import type { SkeeballMachine } from './world';
@@ -10,8 +10,9 @@ import './ui.css';
 // camera looks straight up the lane from just over your head (you're out of the way, see index.ts).
 // A roll is two holds of Space (or the mouse button). The first sends a slider back and forth across
 // the aim bar, from one end or the other, and the mark on the target with it: let go to aim there.
-// The second runs the meter up and down: let go to roll, harder the fuller it is. Both move quickly,
-// so it's in the timing, never a mouse placed just so. Nine balls a game. E steps back.
+// The second runs a slider up and down the power bar, and the mark up and down the target with it,
+// to where a ball rolled that hard first comes down: let go to roll. Both move quickly, so it's in
+// the timing, never a mouse placed just so. Nine balls a game. E steps back.
 
 /** The meter runs from nothing to full in this long, then back down. */
 const METER = 0.8;
@@ -54,13 +55,15 @@ export class Roller {
   private n = 0;
   private lastPower = -1;
   private lastAim: number | null = null;
+  /** Where on the target the ball first comes down for each step of the meter, aimed where you've aimed (see landingGauge). */
+  private gauge: { d: number; u: number }[] = [];
   private camPos = new THREE.Vector3();
   private camQuat = new THREE.Quaternion();
   private readonly panel: HTMLElement;
   private readonly titleEl: HTMLElement;
   private readonly knob: HTMLElement;
   private readonly aimLast: HTMLElement;
-  private readonly fill: HTMLElement;
+  private readonly powerKnob: HTMLElement;
   private readonly mark: HTMLElement;
   private readonly infoEl: HTMLElement;
   private shown = '';
@@ -75,15 +78,15 @@ export class Roller {
     this.titleEl = h('div.throw-title');
     this.knob = h('span.skee-knob');
     this.aimLast = h('span.throw-last');
-    this.fill = h('span.throw-fill');
+    this.powerKnob = h('span.skee-knob');
     this.mark = h('span.throw-last');
     this.infoEl = h('div.throw-info');
     this.panel = h(
       'div.throw.skee.panel.hidden',
       { id: 'skeeball', 'aria-label': 'Skeeball' },
       this.titleEl,
-      h('div.skee-row', {}, h('span.skee-label', {}, 'Aim'), h('div.skee-aim', {}, h('span.skee-mid'), this.aimLast, this.knob)),
-      h('div.skee-row', {}, h('span.skee-label', {}, 'Power'), h('div.throw-meter', {}, this.fill, this.mark)),
+      h('div.skee-row', {}, h('span.skee-label', {}, 'Aim'), h('div.skee-bar.skee-aim', {}, h('span.skee-mid'), this.aimLast, this.knob)),
+      h('div.skee-row', {}, h('span.skee-label', {}, 'Power'), h('div.skee-bar.skee-power', {}, this.mark, this.powerKnob)),
       this.infoEl,
     );
     $('hud').append(this.panel);
@@ -183,7 +186,9 @@ export class Roller {
     if (!m) return;
     if (this.stage === 'wait' && performance.now() >= this.readyAt) this.nextBall();
     const aiming = this.stage !== 'wait' && this.next > 0;
-    m.aim(aiming ? this.aim : null);
+    // Aimed: the mark drops to the foot of the target and rides up and down it with the meter.
+    const gauging = this.stage === 'aimed' || this.stage === 'wind';
+    m.aim(aiming ? this.aim : null, gauging ? this.gaugeAt(this.power) : undefined);
     m.ready(aiming);
     this.placeCamera(dt, m);
     this.render();
@@ -228,6 +233,7 @@ export class Roller {
     if (!this.machine) return;
     if (this.stage === 'sweep') {
       this.aimAt = this.aim;
+      this.gauge = landingGauge(this.aimAt);
       this.stage = 'aimed';
       return;
     }
@@ -245,6 +251,16 @@ export class Roller {
     this.hooks.roll(this.aimAt, power, this.n);
   }
 
+  /** Where on the target the gauge is for `power` on the meter, between its steps. */
+  private gaugeAt(power: number): { d: number; u: number } | undefined {
+    const g = this.gauge;
+    if (!g.length) return undefined;
+    const x = Math.min(1, Math.max(0, power)) * (g.length - 1);
+    const i = Math.min(g.length - 2, Math.floor(x));
+    const k = x - i;
+    return { d: g[i].d + (g[i + 1].d - g[i].d) * k, u: g[i].u + (g[i + 1].u - g[i].u) * k };
+  }
+
   /** Square behind the lane, just over your head, looking up it at the target. */
   private placeCamera(dt: number, m: SkeeballMachine) {
     const s = m.spot;
@@ -259,17 +275,18 @@ export class Roller {
     this.camera.quaternion.copy(this.camQuat);
   }
 
-  /** The slider and the meter, which ball's next, and the game so far. */
+  /** The two sliders, which ball's next, and the game so far. */
   private render() {
-    // Inside the bar's rounded ends, so the slider's still in sight at either rail.
-    const across = (u: number) => `calc(6px + (100% - 12px) * ${(u / AIM_MAX + 1) / 2})`;
+    // Inside the bars' rounded ends, so the sliders are still in sight at either end.
+    const along = (k: number) => `calc(6px + (100% - 12px) * ${k})`;
+    const across = (u: number) => along((u / AIM_MAX + 1) / 2);
     this.knob.style.left = across(this.aim);
     this.knob.classList.toggle('set', this.stage === 'aimed' || this.stage === 'wind');
     this.aimLast.style.left = across(this.lastAim ?? 0);
     this.aimLast.classList.toggle('hidden', this.lastAim === null);
-    const power = this.power;
-    this.fill.style.width = `${power * 100}%`;
-    this.mark.style.left = `${this.lastPower * 100}%`;
+    this.powerKnob.style.left = along(this.power);
+    this.powerKnob.classList.toggle('hidden', this.stage !== 'aimed' && this.stage !== 'wind');
+    this.mark.style.left = along(this.lastPower);
     this.mark.classList.toggle('hidden', this.lastPower < 0);
     const next = this.next;
     const title = next ? `🎳 Skeeball · ball ${next} of ${BALLS}` : '🎳 Skeeball · last ball rolling';
