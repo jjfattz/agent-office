@@ -3,9 +3,9 @@ import { carry, type Club } from '../../../shared/golf';
 
 // Where a full shot's meant to come down, over the ball: a circle on the ground out along your aim, as
 // wide as how far off it'll roughly be, with a dotted arc up from the ball to it, the flight a swing
-// stopped at the meter's notch would take through still air. While you hold Space, a gold ring runs
-// out and back along the line with the meter: where you'd land it if you let go now. Trees, walls,
-// the bounce and the roll aren't in it; the ball's own flight is in shared/golf.ts.
+// stopped at the power bar's flag would take through still air. How hard you're swinging is on the
+// bar, not out on the course (see controller.ts). Trees, walls, the bounce and the roll aren't in it;
+// the ball's own flight is in shared/golf.ts.
 
 /** The circle's radius: this much of the distance out, and never less than this. */
 const SPREAD = 0.05;
@@ -24,10 +24,8 @@ export interface Landing {
   dist: number;
   club: Club;
   loft: number;
-  /** The meter's notch, the power that carries it `dist`. */
+  /** The power bar's flag, the power that carries it `dist`. */
   power: number;
-  /** While the meter runs: how far it'd carry if you let go now. */
-  now: number | null;
 }
 
 export class LandingMark {
@@ -35,7 +33,6 @@ export class LandingMark {
   private readonly ring: THREE.Mesh;
   private readonly fill: THREE.Mesh;
   private readonly dot: THREE.Mesh;
-  private readonly now: THREE.Mesh;
   private readonly arc: THREE.InstancedMesh;
   private readonly m = new THREE.Matrix4();
   private readonly pts: number[] = [];
@@ -52,10 +49,9 @@ export class LandingMark {
     this.ring = new THREE.Mesh(flat(new THREE.RingGeometry(0.9, 1, 48)), mat('#fffaf3', 0.95));
     this.fill = new THREE.Mesh(flat(new THREE.CircleGeometry(0.9, 48)), mat('#fffaf3', 0.18));
     this.dot = new THREE.Mesh(flat(new THREE.CircleGeometry(0.22, 16)), mat('#fffaf3', 0.95));
-    this.now = new THREE.Mesh(flat(new THREE.RingGeometry(0.35, 0.6, 24)), mat('#ffd166', 1));
     this.arc = new THREE.InstancedMesh(new THREE.SphereGeometry(0.06, 6, 4), mat('#fffaf3', 0.7, true), MOST);
     this.arc.frustumCulled = false;
-    this.group.add(this.fill, this.ring, this.dot, this.now, this.arc);
+    this.group.add(this.fill, this.ring, this.dot, this.arc);
     for (const o of this.group.children) o.renderOrder = 3;
     this.group.visible = false;
   }
@@ -71,9 +67,7 @@ export class LandingMark {
     for (const o of [this.ring, this.fill, this.dot]) o.position.set(l.at.x + sx * l.dist, y, l.at.z + sz * l.dist);
     this.ring.scale.setScalar(r);
     this.fill.scale.setScalar(r);
-    this.now.visible = l.now !== null;
-    if (l.now !== null) this.now.position.set(l.at.x + sx * l.now, y + 0.01, l.at.z + sz * l.now);
-    // The arc only changes with the club, the loft and the notch.
+    // The arc only changes with the club, the loft and the flag.
     const key = `${l.club}|${l.loft.toFixed(3)}|${l.power.toFixed(4)}`;
     if (key !== this.arcKey) {
       this.arcKey = key;

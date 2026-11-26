@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { HOLES, yawTo } from '../../../shared/course';
-import { BALL_R, CLUBS, CLUB_ORDER, TEE_H, carry, pinText, type Club, type Flight, type Shot } from '../../../shared/golf';
+import { BALL_R, CLUBS, CLUB_ORDER, TEE_H, pinText, powerFor, type Club, type Flight, type Shot } from '../../../shared/golf';
 import { isTyping, type PlayerController } from '../../player';
 import { $, h, modalOpen } from '../../ui/dom';
 import { IMPACT, type Person } from '../../world/character';
@@ -11,9 +11,10 @@ import { ShotTarget } from './target';
 // Over your ball on the course (E at it, or at a tee): you stand square to the line with a club, and
 // the camera goes down low behind the ball, looking down the line at the pin. The mouse (or A and D)
 // aims, W and S pick the loft, C changes club, and holding Space takes the club back while the power
-// meter runs up and down: let go to hit it. A circle out on the course marks where you mean it to
-// land, and the meter's notch how hard to hit it for that; holding the right mouse button (or Z) lifts
-// the view up over the circle to move it (see target.ts). The camera follows the ball out to wherever
+// meter fills up and down the power bar: let go to hit it. A flag on the bar marks how hard to hit
+// it, so let go right at the flag: over a full shot that lands it in the circle out on the course
+// (holding the right mouse button, or Z, lifts the view up over the circle to move it, see target.ts),
+// and over a putt it rolls as far as the pin on the flat. The camera follows the ball out to wherever
 // it stops, then the round says what's next (see index.ts). E steps away from the ball.
 
 /** The power meter runs from nothing to full in this long, then back down again. */
@@ -100,8 +101,8 @@ export class Golfer {
   /** Covers the meter from the right, down to how hard you'd hit it. */
   private readonly rest: HTMLElement;
   private readonly mark: HTMLElement;
-  /** On the meter: how far up it to let go for the ball to land in the circle. */
-  private readonly notch: HTMLElement;
+  /** On the bar: the flag, how far up it to let go for the ball to land in the circle (or roll to the pin, putting). */
+  private readonly flag: HTMLElement;
   private readonly info: HTMLElement;
   private shown = '';
   /** Where you mean it to land, and the view up over it. */
@@ -118,9 +119,11 @@ export class Golfer {
     this.title = h('div.golf-title');
     this.rest = h('span.golf-rest');
     this.mark = h('span.golf-last');
-    this.notch = h('span.golf-notch');
+    // The flag sits over the meter, not in it, so its pole and pennant can stand up above the bar.
+    this.flag = h('span.golf-flag', { 'aria-hidden': 'true' });
     this.info = h('div.golf-info');
-    this.panel = h('div.golf.panel.hidden', { id: 'golf', 'aria-label': 'Golf' }, this.title, h('div.golf-meter', {}, this.rest, this.notch, this.mark), this.info);
+    const bar = h('div.golf-bar', {}, h('div.golf-meter', {}, this.rest, this.mark), this.flag);
+    this.panel = h('div.golf.panel.hidden', { id: 'golf', 'aria-label': 'Golf' }, this.title, bar, this.info);
     this.target = new ShotTarget(player, () => this.active);
     $('hud').append(this.panel);
     window.addEventListener('keydown', (e) => this.key(e, true));
@@ -160,7 +163,6 @@ export class Golfer {
       club: this.club,
       loft: this.loft,
       power,
-      now: this.stage === 'charge' ? carry(this.club, this.loft, this.power) : null,
     };
   }
 
@@ -341,7 +343,7 @@ export class Golfer {
     this.camera.quaternion.copy(this.camQuat);
   }
 
-  /** The power meter, the club and loft, and where you're aiming. */
+  /** The power bar and its flag, the club and loft, and where you're aiming. */
   private render() {
     const power = this.stage === 'charge' ? this.power : this.stage === 'aim' ? 0 : this.lastPower;
     this.rest.style.width = `${(1 - Math.max(0, power)) * 100}%`;
@@ -349,13 +351,16 @@ export class Golfer {
     this.mark.classList.toggle('hidden', this.lastPower < 0);
     const putt = this.club === 'putter';
     const reach = this.target.reach(this.club, this.loft);
-    if (!putt) this.notch.style.left = `${this.target.powerFor(this.club, this.loft) * 100}%`;
-    this.notch.classList.toggle('hidden', putt);
     const h = HOLES[this.hole];
+    const toPin = Math.hypot(h.pin.x - this.at.x, h.pin.z - this.at.z);
+    const flag = putt ? powerFor('putter', 0, toPin) : this.target.powerFor(this.club, this.loft);
+    this.flag.style.left = `${flag * 100}%`;
+    // Near the end of the bar, the pennant flies the other way so it stays on the panel.
+    this.flag.classList.toggle('back', flag > 0.92);
     const off = THREE.MathUtils.radToDeg(wrap(this.aim - yawTo(this.at, h.pin)));
     const aim = Math.abs(off) < 0.5 ? 'at the pin' : `${Math.abs(off).toFixed(0)}° ${off > 0 ? 'left' : 'right'}`;
     const club = CLUBS[this.club];
-    const pin = pinText(Math.hypot(h.pin.x - this.at.x, h.pin.z - this.at.z));
+    const pin = pinText(toPin);
     const loft = this.club === 'putter' ? '' : ` · ${THREE.MathUtils.radToDeg(this.loft).toFixed(0)}°`;
     const to = putt ? `full ≈ ${Math.round(reach)} m` : `to land ${Math.round(this.target.dist)} m of ${Math.round(reach)}`;
     const text = `${club.name}${loft} · ${to} · pin ${pin} · aim ${aim}${putt ? this.breaks() : ''}`;
