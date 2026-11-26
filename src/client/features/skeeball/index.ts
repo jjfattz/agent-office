@@ -77,7 +77,7 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
     return !ctx.upTop() && ctx.world().interactables.includes(m.interactable) ? m : null;
   }
 
-  const roller = new Roller(ctx.player, ctx.camera, ctx.canvas, {
+  const roller = new Roller(ctx.player, ctx.camera, {
     roll: (aim, power, n) => {
       const points = roll(aim, power).outcome.points;
       ctx.net.send({ t: 'skeeball', aim, power, n, points });

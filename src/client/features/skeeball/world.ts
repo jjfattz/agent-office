@@ -36,8 +36,11 @@ export interface SkeeballMachine {
    * and with `guide`, the dotted line up the lane there.
    */
   aim(aimU: number | null, guide?: boolean): void;
-  /** The power mark on the target, at `at` (d up it, u across; null: none). */
-  power(at: { d: number; u: number } | null): void;
+  /**
+   * The power mark on the target, at `at` (d up it, u across; null: none), and with `guide`, the
+   * dotted line up the target to it from where the aim line meets its foot.
+   */
+  power(at: { d: number; u: number } | null, guide?: boolean): void;
   /** The next ball sitting at the foot of the lane, ready to roll. */
   ready(on: boolean): void;
   /** What the score display says. */
@@ -89,11 +92,22 @@ export function buildSkeeball(): SkeeballMachine {
   const spare: THREE.Mesh[] = [];
 
   // The guide up the lane while you aim: dots the way the ball will go; and on the target, a ring of
-  // each color, for where it's aimed across and how far up it'll come down.
+  // each color, for where it's aimed across and how far up it'll come down, with dots of its own
+  // color up the target to the power one while the power slider runs.
   const guide = new THREE.Group();
-  const dotMat = new THREE.MeshBasicMaterial({ color: '#3ddc97', transparent: true, opacity: 0.9, depthWrite: false });
+  const dotMat = new THREE.MeshBasicMaterial({ color: AIM_COLOR, transparent: true, opacity: 0.9, depthWrite: false });
   const dots = Array.from({ length: 13 }, () => new THREE.Mesh(new THREE.CircleGeometry(0.016, 12).rotateX(-Math.PI / 2), dotMat));
   guide.add(...dots);
+  const powerDotMat = new THREE.MeshBasicMaterial({ color: POWER_COLOR, transparent: true, opacity: 0.9, depthWrite: false });
+  const powerDots = Array.from({ length: 12 }, () => {
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.014, 12), powerDotMat);
+    dot.renderOrder = 2;
+    dot.visible = false;
+    cab.faceFrame.add(dot);
+    return dot;
+  });
+  /** Across the target where the aim line meets its foot, for the power dots to start from. */
+  let footU = 0;
   const ring = (color: string) => {
     const m = new THREE.Mesh(new THREE.RingGeometry(0.045, 0.068, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false }));
     m.add(new THREE.Mesh(new THREE.RingGeometry(0.068, MARK_R, 32), new THREE.MeshBasicMaterial({ color: INK, transparent: true, opacity: 0.8, depthWrite: false })));
@@ -146,6 +160,7 @@ export function buildSkeeball(): SkeeballMachine {
       guide.visible = aimU !== null && withGuide;
       if (aimU === null) return;
       const a = aimAngle(aimU);
+      footU = (LANE.face.s - start.s) * Math.tan(a);
       const half = LANE.inner / 2 - LANE.ball;
       dots.forEach((dot, i) => {
         const run = 0.12 + i * 0.14;
@@ -158,13 +173,26 @@ export function buildSkeeball(): SkeeballMachine {
       aimMark.position.set((target.s - start.s) * Math.tan(a), RINGS.d, 0.02);
       aimMark.scale.setScalar(1 + 0.12 * Math.sin(clock.t * 6));
     },
-    power(at) {
+    power(at, withGuide = false) {
       powerMark.visible = at !== null;
-      if (!at) return;
+      if (!at) {
+        for (const dot of powerDots) dot.visible = false;
+        return;
+      }
       // Kept clear of the target's top edge, and of its bottom one behind the gutter's lip, so it's all in sight.
-      powerMark.position.x = at.u;
-      powerMark.position.y = THREE.MathUtils.clamp(at.d, MARK_R + 0.04, LANE.face.long - MARK_R);
+      const low = MARK_R + 0.04;
+      const x = at.u;
+      const y = THREE.MathUtils.clamp(at.d, low, LANE.face.long - MARK_R);
+      powerMark.position.x = x;
+      powerMark.position.y = y;
       powerMark.scale.setScalar(1 + 0.12 * Math.sin(clock.t * 6 + 1.5));
+      // From the foot of the target up to the mark, a dot every so often, stopping short of the ring.
+      const len = Math.hypot(x - footU, y - low * 0.5);
+      powerDots.forEach((dot, i) => {
+        const k = ((i + 0.5) * 0.07) / (len || 1);
+        dot.visible = withGuide && k * len < len - MARK_R;
+        dot.position.set(footU + (x - footU) * k, low * 0.5 + (y - low * 0.5) * k, 0.022);
+      });
     },
     ready(on) {
       handBall.visible = on;
