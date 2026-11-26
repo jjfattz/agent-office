@@ -9,23 +9,27 @@ import './ui.css';
 // Stepping up to the skeeball machine (E there): you stand at its front with a ball in hand, and the
 // camera looks straight up the lane from just over your head (you're out of the way, see index.ts).
 // A roll is two holds of Space (or the mouse button). The first sends a slider back and forth across
-// the aim bar, from one end or the other, and the mark on the target with it: let go to aim there.
-// The second runs a slider up and down the power bar, and the mark up and down the target with it,
-// to where a ball rolled that hard first comes down: let go to roll. Both move quickly, so it's in
-// the timing, never a mouse placed just so. Nine balls a game. E steps back.
+// the aim bar, from one end or the other, and the aim mark across the target with it: let go to aim
+// there. The second runs a slider up and down the power bar, and the power mark (another color) up
+// and down the target with it, to where a ball rolled that hard first comes down: let go to roll.
+// Both move quickly, so it's in the timing, never a mouse placed just so. The two marks stay where
+// you left them until the ball drops into a hole, and then the next ball's in hand. Nine balls a
+// game. E steps back.
 
 /** The meter runs from nothing to full in this long, then back down. */
-const METER = 0.8;
+const METER = 0.6;
 /** Let go with the meter under this and you didn't roll after all. */
 const MIN_POWER = 0.03;
-/** Seconds from one roll to having the next ball in hand. */
-const BETWEEN = 0.7;
+/** Seconds from your ball dropping into its hole to having the next one in hand. */
+const AFTER = 0.35;
+/** If your ball never comes back as down (it can't take longer than this, s), the next one's in hand anyway. */
+const GIVE_UP = 9;
 /** The camera: back from where you stand, up, and how wide it sees (degrees), looking `at` up the lane (s along it, y up, in the machine's own frame). */
 const CAM = { back: 0, up: 1.9, fov: 50, at: { s: 2.45, y: 1.0 } };
 
 /**
  * Where a roll is: waiting to aim, the aim slider sweeping, aimed and waiting to roll, the meter
- * running, or the ball away and the next one not in hand yet.
+ * running, or the ball away (rolling, then down its hole) and the next one not in hand yet.
  */
 export type RollStage = 'aim' | 'sweep' | 'aimed' | 'wind' | 'wait';
 
@@ -51,6 +55,8 @@ export class Roller {
   private sweepAt = 0;
   private windAt = 0;
   private readyAt = 0;
+  /** The ball you rolled is down its hole (until the next one's in hand). */
+  private down = false;
   /** Balls rolled this game. */
   private n = 0;
   private lastPower = -1;
@@ -85,8 +91,8 @@ export class Roller {
       'div.throw.skee.panel.hidden',
       { id: 'skeeball', 'aria-label': 'Skeeball' },
       this.titleEl,
-      h('div.skee-row', {}, h('span.skee-label', {}, 'Aim'), h('div.skee-bar.skee-aim', {}, h('span.skee-mid'), this.aimLast, this.knob)),
-      h('div.skee-row', {}, h('span.skee-label', {}, 'Power'), h('div.skee-bar.skee-power', {}, this.mark, this.powerKnob)),
+      h('div.skee-row', {}, h('span.skee-label.skee-for-aim', {}, 'Aim'), h('div.skee-bar.skee-aim', {}, h('span.skee-mid'), this.aimLast, this.knob)),
+      h('div.skee-row', {}, h('span.skee-label.skee-for-power', {}, 'Power'), h('div.skee-bar.skee-power', {}, this.mark, this.powerKnob)),
       this.infoEl,
     );
     $('hud').append(this.panel);
@@ -180,15 +186,25 @@ export class Roller {
     this.info = text;
   }
 
-  /** Every frame, once the player has moved: the slider, the meter, the guide up the lane and the camera. */
+  /** The ball you last rolled has dropped into its hole: the marks come off the target, and the next ball's in hand shortly. */
+  ballDown(): void {
+    if (this.stage !== 'wait' || this.down) return;
+    this.down = true;
+    this.readyAt = Math.min(this.readyAt, performance.now() + AFTER * 1000);
+  }
+
+  /** Every frame, once the player has moved: the sliders, the marks on the target, the guide up the lane and the camera. */
   update(dt: number): void {
     const m = this.machine;
     if (!m) return;
     if (this.stage === 'wait' && performance.now() >= this.readyAt) this.nextBall();
     const aiming = this.stage !== 'wait' && this.next > 0;
-    // Aimed: the mark drops to the foot of the target and rides up and down it with the meter.
+    // While it rolls, both marks stay where you left them, until it drops.
+    const rolling = this.stage === 'wait' && !this.down;
+    m.aim(aiming || rolling ? this.aim : null, aiming);
+    // Aimed: the power mark starts at the foot of the target and rides up and down it with the meter.
     const gauging = this.stage === 'aimed' || this.stage === 'wind';
-    m.aim(aiming ? this.aim : null, gauging ? this.gaugeAt(this.power) : undefined);
+    m.power(gauging ? this.gaugeAt(this.power) : rolling ? this.gaugeAt(this.lastPower) : null);
     m.ready(aiming);
     this.placeCamera(dt, m);
     this.render();
@@ -212,6 +228,7 @@ export class Roller {
   /** A new ball in hand: the slider waits at one end or the other, so where it'll be when you let go is in your timing, not a habit. */
   private nextBall() {
     this.stage = 'aim';
+    this.down = false;
     this.from = Math.random() < 0.5 ? -1 : 1;
     this.aimAt = this.from * AIM_MAX;
   }
@@ -247,14 +264,15 @@ export class Roller {
     this.lastPower = power;
     this.lastAim = this.aimAt;
     this.stage = 'wait';
-    this.readyAt = performance.now() + BETWEEN * 1000;
+    this.down = false;
+    this.readyAt = performance.now() + GIVE_UP * 1000;
     this.hooks.roll(this.aimAt, power, this.n);
   }
 
   /** Where on the target the gauge is for `power` on the meter, between its steps. */
-  private gaugeAt(power: number): { d: number; u: number } | undefined {
+  private gaugeAt(power: number): { d: number; u: number } | null {
     const g = this.gauge;
-    if (!g.length) return undefined;
+    if (!g.length) return null;
     const x = Math.min(1, Math.max(0, power)) * (g.length - 1);
     const i = Math.min(g.length - 2, Math.floor(x));
     const k = x - i;
@@ -281,11 +299,11 @@ export class Roller {
     const along = (k: number) => `calc(6px + (100% - 12px) * ${k})`;
     const across = (u: number) => along((u / AIM_MAX + 1) / 2);
     this.knob.style.left = across(this.aim);
-    this.knob.classList.toggle('set', this.stage === 'aimed' || this.stage === 'wind');
     this.aimLast.style.left = across(this.lastAim ?? 0);
     this.aimLast.classList.toggle('hidden', this.lastAim === null);
-    this.powerKnob.style.left = along(this.power);
-    this.powerKnob.classList.toggle('hidden', this.stage !== 'aimed' && this.stage !== 'wind');
+    const rolling = this.stage === 'wait' && !this.down;
+    this.powerKnob.style.left = along(rolling ? this.lastPower : this.power);
+    this.powerKnob.classList.toggle('hidden', this.stage !== 'aimed' && this.stage !== 'wind' && !rolling);
     this.mark.style.left = along(this.lastPower);
     this.mark.classList.toggle('hidden', this.lastPower < 0);
     const next = this.next;

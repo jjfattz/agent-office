@@ -7,7 +7,7 @@ import { buildCabinet } from './model';
 import { paintDisplay, type DisplayState } from './paint';
 
 // The skeeball machine by the loft's stairs: its cabinet (model.ts), and what moves on it: the balls
-// waiting in the trough and rolling up the lane, the guide up the lane and the mark on the target
+// waiting in the trough and rolling up the lane, the guide up the lane and the marks on the target
 // while you aim, the score popping up, the rings and bulbs lighting up, and the display. Its back is
 // against the meeting room's west glass, just north of the stairs, and you roll from its front,
 // facing east. It's built in its own frame (x along the lane, z across it, y up), which is the room's
@@ -15,7 +15,10 @@ import { paintDisplay, type DisplayState } from './paint';
 
 const INK = '#14112b';
 const BALL = '#f4f1de';
-/** How far the mark on the target reaches out from its middle. */
+/** The two marks on the target: where you're aiming across it, and how far up it the roll comes down. The panel's sliders match. */
+export const AIM_COLOR = '#22d3ee';
+export const POWER_COLOR = '#ff7b1c';
+/** How far each mark on the target reaches out from its middle. */
 const MARK_R = 0.078;
 
 export interface SkeeballMachine {
@@ -29,10 +32,12 @@ export interface SkeeballMachine {
   /** How many balls wait in the trough at the front; more than there were roll in from the side. */
   setTrough(n: number): void;
   /**
-   * The guide up the lane for aiming at `aimU` across the target (null: none), and the mark on the
-   * target: where that line reaches the rings, or `at` (d up the target, u across) if given.
+   * The aim mark on the target, where the line to `aimU` across it reaches the rings (null: none),
+   * and with `guide`, the dotted line up the lane there.
    */
-  aim(aimU: number | null, at?: { d: number; u: number }): void;
+  aim(aimU: number | null, guide?: boolean): void;
+  /** The power mark on the target, at `at` (d up it, u across; null: none). */
+  power(at: { d: number; u: number } | null): void;
   /** The next ball sitting at the foot of the lane, ready to roll. */
   ready(on: boolean): void;
   /** What the score display says. */
@@ -83,16 +88,25 @@ export function buildSkeeball(): SkeeballMachine {
   const rolling: Rolling[] = [];
   const spare: THREE.Mesh[] = [];
 
-  // The guide up the lane while you aim: dots the way the ball will go, and a ring on the target where it's headed.
+  // The guide up the lane while you aim: dots the way the ball will go; and on the target, a ring of
+  // each color, for where it's aimed across and how far up it'll come down.
   const guide = new THREE.Group();
   const dotMat = new THREE.MeshBasicMaterial({ color: '#3ddc97', transparent: true, opacity: 0.9, depthWrite: false });
   const dots = Array.from({ length: 13 }, () => new THREE.Mesh(new THREE.CircleGeometry(0.016, 12).rotateX(-Math.PI / 2), dotMat));
   guide.add(...dots);
-  const mark = new THREE.Mesh(new THREE.RingGeometry(0.045, 0.068, 32), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.95, depthWrite: false }));
-  mark.add(new THREE.Mesh(new THREE.RingGeometry(0.068, MARK_R, 32), new THREE.MeshBasicMaterial({ color: INK, transparent: true, opacity: 0.8, depthWrite: false })));
-  mark.renderOrder = 2;
-  cab.faceFrame.add(mark);
-  guide.visible = mark.visible = false;
+  const ring = (color: string) => {
+    const m = new THREE.Mesh(new THREE.RingGeometry(0.045, 0.068, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false }));
+    m.add(new THREE.Mesh(new THREE.RingGeometry(0.068, MARK_R, 32), new THREE.MeshBasicMaterial({ color: INK, transparent: true, opacity: 0.8, depthWrite: false })));
+    m.renderOrder = 2;
+    m.visible = false;
+    cab.faceFrame.add(m);
+    return m;
+  };
+  const aimMark = ring(AIM_COLOR);
+  const powerMark = ring(POWER_COLOR);
+  // The power mark over the aim one where they meet.
+  powerMark.position.z = 0.024;
+  guide.visible = false;
   group.add(guide);
 
   // The score that pops up over the target, and how lit up everything is.
@@ -127,8 +141,9 @@ export function buildSkeeball(): SkeeballMachine {
       });
       shown = n;
     },
-    aim(aimU, at) {
-      guide.visible = mark.visible = aimU !== null;
+    aim(aimU, withGuide = true) {
+      aimMark.visible = aimU !== null;
+      guide.visible = aimU !== null && withGuide;
       if (aimU === null) return;
       const a = aimAngle(aimU);
       const half = LANE.inner / 2 - LANE.ball;
@@ -138,12 +153,18 @@ export function buildSkeeball(): SkeeballMachine {
         dot.position.set(s, laneY(s) + 0.004, THREE.MathUtils.clamp(run * Math.sin(a), -half, half));
         dot.visible = s < LANE.foot.s;
       });
-      // Where it's told, or where the line reaches the rings, up the target.
+      // Where the line reaches the rings, up the target.
       const target = onFace(RINGS.d, 0);
-      // (Kept clear of the target's top edge, and of its bottom one behind the gutter's lip, so it's all in sight.)
-      if (at) mark.position.set(at.u, THREE.MathUtils.clamp(at.d, MARK_R + 0.04, LANE.face.long - MARK_R), 0.02);
-      else mark.position.set((target.s - start.s) * Math.tan(a), RINGS.d, 0.02);
-      mark.scale.setScalar(1 + 0.12 * Math.sin(clock.t * 6));
+      aimMark.position.set((target.s - start.s) * Math.tan(a), RINGS.d, 0.02);
+      aimMark.scale.setScalar(1 + 0.12 * Math.sin(clock.t * 6));
+    },
+    power(at) {
+      powerMark.visible = at !== null;
+      if (!at) return;
+      // Kept clear of the target's top edge, and of its bottom one behind the gutter's lip, so it's all in sight.
+      powerMark.position.x = at.u;
+      powerMark.position.y = THREE.MathUtils.clamp(at.d, MARK_R + 0.04, LANE.face.long - MARK_R);
+      powerMark.scale.setScalar(1 + 0.12 * Math.sin(clock.t * 6 + 1.5));
     },
     ready(on) {
       handBall.visible = on;

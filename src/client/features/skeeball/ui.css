@@ -1,5 +1,5 @@
 /* At the skeeball machine (see controller.ts): the aim bar with its slider over the power meter, each labeled. */
-.skee .skee-row { display: grid; grid-template-columns: 46px 1fr; align-items: center; gap: 8px; }
+.skee .skee-row { display: grid; grid-template-columns: 54px 1fr; align-items: center; gap: 8px; }
 .skee .skee-label { font-size: 11px; text-align: left; opacity: .7; }
 /* Both bars: the aim, the lane from rail to rail with its middle marked; and the power, soft to hard. */
 .skee-bar { position: relative; height: 16px; border: 3px solid var(--ink); border-radius: 999px; overflow: hidden; }
@@ -7,4 +7,9 @@
 .skee-power { background: linear-gradient(90deg, #f1e4d3, #ffd166 55%, #ef476f); }
 .skee-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: .35; }
 .skee-knob { position: absolute; top: -1px; bottom: -1px; width: 8px; margin-left: -4px; border-radius: 4px; background: #fffaf3; box-shadow: 0 0 0 2px var(--ink); }
-.skee-knob.set { background: #3ddc97; }
+/* Each slider in the color of its mark on the target (AIM_COLOR and POWER_COLOR in world.ts), and a dot of it by its label. */
+.skee-aim .skee-knob { background: #22d3ee; }
+.skee-power .skee-knob { background: #ff7b1c; }
+.skee .skee-label::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--ink); }
+.skee .skee-for-aim::before { background: #22d3ee; }
+.skee .skee-for-power::before { background: #ff7b1c; }
