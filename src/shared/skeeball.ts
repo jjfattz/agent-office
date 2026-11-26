@@ -4,6 +4,7 @@
 // bouncing on the target, knocked back by the rings' lips, and rolling down until it drops into a
 // hole. Every page on the floor runs the same simulation, as golf does (see features/skeeball).
 
+import { meterAt } from './bargames.js';
 import { MEETING_ROOM, STAIRS } from './layout.js';
 
 /**
@@ -13,9 +14,9 @@ import { MEETING_ROOM, STAIRS } from './layout.js';
 export const LANE = {
   /** How long the whole machine is, front to back, and how wide outside. */
   length: 3.22,
-  width: 1.04,
+  width: 1.26,
   /** Inside the side rails: what the ball rolls between. */
-  inner: 0.78,
+  inner: 1.0,
   /** The ball trough across the front, where the balls wait. */
   trough: 0.3,
   /** The lane's surface: from the trough up to the foot of the hump. */
@@ -31,14 +32,23 @@ export const LANE = {
   back: 3.155,
   /** The net over the target: from (s, y) at its front up to its back, where the display is. */
   net: { s0: 1.9, y0: 1.06, s1: 2.88, y1: 1.86 },
-  ball: 0.05,
+  ball: 0.036,
 } as const;
+
+/**
+ * How much bigger the machine stands in the room than its own frame measures: everything about it,
+ * the ball's roll included, is worked out in LANE's meters and drawn this much bigger.
+ */
+export const SIZE = 1.1;
 
 /** Where the machine stands: its back to the meeting room's west glass, just north of the stairs, the lane pointing east (+x). */
 export const SKEEBALL = {
   /** The front edge, where you stand to roll. */
-  x: MEETING_ROOM.minX - 0.1 - LANE.length,
-  z: STAIRS.minZ - 0.16 - LANE.width / 2,
+  x: MEETING_ROOM.minX - 0.1 - LANE.length * SIZE,
+  z: STAIRS.minZ - 0.16 - (LANE.width * SIZE) / 2,
+  /** How long and wide it stands in the room. */
+  length: LANE.length * SIZE,
+  width: LANE.width * SIZE,
 } as const;
 
 /** Balls a game. */
@@ -47,17 +57,24 @@ export const BALLS = 9;
 export const POINTS = [0, 10, 20, 30, 40, 50, 100] as const;
 
 /** The rings on the target round (d up the face, 0 across): each lip's radius, and what lands inside it (and outside the next one in) scores. */
-export const RINGS = { d: 0.58, bands: [[0.075, 50], [0.15, 40], [0.225, 30], [0.3, 20]] } as const;
-/** The two pockets in the top corners, worth 100. */
-export const CORNERS = { d: 0.885, u: 0.25, r: 0.06 } as const;
+export const RINGS = { d: 0.55, bands: [[0.06, 50], [0.15, 40], [0.24, 30], [0.33, 20]] } as const;
+/** The two pockets up in the corners, outside the rings and in from the rails, worth 100. */
+export const CORNERS = { d: 0.82, u: 0.39, r: 0.055 } as const;
 /** How far round from straight down the hole in each band reaches, either way (radians). */
-export const HOLE_SPREAD = 1.05;
+export const HOLE_SPREAD = 0.85;
 
 /**
- * How far across the target you can aim (meters either side of the middle of the rings): as far as
- * keeps the line clear of the rails all the way up past the pockets.
+ * How far across the target you can aim (meters either side of the middle of the rings): from rail
+ * to rail. Out at the ends the ball runs into the rail and dies against it; the way to a 100 is the
+ * narrow gap between the rings and the rail, rolled just hard enough to stop over the pocket.
  */
-export const AIM_MAX = 0.29;
+export const AIM_MAX = 0.46;
+
+/** The aim slider crosses the bar from one end to the other in this long (s), then comes back. */
+export const SWEEP = 0.75;
+
+/** Where the aim slider is `secs` into a sweep that set off from the `from` end (−1: left, 1: right), as an aim across the target. */
+export const aimSweep = (secs: number, from: number) => from * AIM_MAX * (1 - 2 * meterAt(secs, SWEEP));
 
 const G = 9.81;
 const R = LANE.ball;
@@ -73,7 +90,7 @@ const AIM_RUN = LANE.face.s + RINGS.d * COS_A - LANE.start.s;
 const ROLL_LANE = 0.012;
 const ROLL_FACE = 0.06;
 /** How much bounce a ball keeps off the target, the back wall, the rails and a ring's lip. */
-const BOUNCE = { face: 0.22, back: 0.25, rail: 0.55, lip: 0.35, net: 0.3 };
+const BOUNCE = { face: 0.22, back: 0.55, rail: 0.1, lip: 0.35, net: 0.3 };
 /**
  * Each ring stands a step higher than the one round it, so its lip is a little wall from outside and
  * a drop from inside. Into one from outside, a ball has to be going this fast square on (m/s) to hop
@@ -92,7 +109,7 @@ const KEEP = 4;
 const MAX_T = 6;
 
 /** How fast a ball leaves your hand for how hard you rolled it (0–1 on the meter). */
-export const speedOf = (power: number) => 1.4 + 5.6 * Math.min(1, Math.max(0, power));
+export const speedOf = (power: number) => 1.2 + 7.3 * Math.min(1, Math.max(0, power));
 
 /** What a roll scored, what that's called, and the hole it dropped into (d up the face, u across; d < 0 is the gutter). */
 export interface Outcome {
@@ -340,9 +357,9 @@ export function roll(aimU: number, power: number): { path: PathPoint[]; events: 
       y = p.y;
       // Into a pocket, the 50's cup, or the hole round the bottom of its band; or off the bottom into the gutter.
       const speed = Math.hypot(vd, vu);
-      for (const side of [-1, 1]) if (speed < SKIP && Math.hypot(d - CORNERS.d, u - side * CORNERS.u) < CORNERS.r - R * 0.25) return done(100, '100', { d: CORNERS.d, u: side * CORNERS.u });
+      for (const side of [-1, 1]) if (speed < SKIP && Math.hypot(d - CORNERS.d, u - side * CORNERS.u) < CORNERS.r - R * 0.6) return done(100, '100', { d: CORNERS.d, u: side * CORNERS.u });
       const r = Math.hypot(d - RINGS.d, u);
-      if (r < RINGS.bands[0][0] - R * 0.35) return done(50, '50', { d: RINGS.d, u: 0 });
+      if (r < RINGS.bands[0][0] - R * 0.6 && speed < SKIP) return done(50, '50', { d: RINGS.d, u: 0 });
       const band = RINGS.bands.find(([outer]) => r < outer);
       if (band && band[1] !== 50 && r > band[0] - R * 1.15 && Math.abs(Math.atan2(u, RINGS.d - d)) < HOLE_SPREAD && speed < DROP) return done(band[1], String(band[1]), { d, u });
       if (d < R * 0.5 && vd <= 0) return done(10, '10', { d: -1, u });

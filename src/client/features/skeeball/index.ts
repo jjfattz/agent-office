@@ -96,8 +96,12 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
       return true;
     },
     hint: (el) => {
-      const winding = roller.doing === 'wind';
-      ctx.hint.draw(el, `skeeball|${winding}`, () => (winding ? [h('span.title', {}, 'Let go to roll!')] : [key('Mouse', 'Aim'), key('Space', 'Hold to roll'), key('E', 'Step back')]));
+      const doing = roller.doing;
+      ctx.hint.draw(el, `skeeball|${doing}`, () => {
+        if (doing === 'sweep') return [h('span.title', {}, 'Let go to aim!')];
+        if (doing === 'wind') return [h('span.title', {}, 'Let go to roll!')];
+        return [key('Space', doing === 'aimed' ? 'Hold to roll' : 'Hold to aim'), key('E', 'Step back')];
+      });
     },
     takesCamera: true,
     hidesHands: true,

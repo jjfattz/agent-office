@@ -74,10 +74,10 @@ export function paintFace(w: number, long: number): THREE.CanvasTexture {
     g.fillStyle = grad;
     g.fill();
     if (points !== 50) {
-      // The hole: a dark slot round the bottom of the band, just inside its lip.
+      // The hole: a dark slot round the bottom of the band, as wide as a ball drops through.
       g.beginPath();
-      g.arc(X(0), Y(RINGS.d), (r - 0.022) * px, Math.PI / 2 - HOLE_SPREAD, Math.PI / 2 + HOLE_SPREAD);
-      g.lineWidth = 0.03 * px;
+      g.arc(X(0), Y(RINGS.d), (r - (r - inner) / 2) * px, Math.PI / 2 - HOLE_SPREAD, Math.PI / 2 + HOLE_SPREAD);
+      g.lineWidth = (r - inner) * 0.8 * px;
       g.lineCap = 'round';
       g.strokeStyle = '#07051a';
       g.stroke();
@@ -86,14 +86,14 @@ export function paintFace(w: number, long: number): THREE.CanvasTexture {
     g.font = `900 ${0.045 * px}px ${FONT}`;
     if (points !== 50) g.fillText(String(points), X(0), Y(RINGS.d + (r + inner) / 2));
   });
-  // The 50's cup in the middle.
+  // The 50's cup in the middle, with its number in it.
   g.beginPath();
-  g.arc(X(0), Y(RINGS.d), 0.05 * px, 0, Math.PI * 2);
+  g.arc(X(0), Y(RINGS.d), (RINGS.bands[0][0] - 0.012) * px, 0, Math.PI * 2);
   g.fillStyle = '#07051a';
   g.fill();
   g.fillStyle = '#fff';
   g.font = `900 ${0.04 * px}px ${FONT}`;
-  g.fillText('50', X(0), Y(RINGS.d + 0.062));
+  g.fillText('50', X(0), Y(RINGS.d));
   // The 100 pockets up in the corners.
   for (const side of [-1, 1]) {
     g.beginPath();
