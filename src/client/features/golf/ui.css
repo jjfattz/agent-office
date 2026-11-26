@@ -10,6 +10,8 @@
 .golf-card-total { white-space: nowrap; }
 .golf-card-note { font-weight: 800; }
 #hud:has(.golf-card:not(.hidden)) #toasts { translate: 0 118px; }
-/* On the power meter over a full shot: where to let go for the ball to land in the circle (see landing.ts). */
-.golf-meter .golf-notch { position: absolute; top: 0; bottom: 0; width: 5px; margin-left: -2.5px; background: #118ab2; box-shadow: 0 0 0 1.5px #fffaf3; }
-.golf-meter .golf-notch.hidden { display: none; }
+/* The power bar, with a flag on a pole standing up out of it where to let go: for the ball to land in the circle, or a putt to roll to the pin (see controller.ts). */
+.golf-bar { position: relative; margin-top: 12px; }
+.golf-bar .golf-flag { position: absolute; bottom: -3px; height: calc(100% + 15px); width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--ink); filter: drop-shadow(0 0 1px #fffaf3) drop-shadow(0 0 1px #fffaf3); pointer-events: none; }
+.golf-bar .golf-flag::after { content: ''; position: absolute; left: 3px; top: 0; width: 17px; height: 12px; background: #ef476f; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.golf-bar .golf-flag.back::after { left: auto; right: 3px; clip-path: polygon(100% 0, 0 50%, 100% 100%); }

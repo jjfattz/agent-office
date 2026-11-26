@@ -2,7 +2,7 @@ import { fullReach, powerFor, type Club } from '../../../shared/golf';
 import type { PlayerController } from '../../player';
 
 // Where you mean the ball to come down, over a full shot (not a putt): a distance out along your aim,
-// marked on the course by a landing circle (landing.ts) and on the power meter by the notch to stop
+// marked on the course by a landing circle (landing.ts) and on the power bar by the flag to stop
 // it at. Holding the right mouse button (or Z, which is the touch button too) lifts the view up over
 // that spot, and there the mouse moves it: across turns your aim as it always does, and up and down
 // takes it further and nearer, as do W and S.
@@ -64,7 +64,7 @@ export class ShotTarget {
     return this.full.m;
   }
 
-  /** How far up the power meter to let go for it to land at the target. */
+  /** How far up the power bar (where its flag goes) to let go for it to land at the target. */
   powerFor(club: Club, loft: number): number {
     const key = `${club}|${loft.toFixed(3)}|${this.dist.toFixed(2)}`;
     if (this.power.key !== key) this.power = { key, p: powerFor(club, loft, this.dist) };

@@ -373,7 +373,7 @@ export function installGolf(ctx: Ctx, deps: GolfDeps) {
       stage === 'watch'
         ? [title('⛳ Fore!'), key('Space', 'Skip'), key('E', 'Step away'), key('Q', 'End round')]
         : stage === 'charge' || stage === 'swing'
-          ? [title('⛳ Let go to hit it'), aside(putt ? 'the fuller the meter, the further it goes' : 'at the blue notch, it lands in the circle'), ...(stage === 'charge' ? look : [])]
+          ? [title('⛳ Let go to hit it'), aside(putt ? 'at the flag, it rolls to the pin on the flat' : 'at the flag, it lands in the circle'), ...(stage === 'charge' ? look : [])]
           : up
             ? [title('⛳ Where it lands'), key('Mouse', 'Move the circle'), key('A D', 'Left / right'), key('W S', 'Nearer / further'), key('Space', 'Hold to swing')]
             : [key('Space', 'Hold to swing'), key('A D', 'Aim'), ...(putt ? [] : [key('W S', 'Loft')]), ...look, key('C', 'Club'), key('X', 'Pick up'), key('Q', 'End round'), key('E', 'Step away')],
