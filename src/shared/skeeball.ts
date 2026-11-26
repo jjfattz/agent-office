@@ -71,7 +71,7 @@ export const HOLE_SPREAD = 0.85;
 export const AIM_MAX = 0.46;
 
 /** The aim slider crosses the bar from one end to the other in this long (s), then comes back. */
-export const SWEEP = 0.75;
+export const SWEEP = 0.55;
 
 /** Where the aim slider is `secs` into a sweep that set off from the `from` end (−1: left, 1: right), as an aim across the target. */
 export const aimSweep = (secs: number, from: number) => from * AIM_MAX * (1 - 2 * meterAt(secs, SWEEP));

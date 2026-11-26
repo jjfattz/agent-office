@@ -182,7 +182,10 @@ export function installSkeeball(ctx: Ctx, deps: SkeeballDeps) {
     const { path, events, outcome } = roll(aim, power);
     const hop = events.find((e) => e.kind === 'hop');
     ctx.sound.skeeball('roll', m.toWorld(0.6, 0, 0.8, at), 0, hop?.t ?? path[path.length - 1].t);
-    m.launch(path, events, sound, () => dropped(m, it, points, points === outcome.points ? outcome.label : String(points), mine));
+    m.launch(path, events, sound, () => {
+      if (mine) roller.ballDown();
+      dropped(m, it, points, points === outcome.points ? outcome.label : String(points), mine);
+    });
   }
 
   /** What the ball sounds like as it goes: off the hump, onto the target, off a lip or a rail. */
