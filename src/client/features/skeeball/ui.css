@@ -1,0 +1,8 @@
+/* At the skeeball machine (see controller.ts): the aim bar with its slider over the power meter, each labeled. */
+.skee .skee-row { display: grid; grid-template-columns: 46px 1fr; align-items: center; gap: 8px; }
+.skee .skee-label { font-size: 11px; text-align: left; opacity: .7; }
+/* The lane from rail to rail, its middle marked. */
+.skee-aim { position: relative; height: 16px; border: 3px solid var(--ink); border-radius: 999px; background: linear-gradient(90deg, #c98d4f, #e9c08a 50%, #c98d4f); overflow: hidden; }
+.skee-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: .35; }
+.skee-knob { position: absolute; top: -1px; bottom: -1px; width: 8px; margin-left: -4px; border-radius: 4px; background: #fffaf3; box-shadow: 0 0 0 2px var(--ink); }
+.skee-knob.set { background: #3ddc97; }

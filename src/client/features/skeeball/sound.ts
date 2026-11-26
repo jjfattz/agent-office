@@ -1,16 +1,16 @@
 import type { AudioCore } from '../../sound/core';
 import { biquad, envelope, pick, rand } from '../../sound/dsp';
 import type { Pos } from '../../sound/places';
-import { LANE, SKEEBALL } from '../../../shared/skeeball';
+import { SIZE, SKEEBALL } from '../../../shared/skeeball';
 
 // ---- The skeeball machine -----------------------------------------------------------------------
 
 export type SkeeballSound = 'coin' | 'release' | 'roll' | 'hop' | 'thud' | 'click' | 'drop' | 'score' | 'jackpot' | 'gutter' | 'over' | 'best' | 'tickets';
 
 /** The machine's speaker, in the marquee over the target (its music is in music.ts). */
-export const SPEAKER: Pos = { x: SKEEBALL.x + LANE.length - 0.25, y: 2.2, z: SKEEBALL.z };
+export const SPEAKER: Pos = { x: SKEEBALL.x + SKEEBALL.length - 0.25, y: 2.2 * SIZE, z: SKEEBALL.z };
 /** The trough at its front, where the balls come back to you. */
-export const TROUGH: Pos = { x: SKEEBALL.x + 0.15, y: 0.7, z: SKEEBALL.z };
+export const TROUGH: Pos = { x: SKEEBALL.x + 0.15, y: 0.7 * SIZE, z: SKEEBALL.z };
 
 /**
  * The skeeball machine, from where it happens: a ball rumbling up the wooden lane for `len` seconds,

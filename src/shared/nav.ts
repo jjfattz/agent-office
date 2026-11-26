@@ -5,7 +5,7 @@
 // helpers take how many rows it's built out (`wing`), and each level gets a grid of its own.
 
 import { BALCONY, BALCONY_DOOR, BEANBAGS, BOOKSHELF, CABINET, DESK_SIZE, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, GONG, JUKEBOX, KIOSK, LOFT, MEETING_ROOM, MEETING_SEATS, MEETING_TABLE, PARACHUTE, ROAD, STAIRS, STATIONS, WHITEBOARD, WING, builtDesks, plantsAt, wingLevel, wingMinZ, type DeskDef } from './layout.js';
-import { LANE, SKEEBALL } from './skeeball.js';
+import { SKEEBALL } from './skeeball.js';
 import { POLE } from './pole.js';
 
 
@@ -72,7 +72,7 @@ function obstacles(wing: number): Obstacles {
   // The arcade cabinet next to it, as features/cabinet/world.ts puts it (its control panel sticks out a little).
   rects.push([CABINET.x - 0.45, FLOOR.maxX, CABINET.z - CABINET.width / 2 - 0.02, CABINET.z + CABINET.width / 2 + 0.02]);
   // The skeeball machine, its back to the meeting room's glass, as features/skeeball/world.ts puts it.
-  rects.push([SKEEBALL.x, SKEEBALL.x + LANE.length, SKEEBALL.z - LANE.width / 2, SKEEBALL.z + LANE.width / 2]);
+  rects.push([SKEEBALL.x, SKEEBALL.x + SKEEBALL.length, SKEEBALL.z - SKEEBALL.width / 2, SKEEBALL.z + SKEEBALL.width / 2]);
   // The bookshelf against the south wall, as features/bookshelf/world.ts puts it.
   rects.push([BOOKSHELF.x - BOOKSHELF.width / 2 - 0.04, BOOKSHELF.x + BOOKSHELF.width / 2 + 0.04, BOOKSHELF.z - BOOKSHELF.depth / 2 - 0.03, FLOOR.maxZ]);
   // The overflow bean bags and their lap desks. They're only out while every desk is taken, but they

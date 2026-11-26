@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BALLS, LANE, RINGS, SKEEBALL, aimAngle, laneY, onFace, pathAt, type PathPoint, type RollEvent } from '../../../shared/skeeball';
+import { BALLS, LANE, RINGS, SIZE, SKEEBALL, aimAngle, laneY, onFace, pathAt, type PathPoint, type RollEvent } from '../../../shared/skeeball';
 import { mesh, textSprite, toon } from '../../world/toon';
 import type { Collider, Interactable } from '../../world/types';
 import type { Fixture } from '../../world/office/fixture';
@@ -11,7 +11,7 @@ import { paintDisplay, type DisplayState } from './paint';
 // while you aim, the score popping up, the rings and bulbs lighting up, and the display. Its back is
 // against the meeting room's west glass, just north of the stairs, and you roll from its front,
 // facing east. It's built in its own frame (x along the lane, z across it, y up), which is the room's
-// own way round, moved to where the machine stands.
+// own way round, moved to where the machine stands and drawn SIZE times bigger.
 
 const INK = '#14112b';
 const BALL = '#f4f1de';
@@ -59,6 +59,7 @@ export function buildSkeeball(): SkeeballMachine {
   const cab = buildCabinet();
   const group = cab.group;
   group.position.set(SKEEBALL.x, 0, SKEEBALL.z);
+  group.scale.setScalar(SIZE);
   const { start } = LANE;
 
   // The balls: the ones waiting in the trough, the one in your hand, and the ones rolling.
@@ -97,17 +98,17 @@ export function buildSkeeball(): SkeeballMachine {
   const at = new THREE.Vector3();
   const axis = new THREE.Vector3();
 
-  const { length: L, width: W } = LANE;
-  const collider: Collider = { minX: SKEEBALL.x, maxX: SKEEBALL.x + L, minZ: SKEEBALL.z - W / 2, maxZ: SKEEBALL.z + W / 2, top: 2.6 };
-  const interactable: Interactable = { kind: 'skeeball', x: SKEEBALL.x - 0.3, z: SKEEBALL.z, radius: 1.3 };
+  const { length: L, width: W } = SKEEBALL;
+  const collider: Collider = { minX: SKEEBALL.x, maxX: SKEEBALL.x + L, minZ: SKEEBALL.z - W / 2, maxZ: SKEEBALL.z + W / 2, top: 2.6 * SIZE };
+  const interactable: Interactable = { kind: 'skeeball', x: SKEEBALL.x - 0.3, z: SKEEBALL.z, radius: 1.4 };
   group.userData.interact = interactable;
-  const toWorld = (s: number, u: number, y: number, out: THREE.Vector3) => out.set(SKEEBALL.x + s, y, SKEEBALL.z + u);
+  const toWorld = (s: number, u: number, y: number, out: THREE.Vector3) => out.set(SKEEBALL.x + s * SIZE, y * SIZE, SKEEBALL.z + u * SIZE);
 
   const machine: SkeeballMachine = {
     group,
     colliders: [collider],
     interactable,
-    spot: { x: SKEEBALL.x - 0.45, z: SKEEBALL.z, facing: Math.PI / 2 },
+    spot: { x: SKEEBALL.x - 0.6, z: SKEEBALL.z, facing: Math.PI / 2 },
     toWorld,
     setTrough(n) {
       trough.forEach((b, i) => {
