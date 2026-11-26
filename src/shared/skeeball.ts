@@ -371,6 +371,32 @@ export function roll(aimU: number, power: number): { path: PathPoint[]; events: 
   return done(points, String(points), mode === 'face' ? { d, u } : { d: -1, u });
 }
 
+/** Where a roll first comes down on the target (d up it, u across), or null if it never gets there (too soft, or short into the pit). */
+export function landing(aimU: number, power: number): { d: number; u: number } | null {
+  const { path, events } = roll(aimU, power);
+  const land = events.find((e) => e.kind === 'land');
+  if (!land) return null;
+  const p = pathAt(path, land.t);
+  return { d: Math.max(0, (p.s - LANE.face.s) * COS_A + (p.y - LANE.face.y) * SIN_A), u: p.u };
+}
+
+/**
+ * The power gauge on the target for a roll aimed at `aimU`: where the ball first comes down for each
+ * step of the meter, from nothing (0) to full (`steps`). Too soft to get there is the bottom edge, on
+ * the aim line, and it only ever climbs, so the mark on the target rides up and down with the meter.
+ */
+export function landingGauge(aimU: number, steps = 100): { d: number; u: number }[] {
+  const foot = Math.tan(aimAngle(aimU)) * (LANE.face.s - LANE.start.s);
+  const out: { d: number; u: number }[] = [];
+  let last = { d: 0, u: foot };
+  for (let i = 0; i <= steps; i++) {
+    const at = landing(aimU, i / steps);
+    if (at && at.d >= last.d) last = at;
+    out.push(last);
+  }
+  return out;
+}
+
 /** Where along `path` the ball is at time t (s since it was let go), between its points. */
 export function pathAt(path: readonly PathPoint[], t: number): PathPoint {
   if (t <= path[0].t) return path[0];

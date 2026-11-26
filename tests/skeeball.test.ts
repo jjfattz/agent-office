@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AIM_MAX, BALLS, CORNERS, LANE, RINGS, SKEEBALL, SWEEP, aimSweep, laneY, onFace, pathAt, roll, rollOk, scoreAt } from '../src/shared/skeeball.js';
+import { AIM_MAX, BALLS, CORNERS, LANE, RINGS, SKEEBALL, SWEEP, aimSweep, landing, landingGauge, laneY, onFace, pathAt, roll, rollOk, scoreAt } from '../src/shared/skeeball.js';
 import { MEETING_ROOM, SPAWN, STAIRS } from '../src/shared/layout.js';
 import { route, walkable } from '../src/shared/nav.js';
 
@@ -141,4 +141,20 @@ test('skeeball: only a roll anybody could have rolled goes on to the floor', () 
     { aim: 0, power: 0.5, n: 1 },
   ])
     assert.ok(!rollOk(bad as never), JSON.stringify(bad));
+});
+
+test('skeeball: the power gauge climbs the target with the meter, to where each roll first comes down', () => {
+  for (const aim of [0, 0.2, -0.31, AIM_MAX]) {
+    const g = landingGauge(aim);
+    assert.equal(g.length, 101);
+    assert.equal(g[0].d, 0, 'with nothing on the meter, it sits at the foot of the target');
+    for (let i = 1; i < g.length; i++) assert.ok(g[i].d >= g[i - 1].d, `it only climbs (step ${i})`);
+    assert.ok(g[100].d > LANE.face.long * 0.8, `flat out comes down near the top (${g[100].d.toFixed(2)})`);
+    for (const p of g) assert.ok(Math.abs(p.u) <= LANE.inner / 2, 'between the rails');
+  }
+  assert.equal(landing(0, 0), null, 'too soft never gets there');
+  // Up the middle, the mark is where the ball lands: half way up the meter, in among the rings.
+  const mid = landing(0, 0.45)!;
+  assert.deepEqual(landingGauge(0)[45], mid);
+  assert.ok(Math.abs(mid.d - RINGS.d) < RINGS.bands[3][0] && Math.abs(mid.u) < 1e-6);
 });
