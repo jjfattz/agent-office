@@ -5,8 +5,13 @@ import type { Collider, Interactable } from '../../world/types';
 import type { Fixture } from '../../world/office/fixture';
 import { mergeByMaterial, mesh, toon, toonUnique } from '../../world/toon';
 
-const ORANGE = '#ff6b1a';
-const INK = '#2b2d42';
+/** An NBA rim's orange-red, the orange of the key, and the dark steel holding it all up. */
+const RIM_ORANGE = '#f2561d';
+const STEEL = '#33363f';
+const PAD = '#1c1d22';
+/** NBA lines on the glass: 2 in wide, round the edge and the 24 by 18 in shooter's square over the rim. */
+const LINE = 0.05;
+const SQUARE = { w: 0.61, h: 0.457 } as const;
 
 export interface HoopView {
   group: THREE.Group;
@@ -17,56 +22,156 @@ export interface HoopView {
   update(dt: number): void;
 }
 
+/** A rod of radius `r` from `a` to `b`. */
+function rod(a: THREE.Vector3, b: THREE.Vector3, r: number, mat: THREE.Material): THREE.Mesh {
+  const len = a.distanceTo(b);
+  const m = mesh(new THREE.CylinderGeometry(r, r, len, 8), mat);
+  m.position.copy(a).add(b).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+  return m;
+}
+
 /**
- * The hoop on the west wall: a backboard on arms off the wall, an orange rim and a white net, over a
- * painted key on the floor with its free-throw circle.
+ * The net, as an NBA net is tied: twelve loops off the rim, knotted into rows of diamonds that
+ * narrow down to its bottom. Lines from the ring's middle downwards (so it scales from the rim).
+ */
+function netGeometry(): THREE.BufferGeometry {
+  const strands = 12;
+  const rows = 6;
+  const { r, tube } = HOOP.rim;
+  const point = (i: number, j: number): [number, number, number] => {
+    const u = i / rows;
+    // It narrows quickly under the rim, then hangs nearly straight.
+    const rad = THREE.MathUtils.lerp(r - tube, HOOP.net.r, Math.sqrt(u));
+    const a = ((j + (i % 2) * 0.5) / strands) * Math.PI * 2;
+    return [Math.cos(a) * rad, -u * HOOP.net.depth, Math.sin(a) * rad];
+  };
+  const v: number[] = [];
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < strands; j++) {
+      // Each knot ties to the two below it, either side, which makes the diamonds.
+      const below = i % 2 ? [j, j + 1] : [j - 1, j];
+      for (const k of below) v.push(...point(i, j), ...point(i + 1, (k + strands) % strands));
+    }
+  }
+  // The bottom row's knots, tied round.
+  for (let j = 0; j < strands; j++) v.push(...point(rows, j), ...point(rows, (j + 1) % strands));
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  return geo;
+}
+
+/**
+ * The hoop on the west wall, as an NBA hoop looks: a clear glass backboard with white lines and
+ * black padding round its bottom edge, held off the wall by a steel frame you see through the glass,
+ * an orange breakaway rim and a white nylon net, over a painted key on the floor with its free-throw
+ * circle.
  */
 export function buildHoop(): HoopView {
   const group = new THREE.Group();
   const parts = new THREE.Group();
   const { z, face, board, rim } = HOOP;
-  const ink = toon(INK);
+  const steel = toon(STEEL);
   const back = face - board.thick;
+  const height = board.top - board.bottom;
   const midY = (board.bottom + board.top) / 2;
 
-  // The board: white, with an orange border and the shooter's square over the rim.
-  parts.add(mesh(new THREE.BoxGeometry(board.thick, board.top - board.bottom, board.width), toon('#f8f9fa'), face - board.thick / 2, midY, z));
-  const orange = toon(ORANGE);
-  const line = (w: number, h: number, y: number, dz: number) => parts.add(mesh(new THREE.BoxGeometry(0.012, h, w), orange, face + 0.006, y, z + dz, false));
-  const e = 0.05;
-  line(board.width, e, board.top - e / 2, 0);
-  line(board.width, e, board.bottom + e / 2, 0);
-  for (const s of [-1, 1]) line(e, board.top - board.bottom, midY, s * (board.width / 2 - e / 2));
-  const sq = { w: 0.59, h: 0.45, t: 0.035, y: rim.y + 0.02 };
-  line(sq.w, sq.t, sq.y + sq.t / 2, 0);
-  line(sq.w, sq.t, sq.y + sq.h - sq.t / 2, 0);
-  for (const s of [-1, 1]) line(sq.t, sq.h, sq.y + sq.h / 2, s * (sq.w / 2 - sq.t / 2));
-
-  // Arms from a plate on the wall out to the back of the board, and a brace under them.
-  parts.add(mesh(new THREE.BoxGeometry(0.04, 0.8, 0.9), ink, FLOOR.minX + 0.02, midY - 0.15, z));
-  const reach = back - FLOOR.minX;
-  for (const dz of [-0.32, 0.32]) {
-    for (const y of [midY - 0.25, midY + 0.25]) parts.add(mesh(new THREE.BoxGeometry(reach, 0.05, 0.05), ink, FLOOR.minX + reach / 2, y, z + dz));
-    const brace = mesh(new THREE.CylinderGeometry(0.022, 0.022, Math.hypot(reach, 0.55), 6), ink, FLOOR.minX + reach / 2, midY - 0.52, z + dz);
-    brace.rotation.z = -Math.atan2(reach, 0.55);
-    parts.add(brace);
+  // The glass: clear with a little blue in it, and its edges greener, as thick glass looks edge on.
+  const glassMat = toonUnique('#d4ecf4');
+  glassMat.transparent = true;
+  glassMat.opacity = 0.22;
+  glassMat.depthWrite = false;
+  const glass = mesh(new THREE.BoxGeometry(board.thick, height, board.width), glassMat, face - board.thick / 2, midY, z, false);
+  glass.renderOrder = 2;
+  group.add(glass);
+  const edgeMat = toon('#8fcfbf', { opacity: 0.7 });
+  const edge = 0.015;
+  for (const s of [-1, 1]) {
+    parts.add(mesh(new THREE.BoxGeometry(board.thick + 0.002, edge, board.width), edgeMat, face - board.thick / 2, midY + s * (height / 2 - edge / 2), z, false));
+    parts.add(mesh(new THREE.BoxGeometry(board.thick + 0.002, height, edge), edgeMat, face - board.thick / 2, midY, z + s * (board.width / 2 - edge / 2), false));
   }
 
-  // The rim, and the bracket bolting it to the board.
-  const ring = mesh(new THREE.TorusGeometry(rim.r, rim.tube, 8, 36), orange, rim.x, rim.y, rim.z);
+  // Glare on the glass: two light streaks slanting across its top corner, as a toon draws glass.
+  const glareMat = toon('#ffffff', { opacity: 0.28 });
+  const streak = (u0: number, w: number) => {
+    const h = height - 0.16;
+    const lean = 0.3;
+    const shape = new THREE.Shape();
+    shape.moveTo(u0, -h / 2);
+    shape.lineTo(u0 + w, -h / 2);
+    shape.lineTo(u0 + w + lean, h / 2);
+    shape.lineTo(u0 + lean, h / 2);
+    shape.closePath();
+    const m = mesh(new THREE.ShapeGeometry(shape), glareMat, face + 0.008, midY, z, false);
+    m.rotation.y = Math.PI / 2;
+    parts.add(m);
+  };
+  streak(0.42, 0.09);
+  streak(0.56, 0.035);
+
+  // The white lines on its front: round the edge, and the shooter's square, its base level with the top of the rim.
+  const white = toon('#ffffff');
+  const line = (w: number, h: number, y: number, dz: number) => parts.add(mesh(new THREE.BoxGeometry(0.006, h, w), white, face + 0.003, y, z + dz, false));
+  const inset = 0.02;
+  const bw = board.width - 2 * inset;
+  const bh = height - 2 * inset;
+  line(bw, LINE, board.top - inset - LINE / 2, 0);
+  line(bw, LINE, board.bottom + inset + LINE / 2, 0);
+  for (const s of [-1, 1]) line(LINE, bh, midY, s * (bw / 2 - LINE / 2));
+  const sqBottom = rim.y + rim.tube - LINE;
+  line(SQUARE.w, LINE, sqBottom + LINE / 2, 0);
+  line(SQUARE.w, LINE, sqBottom + SQUARE.h - LINE / 2, 0);
+  for (const s of [-1, 1]) line(LINE, SQUARE.h, sqBottom + SQUARE.h / 2, s * (SQUARE.w / 2 - LINE / 2));
+
+  // Black padding wrapped round the bottom edge and up the sides a way.
+  const pad = toon(PAD);
+  const padT = 0.05;
+  const padX = face - board.thick / 2;
+  const padD = board.thick + 2 * 0.025;
+  parts.add(mesh(new THREE.BoxGeometry(padD, padT + 0.02, board.width + 2 * padT), pad, padX, board.bottom + 0.01, z));
+  const sideH = 0.38;
+  for (const s of [-1, 1]) parts.add(mesh(new THREE.BoxGeometry(padD, sideH, padT), pad, padX, board.bottom + sideH / 2, z + s * (board.width / 2 + padT / 2)));
+
+  // The steel frame behind the glass, as on an NBA stanchion: a box behind the shooter's square, and
+  // the plate the rim bolts through to. You see it through the glass.
+  const frameX = back - 0.025;
+  const post = { dz: 0.3, lo: board.bottom + 0.06, hi: sqBottom + SQUARE.h - 0.04 };
+  for (const s of [-1, 1]) parts.add(mesh(new THREE.BoxGeometry(0.05, post.hi - post.lo, 0.05), steel, frameX, (post.lo + post.hi) / 2, z + s * post.dz));
+  for (const y of [post.lo + 0.025, post.hi - 0.025]) parts.add(mesh(new THREE.BoxGeometry(0.05, 0.05, 2 * post.dz), steel, frameX, y, z));
+  parts.add(mesh(new THREE.BoxGeometry(0.03, 0.26, 0.32), steel, back - 0.015, rim.y - 0.07, z));
+
+  // Arms from a plate on the wall out to the frame, crossed between, all of it hidden behind the board.
+  const armY = [post.lo + 0.1, post.hi - 0.05];
+  parts.add(mesh(new THREE.BoxGeometry(0.04, armY[1] - armY[0] + 0.2, 0.8), steel, FLOOR.minX + 0.02, (armY[0] + armY[1]) / 2, z));
+  const reach = frameX - 0.025 - FLOOR.minX;
+  for (const dz of [-post.dz, post.dz]) {
+    for (const y of armY) parts.add(mesh(new THREE.BoxGeometry(reach, 0.06, 0.06), steel, FLOOR.minX + reach / 2, y, z + dz));
+    parts.add(rod(new THREE.Vector3(FLOOR.minX + 0.04, armY[0], z + dz), new THREE.Vector3(frameX - 0.025, armY[1], z + dz), 0.018, steel));
+  }
+
+  // The rim: the ring, the plate under it out to the glass, two struts and the breakaway housing on the glass.
+  const orange = toon(RIM_ORANGE);
+  const ring = mesh(new THREE.TorusGeometry(rim.r, rim.tube, 8, 40), orange, rim.x, rim.y, rim.z);
   ring.rotation.x = Math.PI / 2;
   parts.add(ring);
   const gap = rim.x - rim.r - face;
-  parts.add(mesh(new THREE.BoxGeometry(gap + 0.02, 0.03, 0.16), orange, face + gap / 2, rim.y - 0.01, z));
-  parts.add(mesh(new THREE.BoxGeometry(0.02, 0.16, 0.2), orange, face + 0.01, rim.y - 0.06, z, false));
+  parts.add(mesh(new THREE.BoxGeometry(gap + 0.05, 0.012, 0.15), orange, face + (gap + 0.05) / 2, rim.y - rim.tube - 0.006, z));
+  parts.add(mesh(new THREE.BoxGeometry(0.07, 0.2, 0.24), orange, face + 0.035, rim.y - 0.08, z));
+  for (const s of [-1, 1]) {
+    const a = new THREE.Vector3(face + 0.06, rim.y - 0.17, z + s * 0.08);
+    const b = new THREE.Vector3(rim.x - rim.r * 0.55, rim.y - rim.tube, z + s * rim.r * 0.8);
+    parts.add(rod(a, b, 0.009, orange));
+  }
+  // The little hooks under the ring the net's loops hang from.
+  for (let j = 0; j < 12; j++) {
+    const a = (j / 12) * Math.PI * 2;
+    parts.add(mesh(new THREE.BoxGeometry(0.012, 0.025, 0.012), orange, rim.x + Math.cos(a) * rim.r, rim.y - rim.tube - 0.01, rim.z + Math.sin(a) * rim.r, false));
+  }
   group.add(mergeByMaterial(parts));
 
-  // The net: a wireframe cone of diamonds, hanging from the rim.
-  const netMat = toonUnique('#ffffff');
-  netMat.wireframe = true;
-  const net = new THREE.Mesh(new THREE.CylinderGeometry(rim.r - 0.01, HOOP.net.r, HOOP.net.depth, 14, 3, true), netMat);
-  net.geometry.translate(0, -HOOP.net.depth / 2, 0);
-  net.position.set(rim.x, rim.y, rim.z);
+  // The net: white nylon, in diamonds, hanging from the rim.
+  const net = new THREE.LineSegments(netGeometry(), new THREE.LineBasicMaterial({ color: '#ffffff' }));
+  net.position.set(rim.x, rim.y - rim.tube, rim.z);
   group.add(net);
 
   // The key painted on the floor, out to the free-throw line, and the circle round the line.
@@ -101,7 +206,7 @@ export function buildHoop(): HoopView {
   const arc = paint(new THREE.RingGeometry(keyW / 2 - w, keyW / 2, 40, 1, -Math.PI / 2, Math.PI), '#ffffff', 0.015);
   arc.position.set(lineX, arc.position.y, z);
 
-  const colliders: Collider[] = [backboard(), { minX: FLOOR.minX, maxX: back, minZ: z - 0.45, maxZ: z + 0.45, bottom: midY - 0.8, top: midY + 0.3 }];
+  const colliders: Collider[] = [backboard(), { minX: FLOOR.minX, maxX: back, minZ: z - post.dz - 0.04, maxZ: z + post.dz + 0.04, bottom: post.lo, top: post.hi }];
 
   // The net's swing: stretched down as the ball goes through, springing back.
   let stretch = 0;
@@ -131,7 +236,7 @@ declare module '../../world/types' {
 /** The basketball hoop, on the west wall by the exit door. */
 export const hoop: Fixture<'hoop'> = (site) => {
   const built = buildHoop();
-  site.wall('west', HOOP.z, (HOOP.board.bottom - 0.6 + HOOP.board.top + 0.1) / 2, HOOP.board.width + 0.2, HOOP.board.top - HOOP.board.bottom + 0.7);
+  site.wall('west', HOOP.z, (HOOP.board.bottom - 0.6 + HOOP.board.top + 0.1) / 2, HOOP.board.width + 0.3, HOOP.board.top - HOOP.board.bottom + 0.7);
   return { group: built.group, colliders: built.colliders, update: (_t, dt) => built.update(dt), handle: { hoop: built } };
 };
 
