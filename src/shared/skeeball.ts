@@ -66,7 +66,7 @@ export const HOLE_SPREAD = 0.85;
 /**
  * How far across the target you can aim (meters either side of the middle of the rings): from rail
  * to rail. Out at the ends the ball runs into the rail and dies against it; the way to a 100 is the
- * narrow gap between the rings and the rail, rolled just hard enough to stop over the pocket.
+ * narrow gap between the rings and the rail, rolled just hard enough to come down in the pocket.
  */
 export const AIM_MAX = 0.46;
 
@@ -98,6 +98,12 @@ const BOUNCE = { face: 0.22, back: 0.55, rail: 0.1, lip: 0.35, net: 0.3 };
  */
 const HOP_IN = 1.8;
 const HOP_OUT = 2.2;
+/** Slower than this square into a lip (m/s), the ball's leaning on it, not knocking into it: it doesn't bounce off. */
+const LEAN = 0.3;
+/** How much of its speed a ball rolling along a lip loses rubbing against it, a second. */
+const LIP_RUB = 0.8;
+/** A ball on the target that's barely moving (m/s) for this long (s) has come to rest: it drops wherever it is. */
+const STILL = { speed: 0.05, secs: 0.4 };
 /** Faster than this (m/s), a ball skips over a pocket's hole instead of dropping in. */
 const SKIP = 1.1;
 /** Slower than this (m/s) at the bottom of its band, a ball drops through the hole there. */
@@ -168,6 +174,9 @@ export function onFace(d: number, u: number, lift = 0): { s: number; u: number; 
   return { s: f.s + d * COS_A - lift * SIN_A, u, y: f.y + d * SIN_A + lift * COS_A };
 }
 
+/** Whether a ball coming down at (d, u) on the target comes down in one of the corner pockets (its middle over the hole). */
+const pocketAt = (d: number, u: number) => Math.hypot(d - CORNERS.d, Math.abs(u) - CORNERS.u) < CORNERS.r;
+
 /** What the target scores for a ball dropping at (d, u): the pockets, the rings, or the 10. */
 export function scoreAt(d: number, u: number): number {
   for (const side of [-1, 1]) if (Math.hypot(d - CORNERS.d, u - side * CORNERS.u) < CORNERS.r) return 100;
@@ -203,6 +212,8 @@ export function roll(aimU: number, power: number): { path: PathPoint[]; events: 
   let vy = 0;
   let d = 0;
   let vd = 0;
+  /** How long it's been barely moving on the target. */
+  let still = 0;
   const keep = (force = false) => {
     if (force || step % KEEP === 0) path.push({ t, s, u, y });
   };
@@ -286,6 +297,11 @@ export function roll(aimU: number, power: number): { path: PathPoint[]; events: 
           const vt = vs * COS_A + vy * SIN_A;
           let vn = -vs * SIN_A + vy * COS_A;
           d = (s - LANE.face.s) * COS_A + (y - LANE.face.y) * SIN_A;
+          // Coming down into a corner pocket, it's caught on the fly: that's how a 100's had.
+          if (vn < 0 && pocketAt(d, u)) {
+            events.push({ t, kind: 'land', speed: -vn });
+            return done(100, '100', { d: CORNERS.d, u: Math.sign(u) * CORNERS.u });
+          }
           if (vn < 0) {
             events.push({ t, kind: 'land', speed: -vn });
             vn = -vn * BOUNCE.face;
@@ -327,28 +343,42 @@ export function roll(aimU: number, power: number): { path: PathPoint[]; events: 
       const r1 = Math.hypot(d - RINGS.d, u);
       for (const [lip] of RINGS.bands) {
         if ((r0 - lip) * (r1 - lip) >= 0) continue;
-        const nd = (pd - RINGS.d) / (r0 || 1);
-        const nu = pu / (r0 || 1);
+        // Square to the lip where the ball's got to (out from the rings' middle), and how fast across it.
+        const nd = (d - RINGS.d) / (r1 || 1);
+        const nu = u / (r1 || 1);
         const vr = vd * nd + vu * nu;
         // Out through the hole round the bottom of the band is the way down, not a lip to bounce off.
         const out = r1 > r0;
         const atHole = out && Math.abs(Math.atan2(u, RINGS.d - d)) < HOLE_SPREAD;
         if (atHole) break;
-        if (Math.abs(vr) < (out ? HOP_OUT : HOP_IN)) {
+        const hop = out ? HOP_OUT : HOP_IN;
+        if (Math.abs(vr) < hop) {
           if (Math.abs(vr) > 0.15) events.push({ t, kind: 'lip', speed: Math.abs(vr) });
-          vd -= (1 + BOUNCE.lip) * vr * nd;
-          vu -= (1 + BOUNCE.lip) * vr * nu;
-          d = pd;
-          u = pu;
-          // Leaning on a lip, it rolls off round it, downhill (off to the right from dead on top).
-          if (Math.abs(vr) < 0.4) {
-            const side = Math.abs(nu) < 1e-3 ? (nd > 0 ? 1 : -1) : Math.sign(nu) * (nd > 0 ? 1 : -1);
-            vd += 0.12 * -nu * side;
-            vu += 0.12 * nd * side;
+          // Kept on its own side of the lip, but as far round it as it got, so it rolls along the lip
+          // instead of sticking to it: a knock bounces back off, and leaning on it, it just runs round.
+          const back = out ? lip - 1e-4 : lip + 1e-4;
+          d = RINGS.d + nd * back;
+          u = nu * back;
+          const keepOff = Math.abs(vr) > LEAN ? BOUNCE.lip : 0;
+          vd -= (1 + keepOff) * vr * nd;
+          vu -= (1 + keepOff) * vr * nu;
+          // Rubbing along the lip slows it a little.
+          const rub = Math.max(0, 1 - LIP_RUB * DT);
+          vd *= rub;
+          vu *= rub;
+          // Balanced dead on top of a ring, it tips off one way or the other (to the right, as it's built).
+          const along = -vd * nu + vu * nd;
+          if (!out && nd > 0.995 && Math.abs(along) < 0.05) {
+            vd -= 0.1 * nu;
+            vu += 0.1 * nd;
           }
         } else {
-          vd *= 0.8;
-          vu *= 0.8;
+          // Over it: up a step into a ring takes some of its way out of it; down one, a thump on landing.
+          const left = out ? 0.8 * vr : Math.sign(vr) * Math.sqrt(vr * vr - (0.6 * hop) ** 2);
+          vd += (left - vr) * nd;
+          vu += (left - vr) * nu;
+          vd *= 0.9;
+          vu *= 0.9;
         }
         break;
       }
@@ -363,6 +393,12 @@ export function roll(aimU: number, power: number): { path: PathPoint[]; events: 
       const band = RINGS.bands.find(([outer]) => r < outer);
       if (band && band[1] !== 50 && r > band[0] - R * 1.15 && Math.abs(Math.atan2(u, RINGS.d - d)) < HOLE_SPREAD && speed < DROP) return done(band[1], String(band[1]), { d, u });
       if (d < R * 0.5 && vd <= 0) return done(10, '10', { d: -1, u });
+      // Come to rest (it shouldn't, on a slope, but just in case): it drops where it is.
+      still = speed < STILL.speed ? still + DT : 0;
+      if (still >= STILL.secs) {
+        const points = scoreAt(d, u);
+        return done(points, String(points), { d, u });
+      }
     }
     keep();
   }

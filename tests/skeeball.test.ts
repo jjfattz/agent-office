@@ -65,7 +65,7 @@ test('skeeball: every score can be had, the 100s only near the edges', () => {
   assert.ok(hundreds.some((a) => a < 0) && hundreds.some((a) => a > 0), 'both corners');
 });
 
-test('skeeball: a 100 takes the gap between the rings and the rail, rolled just so', () => {
+test('skeeball: a 100 takes the gap between the rings and the rail, rolled to come down in the pocket', () => {
   let hundreds = 0;
   let rolls = 0;
   for (let a = -AIM_MAX; a <= AIM_MAX + 1e-9; a += AIM_MAX / 40)
@@ -73,12 +73,43 @@ test('skeeball: a 100 takes the gap between the rings and the rail, rolled just 
       rolls++;
       if (roll(a, p).outcome.points !== 100) continue;
       hundreds++;
-      assert.ok(Math.abs(a) < AIM_MAX - 0.06, `aimed ${a.toFixed(3)}: hugging the rail is no way in`);
-      assert.ok(p < 0.6, `rolled ${p.toFixed(2)}: slamming it off the back is no way in`);
+      assert.ok(Math.abs(a) > 0.2 && Math.abs(a) < AIM_MAX - 0.06, `aimed ${a.toFixed(3)}: it takes the gap, not the rings or the rail`);
+      assert.ok(p < 0.95, `rolled ${p.toFixed(2)}: slamming it off the back is no way in`);
     }
-  assert.ok(hundreds > 0 && hundreds / rolls < 0.02, `${hundreds} of ${rolls} rolls score 100`);
-  // Flat out, wherever it's aimed, it comes back off the back too fast to drop in a pocket.
+  assert.ok(hundreds > 0 && hundreds / rolls < 0.05, `${hundreds} of ${rolls} rolls score 100`);
+  // Flat out, wherever it's aimed, it flies past the pockets and comes back off the back too fast to drop in one.
   for (let a = -AIM_MAX; a <= AIM_MAX + 1e-9; a += AIM_MAX / 40) assert.notEqual(roll(a, 1).outcome.points, 100);
+});
+
+test('skeeball: with the power mark over a corner pocket, the ball drops in it', () => {
+  for (const side of [-1, 1]) {
+    let tried = 0;
+    for (let a = 0.2; a <= AIM_MAX; a += 0.005) {
+      const aim = side * a;
+      const g = landingGauge(aim);
+      for (let i = 0; i <= 100; i++) {
+        // The mark sits where the ball comes down (see landingGauge); over the pocket, short of its rim, that's a 100.
+        const at = landing(aim, i / 100);
+        if (!at || at.d !== g[i].d || Math.hypot(at.d - CORNERS.d, at.u - side * CORNERS.u) > CORNERS.r * 0.8) continue;
+        assert.equal(roll(aim, i / 100).outcome.points, 100, `aimed ${aim.toFixed(3)}, rolled ${i}%`);
+        tried++;
+      }
+    }
+    assert.ok(tried > 0, 'there is a roll that comes down over the pocket');
+  }
+});
+
+test('skeeball: a ball never sits still on the target, and every roll is over quickly', () => {
+  for (let a = -AIM_MAX; a <= AIM_MAX + 1e-9; a += AIM_MAX / 20)
+    for (let p = 0.1; p <= 1; p += 0.02) {
+      const { path } = roll(a, p);
+      assert.ok(path[path.length - 1].t < 4, `aimed ${a.toFixed(2)}, rolled ${p.toFixed(2)}: over in ${path[path.length - 1].t.toFixed(2)} s`);
+      // However long it stays within a couple of centimeters of one spot.
+      for (let i = 0, j = 0; i < path.length; i++) {
+        while (j < path.length && Math.hypot(path[j].s - path[i].s, path[j].u - path[i].u, path[j].y - path[i].y) < 0.02) j++;
+        assert.ok(path[j - 1].t - path[i].t < 1, `aimed ${a.toFixed(2)}, rolled ${p.toFixed(2)}: stuck at t=${path[i].t.toFixed(2)}`);
+      }
+    }
 });
 
 test('skeeball: the aim slider sets off from its end, crosses to the other, and comes back', () => {

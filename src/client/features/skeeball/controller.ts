@@ -8,11 +8,12 @@ import './ui.css';
 
 // Stepping up to the skeeball machine (E there): you stand at its front with a ball in hand, and the
 // camera looks straight up the lane from just over your head (you're out of the way, see index.ts).
-// A roll is two holds of Space (or the mouse button). The first sends a slider back and forth across
-// the aim bar, from one end or the other, and the aim mark across the target with it: let go to aim
-// there. The second runs a slider up and down the power bar, and the power mark (another color) up
-// and down the target with it, to where a ball rolled that hard first comes down: let go to roll.
-// Both move quickly, so it's in the timing, never a mouse placed just so. The two marks stay where
+// A roll is two holds of Space, and only Space: the mouse plays no part. The first sends a slider back
+// and forth across the aim bar, from one end or the other, and the aim mark across the target with it
+// (a dotted line up the lane to it): let go to aim there. The second runs a slider up and down the
+// power bar, and the power mark (another color) up and down the target with it, to where a ball
+// rolled that hard first comes down (a dotted line up the target to it): let go to roll. Both move
+// quickly, so it's all in the timing. The two marks stay where
 // you left them until the ball drops into a hole, and then the next ball's in hand. Nine balls a
 // game. E steps back.
 
@@ -78,7 +79,6 @@ export class Roller {
   constructor(
     private readonly player: PlayerController,
     private readonly camera: THREE.PerspectiveCamera,
-    canvas: HTMLElement,
     private readonly hooks: RollHooks,
   ) {
     this.titleEl = h('div.throw-title');
@@ -98,14 +98,6 @@ export class Roller {
     $('hud').append(this.panel);
     window.addEventListener('keydown', (e) => this.key(e, true));
     window.addEventListener('keyup', (e) => this.key(e, false));
-    canvas.addEventListener('pointerdown', (e) => {
-      // In first person, the click that captures the mouse isn't a roll.
-      const capturing = e.pointerType === 'mouse' && player.canLock && !player.locked;
-      if (this.machine && e.button === 0 && !modalOpen() && !capturing) this.press();
-    });
-    window.addEventListener('pointerup', (e) => {
-      if (this.machine && e.button === 0) this.letGo();
-    });
     // Tabbed away mid-hold: the key never comes back up, so it's neither an aim nor a roll.
     window.addEventListener('blur', () => {
       if (this.stage === 'sweep') this.stage = 'aim';
@@ -204,7 +196,7 @@ export class Roller {
     m.aim(aiming || rolling ? this.aim : null, aiming);
     // Aimed: the power mark starts at the foot of the target and rides up and down it with the meter.
     const gauging = this.stage === 'aimed' || this.stage === 'wind';
-    m.power(gauging ? this.gaugeAt(this.power) : rolling ? this.gaugeAt(this.lastPower) : null);
+    m.power(gauging ? this.gaugeAt(this.power) : rolling ? this.gaugeAt(this.lastPower) : null, gauging);
     m.ready(aiming);
     this.placeCamera(dt, m);
     this.render();
@@ -233,7 +225,7 @@ export class Roller {
     this.aimAt = this.from * AIM_MAX;
   }
 
-  /** Space (or the mouse button) down: the slider sets off, or with the aim set, the meter starts. */
+  /** Space down: the slider sets off, or with the aim set, the meter starts. */
   private press() {
     if (!this.next || performance.now() < this.readyAt) return;
     if (this.stage === 'aim') {
