@@ -1,0 +1,18 @@
+/* Pictures on a queue task: the ones attached so far under its box, and each task's thumbnails. */
+.queue-images { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+.queue-images.hidden { display: none; }
+.queue-image { position: relative; width: 72px; height: 72px; border: 3px solid var(--ink); border-radius: 10px; background: var(--paper-2); overflow: hidden; }
+.queue-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.queue-image.busy img { opacity: .45; }
+.queue-image.busy::after { content: ''; position: absolute; inset: 0; margin: auto; width: 22px; height: 22px; border: 3px solid var(--ink); border-right-color: transparent; border-radius: 50%; animation: queue-image-spin .8s linear infinite; }
+@keyframes queue-image-spin { to { transform: rotate(360deg); } }
+.queue-image-x { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; padding: 0; border: 2px solid var(--ink); border-radius: 50%; background: #fff; color: var(--ink); font-size: 11px; font-weight: 900; line-height: 1; cursor: pointer; }
+.queue-add.dropping textarea { outline: 3px dashed var(--ink); outline-offset: 2px; }
+.queue-add .queue-attach { margin-left: auto; padding: 6px 10px; }
+.queue-add .queue-attach + button[type=submit] { margin-left: 0; }
+.queue-thumbs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.queue-thumbs a { display: block; width: 36px; height: 36px; border: 2px solid var(--ink); border-radius: 6px; overflow: hidden; background: var(--paper-2); }
+.queue-thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* On a phone every button in a window is a thumb's size (styles/phone.css), the ✕ too: the picture grows to fit it. */
+body.phone-ui .queue-image { width: 96px; height: 96px; }
+body.phone-ui .queue-image-x { font-size: 15px; }
