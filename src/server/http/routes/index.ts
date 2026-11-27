@@ -9,6 +9,7 @@ import { fileRoutes } from './files.js';
 import { githubRoutes } from './github.js';
 import { pageRoutes } from './pages.js';
 import { phoneRoutes } from './phone.js';
+import { queueRoutes } from './queue.js';
 import { retroRoutes } from './retro.js';
 import { searchRoutes } from './search.js';
 import { serviceRoutes } from './services.js';
@@ -45,6 +46,7 @@ export const routes: readonly Route[] = [
   fileRoutes.termDrop,
   fileRoutes.changedFile,
   fileRoutes.docs,
+  queueRoutes.image,
   searchRoutes.search,
   serviceRoutes.forwards,
   githubRoutes.github,

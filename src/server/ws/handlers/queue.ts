@@ -1,6 +1,7 @@
 // The floor's task queue: adding, moving and retrying tasks, and how many workers it keeps busy.
 import { isAgentEffort, isAgentProvider, type QueueClientMsg } from '../../../shared/protocol.js';
 import { OPEN_CODE_MODEL_MAX } from '../../../shared/providers.js';
+import { isQueueImageId, QUEUE_IMAGES_MAX } from '../../../shared/queue-images.js';
 import { num, str } from '../../office/input.js';
 import { here } from './common.js';
 import type { HandlerMap, ViewPieces } from './types.js';
@@ -19,9 +20,14 @@ export const queueHandlers = {
     const issue = Number.isInteger(msg.issue) && (msg.issue as number) > 0 ? (msg.issue as number) : undefined;
     const model = msg.model === undefined ? undefined : str(msg.model, OPEN_CODE_MODEL_MAX + 1);
     const effort = isAgentEffort(msg.effort) ? msg.effort : undefined;
+    const images = Array.isArray(msg.images) ? msg.images.slice(0, QUEUE_IMAGES_MAX + 1) : [];
+    if (!images.every(isQueueImageId)) {
+      ctx.warn(c, 'Bad picture');
+      return;
+    }
     // Its worker runs on the sign-ins of whoever queued it, whenever it gets a desk.
     ctx.withSignIn(c, ctx.claudeFor(msg.provider ?? floor.workers.officeDefault.provider), () => {
-      const err = floor.queue.add(str(msg.prompt, 20000), who, str(msg.title, 200), issue, msg.provider, model, effort, c.accountId);
+      const err = floor.queue.add(str(msg.prompt, 20000), who, str(msg.title, 200), issue, msg.provider, model, effort, c.accountId, images);
       if (err) ctx.warn(c, err);
       else ctx.toastFloor(floor, `📋 ${who} queued ${issue !== undefined ? `issue #${issue}` : 'a task'}`);
     });

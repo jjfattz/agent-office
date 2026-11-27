@@ -6,6 +6,8 @@ import { DESK_BY_ID, SEATS, nextFreeSeat } from '../shared/layout.js';
 import { validateWorkerEffort, validateWorkerModel } from './agents.js';
 import { savedEffort, savedModel, takesEffort, takesModel } from '../shared/providers.js';
 import { PROMPTS } from '../shared/prompts.js';
+import { isQueueImageId, QUEUE_IMAGES_MAX } from '../shared/queue-images.js';
+import { imagesNote, QueueImages } from './queue-images.js';
 
 /** What the queue needs from the worker manager. Narrow on purpose, so a smoke test can fake it. */
 export interface QueueWorkers {
@@ -63,6 +65,8 @@ export class TaskQueue {
   /** Set on shutdown: the workers' exit events must not seat anyone into a dying office. */
   private stopped = false;
   private lastStatus = new Map<string, WorkerStatus>();
+  /** The pictures attached to tasks. */
+  readonly images: QueueImages;
 
   constructor(
     dataDir: string,
@@ -70,9 +74,13 @@ export class TaskQueue {
     /** Seat workers in their own git worktree (only when the project is a git repo). */
     private useWorktree: boolean,
     private events: QueueEvents,
+    /** The floor's checkout, which its workers' worktrees are relative to. */
+    projectDir = path.dirname(dataDir),
   ) {
     this.statePath = path.join(dataDir, 'queue.json');
+    this.images = new QueueImages(dataDir, projectDir);
     this.restore();
+    this.images.prune(this.attached());
     this.timer = setInterval(() => this.pump(), PUMP_MS);
   }
 
@@ -84,9 +92,12 @@ export class TaskQueue {
     return this.maxWorkers;
   }
 
-  /** Queues a task. With no `provider`, it runs on the office's default worker, model and effort included. */
-  /** Queues a task; `owner` is the account adding it, whose sign-ins its worker will run on. */
-  add(prompt: string, by: string, title?: string, issue?: number, provider?: AgentProvider, model?: string, effort?: AgentEffort, owner?: string): string | undefined {
+  /**
+   * Queues a task. With no `provider`, it runs on the office's default worker, model and effort
+   * included. `owner` is the account adding it, whose sign-ins its worker will run on, and `images`
+   * the pictures sent up for it (see QueueImages).
+   */
+  add(prompt: string, by: string, title?: string, issue?: number, provider?: AgentProvider, model?: string, effort?: AgentEffort, owner?: string, images: string[] = []): string | undefined {
     if (provider === undefined) ({ provider, model, effort } = this.workers.officeDefault ?? { provider: this.workers.defaultProvider });
     if (!isAgentProvider(provider) || (provider === 'custom' && this.workers.defaultProvider !== 'custom')) return 'Unknown agent provider';
     const modelError = validateWorkerModel('agent', provider, model);
@@ -97,6 +108,10 @@ export class TaskQueue {
     if (!clean) return 'Empty task';
     if (issue !== undefined && this.tasks.some((t) => t.issue === issue && t.status !== 'done')) return `Issue #${issue} is already on the queue`;
     if (this.tasks.filter((t) => t.status !== 'done').length >= MAX_TASKS) return `The queue is full (${MAX_TASKS} tasks)`;
+    const pictures = [...new Set(images)];
+    if (pictures.length > QUEUE_IMAGES_MAX) return `A task takes ${QUEUE_IMAGES_MAX} pictures at most`;
+    const taken = this.attached();
+    if (pictures.some((id) => taken.has(id) || !this.images.has(id))) return 'A picture attached to that task is gone: attach it again';
     const task: QueueTask = {
       id: randomBytes(6).toString('hex'),
       provider,
@@ -105,12 +120,14 @@ export class TaskQueue {
       issue,
       title: (title?.trim() || firstLine(clean)).slice(0, 120),
       prompt: clean,
+      ...(pictures.length ? { images: pictures } : {}),
       addedBy: by,
       ...(owner ? { owner } : {}),
       addedAt: Date.now(),
       status: 'queued',
     };
     this.tasks.push(task);
+    this.images.prune(this.attached());
     this.changed();
     this.pump();
     return undefined;
@@ -121,6 +138,7 @@ export class TaskQueue {
     if (!t) return 'No such task';
     if (t.status === 'running') return `${t.workerName ?? 'Its worker'} is on it — send the worker home to stop it`;
     this.tasks.splice(this.tasks.indexOf(t), 1);
+    this.images.remove(t.images ?? []);
     this.changed();
     this.pump();
     return undefined;
@@ -130,7 +148,8 @@ export class TaskQueue {
   dropIssue(issue: number): boolean {
     const i = this.tasks.findIndex((t) => t.issue === issue && t.status === 'queued');
     if (i < 0) return false;
-    this.tasks.splice(i, 1);
+    const [t] = this.tasks.splice(i, 1);
+    this.images.remove(t.images ?? []);
     this.changed();
     return true;
   }
@@ -155,7 +174,7 @@ export class TaskQueue {
     if (t.status !== 'done') return 'That task is still on the queue';
     if (t.issue !== undefined && this.tasks.some((x) => x !== t && x.issue === t.issue && x.status !== 'done')) return `Issue #${t.issue} is already on the queue`;
     this.tasks.splice(this.tasks.indexOf(t), 1);
-    const fresh: QueueTask = { id: t.id, provider: t.provider, model: t.model, effort: t.effort, issue: t.issue, title: t.title, prompt: t.prompt, addedBy: t.addedBy, owner: t.owner, addedAt: Date.now(), status: 'queued' };
+    const fresh: QueueTask = { id: t.id, provider: t.provider, model: t.model, effort: t.effort, issue: t.issue, title: t.title, prompt: t.prompt, images: t.images, addedBy: t.addedBy, owner: t.owner, addedAt: Date.now(), status: 'queued' };
     this.tasks.push(fresh);
     this.changed();
     this.pump();
@@ -164,9 +183,11 @@ export class TaskQueue {
 
   /** Forgets the finished tasks. */
   clear() {
-    const before = this.tasks.length;
+    const gone = this.tasks.filter((t) => t.status === 'done');
+    if (!gone.length) return;
     this.tasks = this.tasks.filter((t) => t.status !== 'done');
-    if (this.tasks.length !== before) this.changed();
+    this.images.remove(gone.flatMap((t) => t.images ?? []));
+    this.changed();
   }
 
   setLimit(n: number) {
@@ -334,7 +355,10 @@ export class TaskQueue {
       const desk = free ?? this.recycleDesk();
       if (!desk) break;
       const note = this.useWorktree ? this.events.worktreeNote?.() ?? PROMPTS['queue.worktree'].text : '';
-      const r = this.workers.spawn(desk, `${t.addedBy} (queue)`, note ? `${t.prompt}\n\n${note}` : t.prompt, this.useWorktree, 'agent', t.provider ?? this.workers.defaultProvider, t.model, t.effort, undefined, t.owner);
+      // Its pictures are named by where they'll be in its folder; a worktree's copy is made once it's cut, below.
+      const pictures = imagesNote(this.images.handTo(t.images ?? []));
+      const prompt = [t.prompt, pictures, note].filter(Boolean).join('\n\n');
+      const r = this.workers.spawn(desk, `${t.addedBy} (queue)`, prompt, this.useWorktree, 'agent', t.provider ?? this.workers.defaultProvider, t.model, t.effort, undefined, t.owner);
       changed = true;
       if (typeof r === 'string') {
         t.status = 'done';
@@ -344,6 +368,7 @@ export class TaskQueue {
         this.events.toast(`📋 Couldn't start ${label(t)}: ${r}`, 'error');
         continue;
       }
+      if (r.worktree && t.images?.length) this.images.handTo(t.images, r.worktree.path);
       t.status = 'running';
       t.workerId = r.id;
       t.workerName = r.name;
@@ -360,6 +385,11 @@ export class TaskQueue {
       }
     }
     if (changed) this.changed();
+  }
+
+  /** Every picture a task on the queue has. */
+  private attached(): Set<string> {
+    return new Set(this.tasks.flatMap((t) => t.images ?? []));
   }
 
   private changed() {
@@ -391,6 +421,7 @@ export class TaskQueue {
           issue: typeof s.issue === 'number' ? s.issue : undefined,
           title: s.title,
           prompt: s.prompt,
+          images: Array.isArray(s.images) ? s.images.filter(isQueueImageId).slice(0, QUEUE_IMAGES_MAX) : undefined,
           addedBy: s.addedBy ?? '?',
           owner: typeof s.owner === 'string' && s.owner ? s.owner : undefined,
           addedAt: s.addedAt ?? Date.now(),

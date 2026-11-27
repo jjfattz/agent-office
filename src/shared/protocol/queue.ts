@@ -16,6 +16,8 @@ export interface QueueTask {
   issue?: number;
   title: string;
   prompt: string;
+  /** Pictures attached to it (ids, see shared/queue-images.ts), handed to its worker as files. */
+  images?: string[];
   addedBy: string;
   /** The account that queued it: its worker runs on that account's own sign-ins. None: the office's own. */
   owner?: string;
@@ -42,7 +44,8 @@ export interface QueueState {
 }
 
 export type QueueClientMsg =
-  | { t: 'queue.add'; prompt: string; title?: string; issue?: number; provider?: AgentProvider; model?: string; effort?: AgentEffort }
+  /** `images`: pictures already sent up to /api/queue/image, by the ids it gave back. */
+  | { t: 'queue.add'; prompt: string; title?: string; issue?: number; provider?: AgentProvider; model?: string; effort?: AgentEffort; images?: string[] }
   | { t: 'queue.remove'; taskId: string }
   /** Move a queued task up (-1) or down (+1) the queue. */
   | { t: 'queue.move'; taskId: string; delta: number }

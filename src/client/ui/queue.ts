@@ -8,6 +8,7 @@ import { confirmDialog } from './prompt';
 import { providerPicker, providerLabel, providerUsageState, providerWaitingLabel, resolvedProvider, modelBadge } from './provider';
 import { officeFull } from '../../shared/machine';
 import { dictateField } from './dictate';
+import { imageAttacher, taskImages } from './queue-images';
 
 export interface QueueActions {
   openTerminal(workerId: string): void;
@@ -56,23 +57,36 @@ export function openQueue(net: Net, actions: QueueActions) {
   const ta = h('textarea', { rows: 2, placeholder: 'Describe a task for the next free worker…', 'aria-label': 'New task' }) as HTMLTextAreaElement;
   const provider = providerPicker(store.project, 'queue-provider');
   const addBtn = h('button.btn.primary', { type: 'submit' }, 'Add to queue');
-  const form = h('form.queue-add', {}, dictateField(ta), provider.element, addBtn) as HTMLFormElement;
+  const form = h('form.queue-add', {}) as HTMLFormElement;
+  const pictures = imageAttacher(ta, form);
+  form.append(dictateField(ta), pictures.list, provider.element, pictures.button, addBtn);
   form.noValidate = true;
-  const submit = () => {
+  let sending = false;
+  const submit = async () => {
     const text = ta.value.trim();
     if (!text) {
       ta.focus();
       return;
     }
-    if (!provider.valid()) return;
-    net.send({ t: 'queue.add', prompt: text, provider: provider.value(), model: provider.model(), effort: provider.effort() });
-    ta.value = '';
+    if (!provider.valid() || sending) return;
+    // Pictures still on their way go up first; the task names them by the ids the office gave them.
+    sending = true;
+    addBtn.disabled = true;
+    try {
+      const images = await pictures.ready();
+      net.send({ t: 'queue.add', prompt: text, provider: provider.value(), model: provider.model(), effort: provider.effort(), ...(images.length ? { images } : {}) });
+      ta.value = '';
+      pictures.clear();
+    } finally {
+      sending = false;
+      addBtn.disabled = false;
+    }
   };
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    submit();
+    void submit();
   });
-  enterSends(ta, submit);
+  enterSends(ta, () => void submit());
 
   const section = (title: string, tasks: QueueTask[], extra?: HTMLElement) => {
     if (!tasks.length) return null;
@@ -134,7 +148,7 @@ export function openQueue(net: Net, actions: QueueActions) {
       'li',
       { class: t.status },
       pos ? h('span.pos', {}, pos) : null,
-      h('div.queue-main', {}, taskTitle(t), h('div.queue-meta', {}, meta.join(' · '))),
+      h('div.queue-main', {}, taskTitle(t), h('div.queue-meta', {}, meta.join(' · ')), taskImages(t)),
       h('div.queue-actions', {}, ...buttons),
     );
   };
@@ -187,6 +201,7 @@ export function openQueue(net: Net, actions: QueueActions) {
     onClose: () => {
       unsubs.forEach((u) => u());
       clearInterval(tick);
+      pictures.clear();
     },
   });
   close.addEventListener('click', () => modal.close());
