@@ -5,7 +5,7 @@ import type { MapConfig, PropConfig } from './types.js';
  * end, up on a dais, a throne of iron blades where you sit. Workers waiting on you (done, or stuck
  * on a question) come and line up in front of it. The Hand of the King stands at your left, and
  * speaking to him sends a new worker off to a free seat at the tables. The boards hang on the side
- * walls, each with a scribe at a lectern below it.
+ * walls.
  *
  * This is all data: moving something is changing a number here, or (without touching the code)
  * a map of your own that `extends: 'castle'` in the office's .agent-office/maps/ (docs/maps.md).
@@ -97,11 +97,6 @@ export const CASTLE: MapConfig = {
     { name: 'South-west table', x: -6.8, z: 6, length: 10, seats: 4 },
     { name: 'South-east table', x: 6.8, z: 6, length: 10, seats: 4 },
   ],
-  stations: {
-    issues: { x: -11.3, z: -15, rotY: -Math.PI / 2 },
-    queue: { x: -11.3, z: -3, rotY: -Math.PI / 2 },
-    pulls: { x: 11.3, z: -15, rotY: Math.PI / 2 },
-  },
   council: { x: 6.6, z: -18.8, rotY: 0 },
   boards: {
     issues: { x: -WALL_X, y: 3.5, z: -15, rotY: Math.PI / 2, width: 4.4, height: 2.6, label: '📜 Petitions' },

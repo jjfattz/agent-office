@@ -832,7 +832,7 @@ export class DshSession {
     flushEcho();
   }
 
-  /** A prompt from the office (the prompt box, the queue, a board agent): echoed, then submitted. */
+  /** A prompt from the office (the prompt box, the queue): echoed, then submitted. */
   prompt(text: string): void {
     const clean = text.replace(/\r\n?/g, '\n').trim();
     if (!clean) return;

@@ -53,7 +53,7 @@ export interface FloorInfo {
   addedAt: number;
   /**
    * For the elevator panel: who's there and what they're up to. `workers` counts the ones hired onto
-   * desks, bean bags and the meeting room's table, not the board agents at their kiosks.
+   * desks, bean bags and the meeting room's table.
    */
   workers: number;
   busy: number;

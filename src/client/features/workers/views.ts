@@ -126,9 +126,9 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
         model.setOutfit(plan().agents.outfit === 'peasant' ? 'peasant' : null);
         model.setAge(ageOf(w));
         desk.seatAnchor.add(model.root);
-        // Its globe floats beside the laptop (or the kiosk's counter), out from behind the card over
-        // its head and the back of its chair, so it shows from across the room.
-        const beside = desk.def.station ? new THREE.Vector3(0.62, 0.9, 0) : new THREE.Vector3(0.64, 0.5, -0.1);
+        // Its globe floats beside the laptop, out from behind the card over its head and the back of
+        // its chair, so it shows from across the room.
+        const beside = new THREE.Vector3(0.64, 0.5, -0.1);
         model.setPropSpot(model.root.worldToLocal(desk.laptopAnchor.localToWorld(beside)));
         // Called to a meeting just now: out of the elevator and over to the table, one after another.
         if (desk.def.room && !seatedAlready) arrivals.add(model, desk);
@@ -199,10 +199,10 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
     renderTitle();
   }
 
-  /** A worker that sits at the tables (not a board agent or at the meeting table): it gets up and lines up for the throne. */
+  /** A worker that sits at the tables (not at the meeting table): it gets up and lines up for the throne. */
   function inCourt(w: WorkerInfo): boolean {
     const d = plan().byId.get(w.deskId);
-    return w.kind === 'agent' && !!d && !d.station && !d.room && !w.meeting;
+    return w.kind === 'agent' && !!d && !d.room && !w.meeting;
   }
 
   /**
@@ -270,8 +270,7 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
   }
 
   /**
-   * A seat or kiosk shows it's free (its '+', or the board agent waiting there) only while nobody's at
-   * it, and once every desk is taken, bean bags come out for the workers who don't fit.
+   * A seat shows it's free (its '+') only while nobody's at it, and once every desk is taken, bean bags come out for the workers who don't fit.
    */
   function arrangeSeats() {
     const world = ctx.world();
@@ -302,10 +301,8 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
       const d = v.model.root.getWorldPosition(workerPos).distanceTo(player.pos);
       v.model.held = d < (v.model.held ? HOLD_LEAVE : HOLD_NEAR);
       v.model.update(dt, t);
-      // A board agent's kiosk has no laptop to paint (see buildKiosk).
-      if (!desk.station) v.laptop.update(dt, store.screens.get(id), Math.hypot(desk.x - camPos.x, desk.z - camPos.z));
+      v.laptop.update(dt, store.screens.get(id), Math.hypot(desk.x - camPos.x, desk.z - camPos.z));
     }
-    for (const a of parts.worlds.idleAgents()) if (a.view.vacancy.visible) a.model.update(dt, t);
     departures.update(dt, t);
     if (!core.upTop) {
       sendoffs.update(dt, t);
@@ -383,7 +380,6 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
     me.setCostume(theme);
     for (const r of parts.peers.remotes.values()) r.person.setCostume(theme);
     for (const v of workerViews.values()) v.model.setCostume(theme);
-    for (const a of parts.worlds.idleAgents()) a.model.setCostume(theme);
     ctx.world().herald?.person.setCostume(theme);
   }
   store.on('theme', dressUp);

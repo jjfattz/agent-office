@@ -1,6 +1,6 @@
 // Starting things for the workers: which shell, where a command is, how to run one without
 // blocking the office, and the install's own bin/ scripts and the commands that run them.
-import { accessSync, chmodSync, constants, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { accessSync, chmodSync, constants, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { execFile, execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -80,14 +80,16 @@ export function shq(s: string) {
 }
 
 /**
- * Writes the office-queue and office-workers commands into the data dir's bin/, each running its
- * script in bin/ with the office's own node, and returns that directory. Rewritten on every start,
- * so after an upgrade they run the new install's scripts.
+ * Writes the office-workers command into the data dir's bin/, running its script in bin/ with the
+ * office's own node, and returns that directory. Rewritten on every start, so after an upgrade it
+ * runs the new install's script.
  */
 export function writeOfficeCommands(dataDir: string): string | undefined {
   const dir = path.join(dataDir, 'bin');
+  // The board agents' office-queue command, from before they were let go.
+  for (const old of ['office-queue', 'office-queue.cmd']) rmSync(path.join(dir, old), { force: true });
   let wrote = false;
-  for (const [name, what] of [['office-queue', "Agent Office's task queue, for the board agents"], ['office-workers', "Agent Office's workers, for every worker"]]) {
+  for (const [name, what] of [['office-workers', "Agent Office's workers, for every worker"]]) {
     const script = binScript(`${name}.js`);
     if (!script) continue;
     mkdirSync(dir, { recursive: true, mode: 0o700 });

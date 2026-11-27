@@ -38,7 +38,7 @@ export interface World {
   interactables: Interactable[];
   /** What a click at the scene can land on. */
   pickables: THREE.Object3D[];
-  /** Every seat by id: the desks, the overflow seats, the board agents' places and the meeting chairs. */
+  /** Every seat by id: the desks, the overflow seats and the meeting chairs. */
   desks: Map<string, DeskView>;
   boardMeshes: Record<BoardKey, THREE.Mesh>;
   /** The meeting's output as it's written, and how the meeting's going, where the map shows them. */

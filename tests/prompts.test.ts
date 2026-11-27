@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { PROMPTS, PROMPT_IDS, PROMPT_MAX, fillPrompt, placeholders, promptText } from '../src/shared/prompts.js';
 import { OfficePrompts, officePrompt, type PromptSource } from '../src/server/prompts.js';
-import { stationBrief } from '../src/server/stations.js';
 import { TaskQueue, type QueueWorkers } from '../src/server/queue.js';
 import type { AgentChoice, PromptsState, WorkerInfo } from '../src/shared/protocol.js';
 
@@ -104,12 +103,6 @@ test('the default worker is checked before it is kept, and one the office can no
   assert.ok(readFileSync(file, 'utf8'));
 });
 
-test('a board agent is told its rewritten brief', () => {
-  const source: PromptSource = { text: (id) => (id === 'station.pulls' ? 'You review PRs. The request:' : PROMPTS[id].text), agent: () => undefined };
-  assert.equal(stationBrief('pulls', source), 'You review PRs. The request:');
-  assert.equal(stationBrief('issues', source), stationBrief('issues'));
-});
-
 function queueFixture(t: { after(fn: () => void): void }, officeDefault: AgentChoice | undefined, note?: string) {
   const dir = scratch(t);
   const workers: WorkerInfo[] = [];
@@ -135,7 +128,7 @@ function queueFixture(t: { after(fn: () => void): void }, officeDefault: AgentCh
 
 test('a task nobody picked a worker for runs on the office default; one that did keeps its own', (t) => {
   const { queue, workers } = queueFixture(t, { provider: 'claude', model: 'sonnet', effort: 'low' });
-  assert.equal(queue.add('Fix the dog', 'Queue agent'), undefined);
+  assert.equal(queue.add('Fix the dog', 'Ada'), undefined);
   assert.deepEqual([workers[0].provider, workers[0].model, workers[0].effort], ['claude', 'sonnet', 'low']);
   assert.equal(queue.add('Fix the cat', 'Ada', undefined, undefined, 'claude', 'haiku'), undefined);
   assert.deepEqual([workers[1].provider, workers[1].model, workers[1].effort], ['claude', 'haiku', undefined]);

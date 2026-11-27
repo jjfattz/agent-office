@@ -44,7 +44,7 @@ export function workerCard(w: WorkerInfo, a: CardActions): HTMLElement {
   const sub = [
     w.kind === 'agent' ? `⚙️ ${providerLabel(w.provider, store.project)}${badge ? ` · ${badge}` : ''}` : '🐚 shell',
     w.account && store.accountName(w.account) && `🪪 ${store.accountName(w.account)}`,
-    desk && (desk.station ? `📌 ${desk.label}` : desk.label),
+    desk?.label,
     w.worktree && `🌿 ${w.worktree.branch}`,
     w.pr && `🔀 PR #${w.pr.number}`,
     w.lastInput && `⌨️ ${w.lastInput.by} ${timeAgo(w.lastInput.at)}`,

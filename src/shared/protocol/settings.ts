@@ -45,7 +45,7 @@ export interface MachineState {
   history: [number, number][];
   /** What makes another worker a strain right now, e.g. "memory is 93% used"; missing when nothing does. */
   pressure?: string;
-  /** Workers in the office now: every floor's, shells and board agents too. */
+  /** Workers in the office now: every floor's, shells too. */
   workers: number;
   /** The most workers the office takes; missing when there's no limit. */
   limit?: number;

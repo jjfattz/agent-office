@@ -1,4 +1,4 @@
-import { BEANBAGS, BOARDS, DESKS, ELEVATOR, ELEVATOR_CAR, EXIT_DOOR, FLOOR, MEETING_SEATS, SEATING, STATIONS, STATION_AGENT, WALL_HEIGHT, WING_DESKS, seatHere, seatPlace, type DeskDef, type SeatDef, type SeatPlace, type StationKind } from '../layout.js';
+import { BEANBAGS, BOARDS, DESKS, ELEVATOR, ELEVATOR_CAR, EXIT_DOOR, FLOOR, MEETING_SEATS, SEATING, WALL_HEIGHT, WING_DESKS, seatHere, seatPlace, type DeskDef, type SeatDef, type SeatPlace } from '../layout.js';
 import type { Circle, Rect } from '../nav.js';
 import { planAirlock, wallOpenings } from './airlock.js';
 import { CASTLE } from './castle.js';
@@ -24,7 +24,6 @@ const STYLE_PROPS: Record<MapStyle, { kinds: Readonly<Record<string, string>>; f
   station: { kinds: STATION_PROP_KINDS, footprint: stationFootprint, top: stationTop },
 };
 
-const STATION_KINDS: readonly StationKind[] = ['issues', 'pulls', 'queue'];
 /** How far in from a table's edge a seat's place setting is; the worker sits 0.85 out from it (see deskSeat), on the bench. */
 const PLACE_IN = 0.35;
 /** How far out from a table's edge the middle of the bench down that side is. */
@@ -58,7 +57,7 @@ const DEFAULT_BOARD_LABEL: Record<BoardKey, string> = { issues: 'Issues', queue:
 const MAP_DESKS: DeskDef[] = [...DESKS, ...WING_DESKS];
 
 function officePlan(): MapPlan {
-  const byId = new Map([...MAP_DESKS, ...BEANBAGS, ...STATIONS, ...MEETING_SEATS].map((d) => [d.id, d]));
+  const byId = new Map([...MAP_DESKS, ...BEANBAGS, ...MEETING_SEATS].map((d) => [d.id, d]));
   const boards = {} as Record<BoardKey, BoardDef>;
   for (const k of BOARD_KEYS) boards[k] = { ...BOARDS[k] };
   return {
@@ -72,7 +71,6 @@ function officePlan(): MapPlan {
     spawn: { x: ELEVATOR.x, y: 0, z: (ELEVATOR_CAR.minZ + ELEVATOR_CAR.maxZ) / 2, rotY: 0 },
     desks: MAP_DESKS,
     overflow: BEANBAGS,
-    stations: STATIONS,
     meeting: MEETING_SEATS,
     byId,
     seating: SEATING,
@@ -212,19 +210,6 @@ export function planMap(input: unknown): MapPlan {
   });
   const desks: DeskDef[] = named.slice(0, MAP_DESKS.length).map((d, i) => ({ ...d, id: MAP_DESKS[i].id }));
   const overflow: DeskDef[] = named.slice(MAP_DESKS.length).map((d, i) => ({ ...d, id: BEANBAGS[i].id }));
-
-  // The board agents' lecterns.
-  if (!isObj(c.stations)) throw new MapError('it needs stations: where the Issues, PR and Queue agents stand');
-  const stations: DeskDef[] = STATION_KINDS.map((kind) => {
-    const p = place(c.stations[kind], `stations.${kind}`);
-    const def = { id: `station-${kind}`, station: kind, x: p.x, z: p.z, rotY: p.rotY, label: STATION_AGENT[kind].name };
-    // The agent stands behind its lectern: that's in the hall too.
-    inside(p.x + Math.sin(p.rotY) * 0.9, p.z + Math.cos(p.rotY) * 0.9, `where the ${STATION_AGENT[kind].name} stands`, 0);
-    // The lectern, and the agent standing behind it.
-    const corners = [-1, 1].flatMap((t) => [-0.25, 0.9].map((s) => [p.x + Math.cos(p.rotY) * t * 0.4 + Math.sin(p.rotY) * s, p.z - Math.sin(p.rotY) * t * 0.4 + Math.cos(p.rotY) * s]));
-    rects.push([Math.min(...corners.map((q) => q[0])), Math.max(...corners.map((q) => q[0])), Math.min(...corners.map((q) => q[1])), Math.max(...corners.map((q) => q[1]))]);
-    return def;
-  });
 
   // The meeting table: five chairs round it, the head of the table first.
   const council = place(c.council, 'council');
@@ -370,7 +355,7 @@ export function planMap(input: unknown): MapPlan {
   const sendHome = planSendHome(c.sendHome, bounds, free, dungeon, airlock);
   const outfit = c.agents?.outfit === 'peasant' ? 'peasant' : 'none';
   const ageMinutes = c.agents?.ageMinutes === undefined ? 0 : num(c.agents.ageMinutes, 'agents.ageMinutes', 0, 100000);
-  const byId = new Map([...desks, ...overflow, ...stations, ...meeting].map((d) => [d.id, d]));
+  const byId = new Map([...desks, ...overflow, ...meeting].map((d) => [d.id, d]));
   for (const d of byId.values()) inside(d.x, d.z, d.label);
   return {
     id,
@@ -384,7 +369,6 @@ export function planMap(input: unknown): MapPlan {
     spawn: { ...spawn, y: 0 },
     desks,
     overflow,
-    stations,
     meeting,
     byId,
     seating,

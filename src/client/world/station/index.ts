@@ -13,20 +13,20 @@ import { buildAirlock } from './airlock';
 import { buildBoards } from './boards';
 import { materials, type Kit } from './kit';
 import { PROPS } from './props';
-import { agentConsole, buildBenches, buildBridge, buildBriefing, placeSetting } from './seats';
+import { buildBenches, buildBridge, buildBriefing, placeSetting } from './seats';
 import { buildShell } from './shell';
 import { SUNWARD, buildSpace } from './space';
 
 /*
  * The station's style of map (see shared/maps/station.ts for the station itself): a pressurised
  * deck in orbit, windows cut through its hull onto the stars and the Earth, a bridge at one end with
- * the captain's chair on it, long benches for the workers, consoles for the board agents, a briefing
+ * the captain's chair on it, long benches for the workers, a briefing
  * table for meetings, and an airlock to see workers off through. Everything is placed from the map's
  * plan, so another map in this style is just other numbers.
  *
  * It goes up a part at a time, each in a file of its own beside this one: the shell (the deck, the
  * hull and what's cut through it, the hatch and the solar wings), the airlock, the props (one builder
- * for each kind), the seats (the benches, the consoles, the briefing table and the bridge), the
+ * for each kind), the seats (the benches, the briefing table and the bridge), the
  * boards, the people, and space itself, outside (space.ts). What they build with is in kit.ts.
  */
 
@@ -68,7 +68,6 @@ export function buildStation(plan: MapPlan): World {
     kit.desks.set(def.id, view);
     overflow.set(def.id, it);
   }
-  for (const def of plan.stations) kit.desks.set(def.id, agentConsole(kit, def));
   const briefing = buildBriefing(kit);
   const boardMeshes = buildBoards(kit);
   const herald = buildHerald(kit);
@@ -174,7 +173,7 @@ export function buildStation(plan: MapPlan): World {
         shell.slide(doorOpen);
       }
       for (const d of kit.desks.values()) {
-        if (!d.vacancy.visible || !d.group.visible || d.def.station) continue;
+        if (!d.vacancy.visible || !d.group.visible) continue;
         d.vacancy.position.y = d.vacancyY + Math.sin(t * 2 + d.def.x) * 0.06;
         d.vacancy.rotation.y = t * 1.2;
       }

@@ -25,7 +25,7 @@ import { plug, walls, type Door } from './shell';
 import { balcony } from './balcony';
 import { downstairs } from './ground';
 import { wing } from './wing';
-import { beanbags, desks, kiosks } from './seats';
+import { beanbags, desks } from './seats';
 import { meetingRoom } from './meeting-room';
 import { loft } from './loft';
 import type { Fixture, Gives, Site } from './fixture';
@@ -51,7 +51,6 @@ function floorPlan() {
     tower,
     desks,
     beanbags,
-    kiosks,
     boards,
     // The lounge: the TV, the couch and its table and poufs, and the jukebox and the arcade in the corner.
     tv,
@@ -152,8 +151,7 @@ export function buildOffice(): Office {
       d.show(d.open);
     }
     for (const d of desks.values()) {
-      // A board agent waiting to be asked stands still (its own idle bob is in Worker.update).
-      if (!d.vacancy.visible || !d.group.visible || d.def.station) continue;
+      if (!d.vacancy.visible || !d.group.visible) continue;
       d.vacancy.position.y = d.vacancyY + Math.sin(t * 2 + d.def.x) * 0.06;
       d.vacancy.rotation.y = t * 1.2;
     }

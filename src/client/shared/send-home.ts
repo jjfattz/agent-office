@@ -9,10 +9,9 @@ import { store } from '../state';
 import { confirmDialog, sendHomeDialog } from '../ui/prompt';
 import { providerLabel } from '../ui/provider';
 
-/** Where the worker sits: its desk's label, and whether it's a board agent's (which keeps its desk). */
+/** Where the worker sits: its desk's label. */
 export interface HomeDesk {
   label: string;
-  station?: unknown;
 }
 
 /** Asks before sending `w` home, then tells the office. */
@@ -39,8 +38,6 @@ export function askSendHome(net: Net, w: WorkerInfo, desk: HomeDesk | undefined)
     });
     return;
   }
-  const body = desk?.station
-    ? `This stops its ${session} for everyone, and it forgets what it was asked. The next prompt at the ${where} starts a fresh one.`
-    : `This stops the ${session} at ${where} for everyone and frees the desk.`;
+  const body = `This stops the ${session} at ${where} for everyone and frees the desk.`;
   confirmDialog(`Send ${w.name} home?`, body, 'Send home', () => net.send({ t: 'worker.kill', workerId: w.id }));
 }

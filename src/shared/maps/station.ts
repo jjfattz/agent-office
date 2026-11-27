@@ -5,8 +5,7 @@ import type { MapConfig, PropConfig } from './types.js';
  * the forward end is the bridge, a raised deck under a wall of glass with the captain's chair on it,
  * where you sit; the workers sit at the benches down both sides, and line up before the chair when
  * they're done or need you. The First Officer stands at your left and brings a new worker aboard
- * when you speak to them. The boards are displays on the side walls, a board agent at a console
- * under each. Aft is the hatch workers come in through, and in the starboard wall, between two big
+ * when you speak to them. The boards are displays on the side walls. Aft is the hatch workers come in through, and in the starboard wall, between two big
  * observation windows, the airlock: a worker sent home is marched to it by Security and blown out
  * into space, and everyone ever ejected is still adrift out there, to be seen from those windows.
  *
@@ -82,11 +81,6 @@ export const STATION: MapConfig = {
     { name: 'Port aft bench', x: -BENCH_X, z: 6, length: 10, seats: 4 },
     { name: 'Starboard aft bench', x: BENCH_X, z: 6, length: 10, seats: 4 },
   ],
-  stations: {
-    issues: { x: -13.2, z: BOARDS_Z[0], rotY: -Math.PI / 2 },
-    queue: { x: -13.2, z: BOARDS_Z[1], rotY: -Math.PI / 2 },
-    pulls: { x: 13.2, z: BOARDS_Z[0], rotY: Math.PI / 2 },
-  },
   // The briefing table, aft on the starboard side.
   council: { x: 10, z: 24.8, rotY: Math.PI },
   boards: {

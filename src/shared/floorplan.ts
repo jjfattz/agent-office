@@ -38,7 +38,7 @@ export const SIGN_COLORS = [
 /** A few to start from, in the label window. */
 export const LABEL_IDEAS = ['Operations', 'Code cleanup', 'Frontend', 'Backend', 'Bug fixes', 'Docs', 'Infra', 'Research'];
 
-/** Desks that can have a sign: the room's and the back office's, not the bean bags, kiosks or meeting chairs. */
+/** Desks that can have a sign: the room's and the back office's, not the bean bags or meeting chairs. */
 const LABELABLE = new Set([...DESKS, ...WING_DESKS].map((d) => d.id));
 
 export function canLabel(deskId: string): boolean {

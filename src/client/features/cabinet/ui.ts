@@ -466,5 +466,5 @@ export function lostGame(asked: string, id: string): boolean {
 /** " at Desk 3", or nothing when it's not at a desk here. */
 function deskOf(w: WorkerInfo): string {
   const d = store.plan().byId.get(w.deskId);
-  return d ? ` at ${d.station ? `the ${d.label}` : d.label}` : '';
+  return d ? ` at ${d.label}` : '';
 }

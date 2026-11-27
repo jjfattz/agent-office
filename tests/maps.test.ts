@@ -16,8 +16,6 @@ test('every built-in map places every seat the office has, by the same ids', () 
     assert.deepEqual(new Set(plan.byId.keys()), new Set(DESK_BY_ID.keys()), `${config.id} has the office's seats`);
     for (const [id, d] of plan.byId) {
       const office = DESK_BY_ID.get(id)!;
-      assert.equal(!!d.station, !!office.station, `${id} is a kiosk on both`);
-      assert.equal(d.station, office.station);
       assert.equal(!!d.room, !!office.room, `${id} is a meeting chair on both`);
     }
   }

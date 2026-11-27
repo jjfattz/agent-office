@@ -271,8 +271,8 @@ export class TaskQueue {
   }
 
   /**
-   * The queue's own tasks at work: the slots under its limit. Workers hired by hand, board agents and
-   * meetings don't hold one, and nor does a worker left at its prompt after a restart; the office's
+   * The queue's own tasks at work: the slots under its limit. Workers hired by hand and meetings
+   * don't hold one, and nor does a worker left at its prompt after a restart; the office's
    * worker limit (`room`) is what caps everyone together.
    */
   private busy(): number {

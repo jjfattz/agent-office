@@ -1,7 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { GhPull, LeaveOnMergeState, QueueTask, WorkerInfo } from '../shared/protocol.js';
-import { DESK_BY_ID } from '../shared/layout.js';
 import { isBusy, workerPr, type WorkerPr } from '../shared/status.js';
 
 /**
@@ -68,7 +67,7 @@ export interface Landed {
 /**
  * The workers free to go home because their work landed: a pull request of theirs merged and none
  * is still open (the same call as the purple bubble, see workerPr), they're at rest, and nobody has
- * their terminal open. Board agents, shells and the meeting table don't come and go by pull request.
+ * their terminal open. Shells and the meeting table don't come and go by pull request.
  * A worker across repositories has pull requests on other floors too (`pullsOf` has their lists):
  * none of them may be open, or opened from its desk but missing from its floor's list.
  */
@@ -89,7 +88,6 @@ export function landedWorkers(workers: WorkerInfo[], pulls: GhPull[], tasks: Que
 export function notLeaving(w: WorkerInfo): string | undefined {
   if (w.kind !== 'agent') return 'a shell';
   if (w.meeting) return 'at the meeting table';
-  if (DESK_BY_ID.get(w.deskId)?.station) return 'a board agent';
   if (isBusy(w.status)) return w.status === 'needs_input' ? 'waiting on someone' : 'still working';
   if (w.prOpening) return 'opening a pull request';
   if (w.viewers.length) return `${w.viewers.join(', ')} ${w.viewers.length === 1 ? 'has' : 'have'} its terminal open`;

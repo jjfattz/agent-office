@@ -1,4 +1,4 @@
-import type { DeskDef, SeatDef, StationKind } from '../layout.js';
+import type { DeskDef, SeatDef } from '../layout.js';
 import type { Bounds, Obstacles, Pt, Rect } from '../nav.js';
 
 /*
@@ -7,8 +7,7 @@ import type { Bounds, Obstacles, Pt, Rect } from '../nav.js';
  * into a MapPlan, and a builder for its `style` (the castle's is world/castle/, the station's
  * world/station/) puts up. A config can come from this folder (the built-in ones, ./castle.ts and
  * ./station.ts) or from a JSON file in the office's `.agent-office/maps/` (see docs/maps.md). Every
- * map places the same seats (the desks, the overflow seats, the board agents' kiosks and the meeting
- * chairs, by id), so workers, the queue and meetings work the same on any of them, and a worker keeps
+ * map places the same seats (the desks, the overflow seats and the meeting chairs, by id), so workers, the queue and meetings work the same on any of them, and a worker keeps
  * its seat when the building changes maps.
  */
 
@@ -191,8 +190,6 @@ export interface MapConfig {
   lineup?: { x: number; z: number; rotY: number; step: [number, number]; count: number } | null;
   /** Where the workers sit. The sides toward the middle of the hall fill first. */
   tables: TableConfig[];
-  /** The board agents, each at a lectern: where the lectern is, and `rotY` from it to where the agent stands (it faces back across the lectern, into the hall). */
-  stations: Record<StationKind, Place>;
   /** The meeting table: five chairs round it, the head of the table's on its `rotY` side (facing back across it), and the easel on the other. */
   council: Place;
   boards: Record<BoardKey, BoardPlace>;
@@ -234,7 +231,6 @@ export interface MapPlan {
   /** The regular seats, then the overflow ones that only come out once they're all taken (the office's bean bags). */
   desks: DeskDef[];
   overflow: DeskDef[];
-  stations: DeskDef[];
   meeting: DeskDef[];
   /** Everywhere a worker can be, by id. */
   byId: Map<string, DeskDef>;

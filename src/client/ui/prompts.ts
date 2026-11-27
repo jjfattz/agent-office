@@ -22,9 +22,8 @@ const norm = (text: string) => text.replace(/\r\n?/g, '\n').trim();
 
 /**
  * The office's prompts, to read and (for admins) rewrite: what the boards' buttons send workers, the
- * queue's worktree note, the board agents' briefs, the meeting room's parts and the sign-writer's
- * instructions. A list down the side, grouped by where they're used; the one picked, with its
- * placeholders, on the right.
+ * queue's worktree note, the meeting room's parts and the sign-writer's instructions. A list down the
+ * side, grouped by where they're used; the one picked, with its placeholders, on the right.
  */
 export function openPromptEditor(net: Net, first: PromptId = PROMPT_IDS[0]) {
   let current = first;

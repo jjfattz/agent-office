@@ -1,8 +1,7 @@
 import * as THREE from 'three';
-import { KIOSK, STATION_AGENT, deskSeat, type DeskDef, type StationKind } from '../../../shared/layout';
+import { deskSeat, type DeskDef } from '../../../shared/layout';
 import { BENCH_OUT, COUNCIL, type MapPlan } from '../../../shared/maps';
 import { boxFootprint } from '../../../shared/maps/props';
-import { deskPoint } from '../../../shared/nav';
 import { vacancyMarker } from '../office';
 import type { DeskView, Interactable } from '../types';
 import { mesh, roundedBox, textPlane, toon } from '../toon';
@@ -10,8 +9,8 @@ import { flame } from './fire';
 import { BENCH_TOP, TABLE_TOP, collide, xz, type Kit } from './kit';
 import { box } from './shapes';
 
-// Where everyone sits and stands: the long tables and their benches with a place at each for a
-// worker, the board agents' lecterns, and the round table the meetings are held at.
+// Where everyone sits: the long tables and their benches with a place at each for a worker, and the
+// round table the meetings are held at.
 
 /** The long tables and their benches, as the plan has them, with candles down the middle. */
 export function buildTables(kit: Kit, plan: MapPlan) {
@@ -131,63 +130,6 @@ export function buildCouncil(kit: Kit, plan: MapPlan): { board?: THREE.Mesh; sig
   const [minX, maxX, minZ, maxZ] = boxFootprint(easel.position.x, easel.position.z, 2.6, 0.5, cp.rotY);
   kit.colliders.push({ minX, maxX, minZ, maxZ, top: 99 });
   return { board, sign };
-}
-
-const LECTERN_SIGN: Record<StationKind, string> = { issues: '📜 Ask me', pulls: '🔀 Ask me', queue: '📋 Ask me' };
-
-/** A board agent's lectern (a scribe's desk): the agent stands behind it, as at the office's kiosk. */
-export function lectern(kit: Kit, def: DeskDef): DeskView {
-  const kind = def.station!;
-  const g = new THREE.Group();
-  g.position.set(def.x, 0, def.z);
-  g.rotation.y = def.rotY;
-  const { woodDark, wood, parchment } = kit.mats;
-  g.add(mesh(box(0.5, 0.06, 0.4), woodDark, 0, 0.03, 0));
-  g.add(mesh(box(0.14, 0.95, 0.14), woodDark, 0, 0.5, 0));
-  const top = new THREE.Group();
-  top.position.set(0, 1.0, 0);
-  top.rotation.x = 0.35;
-  top.add(mesh(box(KIOSK.width, 0.06, KIOSK.depth), wood, 0, 0, 0));
-  // An open book on it, its pages facing whoever walks up (-z, the room).
-  for (const sx of [-1, 1]) {
-    const pg = mesh(box(0.28, 0.03, 0.36), parchment, sx * 0.15, 0.045, 0, false);
-    pg.rotation.z = sx * 0.08;
-    top.add(pg);
-  }
-  top.add(mesh(box(0.02, 0.2, 0.02), toon('#f3ead2'), 0.3, 0.1, 0.15, false));
-  g.add(top);
-  // The agent's color on a cloth over the front, and a sign.
-  g.add(mesh(box(0.42, 0.55, 0.02), toon(STATION_AGENT[kind].color), 0, 0.62, -0.09, false));
-  const sign = textPlane(LECTERN_SIGN[kind], { bg: '#efe3c2', size: 56 });
-  sign.scale.multiplyScalar(0.55);
-  sign.position.set(0, 0.62, -0.11);
-  sign.rotation.y = Math.PI;
-  g.add(sign);
-  const laptopAnchor = new THREE.Object3D();
-  laptopAnchor.visible = false;
-  g.add(laptopAnchor);
-  // On its feet behind the lectern, facing it and the room beyond.
-  const stand = new THREE.Object3D();
-  stand.position.set(0, -0.07 * 1.1, KIOSK.stand);
-  stand.rotation.y = Math.PI;
-  stand.scale.setScalar(1.1);
-  const seatAnchor = stand.clone();
-  g.add(seatAnchor);
-  const vacancy = new THREE.Group();
-  vacancy.add(stand);
-  g.add(vacancy);
-  const stage = new THREE.Object3D();
-  stage.position.set(0, 1.0, 0);
-  stage.rotation.y = Math.PI;
-  g.add(stage);
-  kit.group.add(g);
-  const corners = [-1, 1].flatMap((t) => [-0.25, KIOSK.stand + 0.35].map((s) => deskPoint(def, (t * KIOSK.width) / 2, s)));
-  kit.colliders.push({ minX: Math.min(...corners.map((p) => p[0])), maxX: Math.max(...corners.map((p) => p[0])), minZ: Math.min(...corners.map((p) => p[1])), maxZ: Math.max(...corners.map((p) => p[1])), top: 1.5, fence: true });
-  const [fx, fz] = deskPoint(def, 0, -1);
-  const it: Interactable = { kind: 'station', deskId: def.id, x: fx, z: fz, radius: 1.3 };
-  kit.interactables.push(it);
-  g.userData.interact = it;
-  return { def, group: g, laptopAnchor, seatAnchor, stage, chair: new THREE.Group(), vacancy, vacancyY: 0 };
 }
 
 /** A high-backed chair at the meeting table, with its tome on the table in front of it. */
