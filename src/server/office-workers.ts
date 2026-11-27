@@ -1,12 +1,12 @@
 // The office's workers, for the agents working in it: what `office-workers` and the agent-office MCP
 // server (bin/office-workers.js) get from the /office/workers endpoint on the loopback hook port, and
-// how their requests are read. The endpoint itself is in server.ts, next to the board agents' queue.
+// how their requests are read. The endpoint itself is in hooks/office-workers.ts.
 
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { AgentEffort, AgentProvider, GhPull, QueueTask, WorkerInfo, WorkerStatus, WorktreeCleanup } from '../shared/protocol.js';
 import { isAgentEffort, isAgentProvider } from '../shared/protocol.js';
-import { DESK_BY_ID, STATION_AGENT } from '../shared/layout.js';
+import { DESK_BY_ID } from '../shared/layout.js';
 import { workerPr } from '../shared/status.js';
 import { landedWork, notLeaving } from './leave-on-merge.js';
 
@@ -19,8 +19,6 @@ export interface WorkerRow {
   model?: string;
   desk: string;
   status: WorkerStatus;
-  /** The board it stands by, for a board agent ("PR agent"). */
-  board?: string;
   /** At the meeting room's table, called to a meeting. */
   meeting?: true;
   /** The worker asking. */
@@ -77,7 +75,6 @@ export function workerRow(w: WorkerInfo, view: PullsView, me?: string): WorkerRo
     ...(w.model ? { model: w.model } : {}),
     desk: seat?.label ?? w.deskId,
     status: w.status,
-    ...(seat?.station ? { board: STATION_AGENT[seat.station].name } : {}),
     ...(w.meeting ? { meeting: true as const } : {}),
     ...(w.id === me ? { you: true as const } : {}),
     ...(task ? { task } : {}),
@@ -151,9 +148,9 @@ export function readHireRequest(body: unknown, providers: AgentProvider[]): Hire
   if (b.model !== undefined && (typeof b.model !== 'string' || !b.model.trim() || b.model.length > 200)) return 'model is a model name';
   if (b.effort !== undefined && !isAgentEffort(b.effort)) return 'effort is one of low, medium, high, xhigh, max';
   if (b.worktree !== undefined && typeof b.worktree !== 'boolean') return 'worktree is true or false';
-  // Board kiosks and the meeting table seat their own: see station.prompt and meetings.ts.
+  // The meeting table seats its own: see meetings.ts.
   const seat = typeof b.desk === 'string' ? DESK_BY_ID.get(b.desk) : undefined;
-  if (b.desk !== undefined && (!seat || seat.station || seat.room)) return "desk is a desk or bean bag's id, like desk-3";
+  if (b.desk !== undefined && (!seat || seat.room)) return "desk is a desk or bean bag's id, like desk-3";
   if (b.issue !== undefined && !(Number.isSafeInteger(b.issue) && (b.issue as number) > 0)) return 'issue is an issue number';
   return {
     prompt,

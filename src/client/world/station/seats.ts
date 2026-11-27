@@ -1,16 +1,14 @@
 import * as THREE from 'three';
-import { KIOSK, STATION_AGENT, deskSeat, type DeskDef, type StationKind } from '../../../shared/layout';
+import { deskSeat, type DeskDef } from '../../../shared/layout';
 import { BENCH_OUT, COUNCIL, THRONE_SIZE } from '../../../shared/maps';
 import { boxFootprint } from '../../../shared/maps/props';
-import { deskPoint } from '../../../shared/nav';
 import { vacancyMarker } from '../office';
 import type { DeskView, Interactable } from '../types';
 import { mesh, roundedBox, textPlane } from '../toon';
 import { BENCH_TOP, TABLE_TOP, box, collide, lit, xz, type Kit } from './kit';
 
-// Where everyone sits and stands on the station: the long benches with a place at each for a worker,
-// the board agents' consoles, the briefing table the meetings are held at, and the bridge, with the
-// captain's chair on it. Everything is where the plan has it (see planMap), as in the castle.
+// Where everyone sits on the station: the long benches with a place at each for a worker, the
+// briefing table the meetings are held at, and the bridge, with the captain's chair on it. Everything is where the plan has it (see planMap), as in the castle.
 
 /** The long benches the workers work at, as the plan has them: a white top with a line of light down it, a padded seat down each side. */
 export function buildBenches(kit: Kit) {
@@ -69,60 +67,6 @@ export function placeSetting(kit: Kit, def: DeskDef, overflow: boolean): { view:
   g.userData.interact = it;
   kit.group.add(g);
   return { view: { def, group: g, laptopAnchor, seatAnchor, stage, chair: new THREE.Group(), vacancy, vacancyY: 1.35 }, it };
-}
-
-const CONSOLE_SIGN: Record<StationKind, string> = { issues: '📡 Ask me', pulls: '🔀 Ask me', queue: '📋 Ask me' };
-
-/** A board agent's console: a slanted panel on a pedestal, lit in the agent's color; it stands behind it, as at the office's kiosk. */
-export function agentConsole(kit: Kit, def: DeskDef): DeskView {
-  const kind = def.station!;
-  const g = new THREE.Group();
-  g.position.set(def.x, 0, def.z);
-  g.rotation.y = def.rotY;
-  const { metalDark, metal, black } = kit.mats;
-  const color = STATION_AGENT[kind].color;
-  g.add(mesh(new THREE.CylinderGeometry(0.3, 0.36, 0.06, 20), metalDark, 0, 0.03, 0));
-  g.add(mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.92, 12), metal, 0, 0.5, 0));
-  const top = new THREE.Group();
-  top.position.set(0, 1.0, 0);
-  top.rotation.x = 0.35;
-  top.add(mesh(roundedBox(KIOSK.width, 0.07, KIOSK.depth, 0.05), metalDark, 0, 0, 0));
-  top.add(mesh(box(KIOSK.width - 0.12, 0.012, KIOSK.depth - 0.14), black, 0, 0.042, 0, false));
-  top.add(mesh(box(KIOSK.width - 0.3, 0.014, 0.05), lit(color), 0, 0.045, -0.1, false));
-  top.add(mesh(box(KIOSK.width - 0.4, 0.014, 0.05), lit(color), -0.05, 0.045, 0.02, false));
-  g.add(top);
-  // The agent's color round the pedestal, and a sign facing whoever walks up (-z, the room).
-  g.add(mesh(new THREE.TorusGeometry(0.13, 0.03, 6, 20).rotateX(Math.PI / 2), lit(color), 0, 0.72, 0, false));
-  const sign = textPlane(CONSOLE_SIGN[kind], { bg: '#0f1a26', color: '#e6f6ff', border: color, size: 56 });
-  sign.scale.multiplyScalar(0.5);
-  sign.position.set(0, 0.42, -0.14);
-  sign.rotation.y = Math.PI;
-  g.add(sign);
-  const laptopAnchor = new THREE.Object3D();
-  laptopAnchor.visible = false;
-  g.add(laptopAnchor);
-  // On its feet behind the console, facing it and the room beyond.
-  const stand = new THREE.Object3D();
-  stand.position.set(0, -0.07 * 1.1, KIOSK.stand);
-  stand.rotation.y = Math.PI;
-  stand.scale.setScalar(1.1);
-  const seatAnchor = stand.clone();
-  g.add(seatAnchor);
-  const vacancy = new THREE.Group();
-  vacancy.add(stand);
-  g.add(vacancy);
-  const stage = new THREE.Object3D();
-  stage.position.set(0, 1.0, 0);
-  stage.rotation.y = Math.PI;
-  g.add(stage);
-  kit.group.add(g);
-  const corners = [-1, 1].flatMap((t) => [-0.25, KIOSK.stand + 0.35].map((s) => deskPoint(def, (t * KIOSK.width) / 2, s)));
-  kit.colliders.push({ minX: Math.min(...corners.map((p) => p[0])), maxX: Math.max(...corners.map((p) => p[0])), minZ: Math.min(...corners.map((p) => p[1])), maxZ: Math.max(...corners.map((p) => p[1])), top: 1.5, fence: true });
-  const [fx, fz] = deskPoint(def, 0, -1);
-  const it: Interactable = { kind: 'station', deskId: def.id, x: fx, z: fz, radius: 1.3 };
-  kit.interactables.push(it);
-  g.userData.interact = it;
-  return { def, group: g, laptopAnchor, seatAnchor, stage, chair: new THREE.Group(), vacancy, vacancyY: 0 };
 }
 
 /** The round briefing table, its chairs, and the display on a stand with the meeting's board and sign. */

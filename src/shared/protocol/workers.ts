@@ -205,11 +205,6 @@ export type WorkerClientMsg =
   | { t: 'worker.detach'; workerId: string }
   /** With `issue`, the prompt hands the worker that GitHub issue, which is taken as for worker.spawn. */
   | { t: 'worker.prompt'; workerId: string; prompt: string; issue?: number }
-  /**
-   * A prompt for the agent standing by a board (`deskId` is its kiosk, see STATIONS in layout). It's
-   * typed into its session, which is woken up first if it's asleep, or hired there when nobody is.
-   */
-  | { t: 'station.prompt'; deskId: string; prompt: string }
   /** Push a worktree worker's branch and open a pull request for it, drafted from its task. */
   | { t: 'worker.pr'; workerId: string }
   | { t: 'term.input'; workerId: string; data: string }

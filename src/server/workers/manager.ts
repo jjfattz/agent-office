@@ -3,8 +3,7 @@ import path from 'node:path';
 import type { AgentChoice, AgentEffort, AgentProvider, TerminalHit, WorkerInfo, WorkerKind, WorkerRepo, WorkerStatus } from '../../shared/protocol.js';
 import { AGENT_PROVIDERS, takesEffort, takesModel } from '../../shared/providers.js';
 import { Worktrees, workspaceOf, type WorktreeCleanup, type WorktreeState } from '../worktrees.js';
-import { DESK_BY_ID, STATION_AGENT, deskBuilt } from '../../shared/layout.js';
-import { stationBrief } from '../stations.js';
+import { DESK_BY_ID, deskBuilt } from '../../shared/layout.js';
 import type { PromptSource } from '../prompts.js';
 import type { GhAs } from '../signins.js';
 import type { ServiceOwner } from '../services.js';
@@ -51,7 +50,7 @@ export class WorkerManager {
   readonly defaultProvider: AgentProvider;
   /** What each provider set up on this floor, for its launches (see ProviderAdapter.prepare). */
   private setups: Partial<Record<AgentProvider, unknown>> = {};
-  /** Where the office-queue and office-workers commands are, for the workers' PATH (see writeOfficeCommands). */
+  /** Where the office-workers command is, for the workers' PATH (see writeOfficeCommands). */
   private officeBin: string | undefined;
   private screenTimer: NodeJS.Timeout;
   /** The office is shutting down: workers exiting now are being stopped, not failing to resume. */
@@ -221,7 +220,7 @@ export class WorkerManager {
    * other floors' repositories a worker in its own worktree works in too (see makeWorkspace).
    */
   spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], via?: 'herald'): WorkerInfo | string {
-    // Nobody picked (a board agent, say): the office's default worker, model and effort included.
+    // Nobody picked: the office's default worker, model and effort included.
     if (kind === 'agent' && provider === undefined) ({ provider, model, effort } = this.officeDefault);
     const selectedProvider = kind === 'agent' ? provider : undefined;
     const modelError = validateWorkerModel(kind, selectedProvider, model);
@@ -231,12 +230,10 @@ export class WorkerManager {
     const seat = DESK_BY_ID.get(deskId);
     if (!seat) return 'Unknown desk';
     if (!deskBuilt(seat, this.wing())) return `${seat.label} isn't built yet: expand the back office first`;
-    if (this.deskOccupied(deskId)) return seat.station ? `The ${STATION_AGENT[seat.station].name} is already there` : `That ${seat.beanbag ? 'bean bag' : 'desk'} is taken`;
-    if (kind === 'shell' && seat.station) return 'A board agent is always an agent, not a shell';
-    if (seat.station && !prompt?.trim()) return 'Tell the board agent what to do';
+    if (this.deskOccupied(deskId)) return `That ${seat.beanbag ? 'bean bag' : 'desk'} is taken`;
     if (!seat.room !== !meeting) return seat.room ? 'Only a meeting seats workers at the meeting table: call one in the meeting room' : 'A meeting seats its workers at the meeting table';
     if (meeting && (kind !== 'agent' || worktree)) return 'A meeting seats agents, in its own worktree';
-    if (repos.length && (kind !== 'agent' || !worktree || seat.station || meeting)) return 'Only a worker in its own worktree can work in other repositories too';
+    if (repos.length && (kind !== 'agent' || !worktree || meeting)) return 'Only a worker in its own worktree can work in other repositories too';
     if (repos.length > MAX_REPOS) return `A worker can take on at most ${MAX_REPOS} other repositories`;
     if (kind === 'shell' && provider !== undefined) return 'Shell workers do not have an agent provider';
     if (kind === 'agent' && selectedProvider === 'custom' && this.defaultProvider !== 'custom') return 'Custom is not the configured agent provider';
@@ -249,8 +246,7 @@ export class WorkerManager {
     const full = this.capacity?.full();
     if (full) return full;
     const used = new Set([...this.workers.values()].map((w) => w.info.name.replace(/ 🐚$/, '')));
-    const agent = seat.station && STATION_AGENT[seat.station];
-    const name = agent ? agent.name : (NAMES.find((n) => !used.has(n)) ?? `Worker ${this.workers.size + 1}`);
+    const name = NAMES.find((n) => !used.has(n)) ?? `Worker ${this.workers.size + 1}`;
     const id = randomBytes(6).toString('hex');
     let wt: WorkerInfo['worktree'] = meeting?.worktree;
     let others: WorkerRepo[] | undefined;
@@ -276,7 +272,7 @@ export class WorkerManager {
       account: kind === 'agent' ? this.runAs?.account(selectedProvider, owner) : undefined,
       deskId,
       name: kind === 'shell' ? `${name} 🐚` : name,
-      color: kind === 'shell' ? '#8d99ae' : agent ? agent.color : COLORS[Math.floor(Math.random() * COLORS.length)],
+      color: kind === 'shell' ? '#8d99ae' : COLORS[Math.floor(Math.random() * COLORS.length)],
       status: 'starting',
       acked: true,
       createdBy: by,
@@ -296,8 +292,7 @@ export class WorkerManager {
     w.owner = owner;
     this.workers.set(id, w);
     if (info.prompt) this.tasks.notePrompt(w, info.prompt);
-    // A board agent is told what it's there for ahead of its first request (which is what shows).
-    this.launch(w, seat.station && info.prompt ? `${stationBrief(seat.station, this.prompts)}\n\n${info.prompt}` : info.prompt, undefined);
+    this.launch(w, info.prompt, undefined);
     this.persist();
     return info;
   }
@@ -316,9 +311,6 @@ export class WorkerManager {
     clockWork(w.info, 'starting');
     w.info.status = 'starting';
     w.info.exitCode = undefined;
-    const station = DESK_BY_ID.get(w.info.deskId)?.station;
-    // A board agent with no session to carry on starts over, so it needs telling what it's for again.
-    const first = prompt && station && !w.info.sessionId ? `${stationBrief(station, this.prompts)}\n\n${prompt}` : prompt;
     if (prompt) {
       w.info.activity = truncate(prompt, 80);
       this.tasks.notePrompt(w, prompt);
@@ -326,30 +318,8 @@ export class WorkerManager {
     // Cut off mid-turn by a restart: it gets on with it, as whoever was watching would have told it to.
     const carryOn = !prompt && w.interrupted && w.info.kind === 'agent' && !!w.info.sessionId;
     w.interrupted = false;
-    this.launch(w, carryOn ? CARRY_ON_PROMPT : first, w.info.sessionId);
+    this.launch(w, carryOn ? CARRY_ON_PROMPT : prompt, w.info.sessionId);
     return undefined;
-  }
-
-  /**
-   * A request for the agent standing by a board (see STATIONS): typed into its session, which is woken
-   * up with it if it's asleep, or it's hired there with it when nobody is. Returns what went wrong, or
-   * the agent and whether it was just hired.
-   */
-  station(deskId: string, by: string, text: string, owner?: string): { info: WorkerInfo; hired: boolean } | string {
-    if (!DESK_BY_ID.get(deskId)?.station) return 'There is no agent to ask there';
-    const clean = text.replace(/\r\n?/g, '\n').trim();
-    if (!clean) return 'Empty prompt';
-    const w = [...this.workers.values()].find((x) => x.info.deskId === deskId);
-    if (!w) {
-      const info = this.spawn(deskId, by, clean, false, 'agent', undefined, undefined, undefined, undefined, owner);
-      return typeof info === 'string' ? info : { info, hired: true };
-    }
-    // Typed into the question it's asking, the prompt would answer it.
-    if (w.info.status === 'needs_input') return `The ${w.info.name} is waiting on an answer in its terminal`;
-    const running = !!(w.pty || w.dsh);
-    if (!running) w.info.lastInput = { by, at: Date.now() };
-    const err = running ? this.prompt(w.info.id, clean, by) : this.resume(w.info.id, clean);
-    return err ?? { info: w.info, hired: false };
   }
 
   /** The worker whose terminal holds this hook token: how a worker proves it's asking for itself. */
@@ -661,7 +631,7 @@ export class WorkerManager {
     const commandPath = isShell ? undefined : configured ? this.agentPath : resolveCommand(command);
     const base = isShell ? (WIN && !process.env.SHELL ? [] : ['-l']) : configured ? [...this.agentArgs] : [];
     // Its provider's command line, and anything it sets for this run (see ProviderAdapter.launch).
-    const plan: LaunchPlan = adapter ? adapter.launch({ h: this.handleOf(w), args: base, prompt, resumeSessionId, station: DESK_BY_ID.get(info.deskId)?.station, cwd, setup: this.setups[adapter.id] }) : { args: base };
+    const plan: LaunchPlan = adapter ? adapter.launch({ h: this.handleOf(w), args: base, prompt, resumeSessionId, cwd, setup: this.setups[adapter.id] }) : { args: base };
     const { args } = plan;
     if (plan.rotateToken) w.hookToken = randomBytes(16).toString('hex');
     const env = childEnv();
@@ -673,8 +643,7 @@ export class WorkerManager {
       AGENT_OFFICE_HOOK_TOKEN: w.hookToken,
     });
     Object.assign(env, plan.env);
-    // Whichever agent it runs, a worker reaches the office's workers with office-workers, and a board
-    // agent the queue with office-queue.
+    // Whichever agent it runs, a worker reaches the office's workers with office-workers.
     if (this.officeBin) {
       // Windows spells it Path.
       const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH';

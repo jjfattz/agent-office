@@ -14,7 +14,7 @@ import type { World } from '../world';
 import { buildBoards } from './boards';
 import { WALL, materials, type Kit } from './kit';
 import { PROPS, arcade, torch } from './props';
-import { buildCouncil, buildTables, lectern, placeSetting } from './seats';
+import { buildCouncil, buildTables, placeSetting } from './seats';
 import { buildShell } from './shell';
 import { ashlar, flagstones, heraldry, paintBanner, shade, toonMap } from './textures';
 import { buildDais } from './throne';
@@ -23,12 +23,12 @@ import { buildDais } from './throne';
  * The castle's style of map (see shared/maps/castle.ts for the castle itself): a long stone hall
  * under a timber roof, pillars and pointed arches down both sides, stained glass high in the walls,
  * a dais at one end with a throne of iron blades on it, long tables with benches for the workers,
- * lecterns for the board agents, a round table for meetings, and fire everywhere. Everything is
+ * a round table for meetings, and fire everywhere. Everything is
  * placed from the map's plan, so another map in this style is just other numbers.
  *
  * It goes up a part at a time, each in a file of its own beside this one: the shell (the floor, the
  * walls, the great doors and the roof), the throne on its dais, the props (one builder for each kind),
- * the seats (the tables, the lecterns and the council's round table), the boards, and the herald and
+ * the seats (the tables and the council's round table), the boards, and the herald and
  * the Kingsguard (people.ts). What they all build with (the Kit, the materials) is in kit.ts.
  */
 
@@ -77,7 +77,6 @@ export function buildCastle(plan: MapPlan): World {
     kit.desks.set(def.id, view);
     overflow.set(def.id, it);
   }
-  for (const def of plan.stations) kit.desks.set(def.id, lectern(kit, def));
   const council = buildCouncil(kit, plan);
   const boardMeshes = buildBoards(kit, plan);
   const herald = buildHerald(kit, plan);
@@ -204,7 +203,7 @@ export function buildCastle(plan: MapPlan): World {
         shell.swing(doorOpen);
       }
       for (const d of kit.desks.values()) {
-        if (!d.vacancy.visible || !d.group.visible || d.def.station) continue;
+        if (!d.vacancy.visible || !d.group.visible) continue;
         d.vacancy.position.y = d.vacancyY + Math.sin(t * 2 + d.def.x) * 0.06;
         d.vacancy.rotation.y = t * 1.2;
       }

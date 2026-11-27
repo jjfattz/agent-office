@@ -4,7 +4,6 @@ import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { FAILS_TO_DESPAIR, outputFailed, toolAction } from '../../shared/actions.js';
 import { MCP_READ_ONLY, writeClaudeMcpConfig } from '../office-workers.js';
-import { QUEUE_AGENT_DISALLOWED_TOOLS } from '../stations.js';
 import { answered, notified, wantsPermission } from '../workers/lifecycle.js';
 import { shq } from '../workers/process.js';
 import type { WorkerHandle } from '../workers/types.js';
@@ -198,7 +197,7 @@ export const claude: ProviderAdapter<undefined, ClaudeSetup> = {
     settings: writeHookSettings(dataDir),
     mcp: mcpScript ? writeClaudeMcpConfig(dataDir, mcpScript) : undefined,
   }),
-  launch({ h: { info }, args, prompt, resumeSessionId, station, setup }) {
+  launch({ h: { info }, args, prompt, resumeSessionId, setup }) {
     args.unshift('--settings', setup.settings);
     // The office's MCP server: its workers, to list, hire, send home and tell (see office-workers.ts).
     // Ahead of --settings, which ends the list --mcp-config takes.
@@ -206,8 +205,6 @@ export const claude: ProviderAdapter<undefined, ClaudeSetup> = {
     // A model/effort chosen for this worker overrides whatever --agent-args set office-wide.
     if (info.model) args.push('--model', info.model);
     if (info.effort) args.push('--effort', info.effort);
-    // The queue agent only ever adds to the queue: without these it can't touch the checkout's files.
-    if (station === 'queue') args.push('--disallowedTools', ...QUEUE_AGENT_DISALLOWED_TOOLS);
     if (resumeSessionId) args.push('--resume', resumeSessionId);
     // `--` so a prompt like "- fix login" is never parsed as a CLI option.
     if (prompt) args.push('--', prompt);

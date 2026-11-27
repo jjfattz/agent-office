@@ -8,7 +8,6 @@ import { isPaletteKey } from '../../../shared/palette';
 import type { Ctx } from '../../core/context';
 import { seatBuilt } from '../../core/floors';
 import type { Parts } from '../../core/parts';
-import { STATION_INFO } from '../../core/stations';
 import { isTyping } from '../../player';
 import { store } from '../../state';
 import { openAccounts } from '../../ui/accounts';
@@ -39,7 +38,7 @@ export function installPalette(ctx: Ctx, parts: PaletteParts) {
   /** Where you stand at a desk: behind the worker, looking over their shoulder (as standAt), or by a chair at the meeting table. */
   function deskSpot(desk: DeskDef): { x: number; z: number } | undefined {
     if (desk.room) return office.interactables.find((it) => it.deskId === desk.id);
-    return deskSeat(desk, desk.station ? -1.6 : desk.beanbag ? 1.6 : 2.4);
+    return deskSeat(desk, desk.beanbag ? 1.6 : 2.4);
   }
 
   /** The free desk nearest you, for hiring from the palette. */
@@ -72,7 +71,7 @@ export function installPalette(ctx: Ctx, parts: PaletteParts) {
       const spot = desk && deskSpot(desk);
       const open = () => waiting.openWorkerTerminal(w.id);
       out.push({
-        icon: desk?.station ? STATION_INFO[desk.station].icon : w.kind === 'shell' ? '🐚' : '🧑‍💻',
+        icon: w.kind === 'shell' ? '🐚' : '🧑‍💻',
         kind: 'Worker',
         title: w.name,
         detail: [w.task?.name, desk?.label, STATUS_LABEL[w.status]].filter(Boolean).join(' · '),

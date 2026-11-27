@@ -544,9 +544,9 @@ test('the hook server answers only workers, with their own token', async () => {
   assert.equal((await hook('/hooks/codex?worker=nobody', { method: 'POST', body: 'not json' })).status, 400);
   assert.equal((await hook('/hooks/claude?worker=nobody')).status, 404);
   assert.equal((await hook('/elsewhere')).status, 404);
-  for (const p of ['/office/queue?worker=nobody', '/office/workers?worker=nobody']) {
-    const res = await hook(p, { headers: { authorization: 'Bearer nope' } });
-    assert.equal(res.status, 401);
-    assert.match(((await res.json()) as { error: string }).error, /AGENT_OFFICE_WORKER_ID/);
-  }
+  // The board agents' queue is gone with them.
+  assert.equal((await hook('/office/queue?worker=nobody', { headers: { authorization: 'Bearer nope' } })).status, 404);
+  const res = await hook('/office/workers?worker=nobody', { headers: { authorization: 'Bearer nope' } });
+  assert.equal(res.status, 401);
+  assert.match(((await res.json()) as { error: string }).error, /AGENT_OFFICE_WORKER_ID/);
 });

@@ -332,7 +332,7 @@ export function openSettings(net: Net, opts: SettingsOptions) {
     agentBack.textContent = `Back to ${store.project?.agentCmd.split(' ')[0].split(/[\\/]/).pop() ?? 'the --agent'}`;
     if (!agentTouched) agent.set(now);
     agentNote.textContent =
-      'Every worker starts on this: hired at a desk, handed an issue or a pull request from the boards, taken off the queue, the board agents and meetings. Where you start one, ✏️ Edit picks another just for it.' +
+      'Every worker starts on this: hired at a desk, handed an issue or a pull request from the boards, taken off the queue and meetings. Where you start one, ✏️ Edit picks another just for it.' +
       (picked ? ` Set by ${picked.by} ${timeAgo(picked.at)}.` : ' It’s the agent the office was started with, on its own default model.') +
       (admin ? '' : ' Admins can change it.');
   };
@@ -354,7 +354,7 @@ export function openSettings(net: Net, opts: SettingsOptions) {
     const n = rewrittenPrompts();
     promptsOpen.textContent = store.me.admin ? '📝 Edit the prompts…' : '📝 Read the prompts…';
     promptsNote.textContent =
-      'What 🤖 Hand to a worker, 🔍 Review and the boards’ other buttons tell a worker, the note the queue adds to a task, the board agents’ briefs, the meeting room’s parts and the sign writer’s instructions. ' +
+      'What 🤖 Hand to a worker, 🔍 Review and the boards’ other buttons tell a worker, the note the queue adds to a task, the meeting room’s parts and the sign writer’s instructions. ' +
       (n ? `${n} of them rewritten.` : 'All as the office wrote them.') +
       (store.me.admin ? '' : ' Admins can rewrite them.');
   };
@@ -376,7 +376,7 @@ export function openSettings(net: Net, opts: SettingsOptions) {
     const now =
       m.limit === undefined
         ? `No limit: the office hires a worker for every free seat. ${m.workers} ${m.workers === 1 ? 'is' : 'are'} here now, across every floor.`
-        : `At most ${m.limit} worker${m.limit === 1 ? '' : 's'} at once, across every floor (${m.workers} now), shells and board agents too. Hiring past that is refused.`;
+        : `At most ${m.limit} worker${m.limit === 1 ? '' : 's'} at once, across every floor (${m.workers} now), shells too. Hiring past that is refused.`;
     const from = m.set ? ` Set by ${m.set.by} ${timeAgo(m.set.at)}.` : '';
     const cap = m.ceiling ? ` The office was started with --max-workers ${m.ceiling}, so it can't go any higher.` : '';
     limitNote.textContent = now + from + cap + (admin ? '' : ' Admins can change it.');

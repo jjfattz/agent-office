@@ -226,8 +226,8 @@ Mirrors the role of `src/server/opencode.ts` and `src/server/codex.ts`:
 
 - Locate the `dsh` executable and the profile name (`--dsh-profile`, env
   `AGENT_OFFICE_DSH_PROFILE`, default `acp`).
-- Spawn the child with the worker's `cwd`, the shared `AGENT_OFFICE_*` environment and, for board
-  agents, `office-queue` first on `PATH` — the existing environment block in
+- Spawn the child with the worker's `cwd`, the shared `AGENT_OFFICE_*` environment and
+  `office-workers` first on `PATH` — the existing environment block in
   `src/server/workers/manager.ts` already does both, so it carries over unchanged.
 - Own the ACP connection: `initialize`, `session/new`, `session/prompt`, `session/cancel`,
   `session/set_config_option`, `session/list`, `session/resume`, `session/close`.

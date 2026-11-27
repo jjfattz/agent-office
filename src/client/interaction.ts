@@ -33,11 +33,6 @@ export function interactionAvailable(it: Interactable | null, key: DeskKey, stat
     return !!state.worker && (key === 'C' || key === 'X' || key === 'O');
   }
 
-  if (it.kind === 'station') {
-    if (!it.deskId) return false;
-    return key === 'E' || key === 'P' || (!!state.worker && (key === 'O' || key === 'X'));
-  }
-
   if (state.note && it.kind === 'issues') return key === 'E' || key === 'O';
   if (key !== 'E') return false;
 

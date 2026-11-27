@@ -147,7 +147,7 @@ function hooksPath(cwd: string): string {
 /**
  * Puts a worker's hook entries in the hooks.json of the folder it works in, next to whatever the
  * project has there. Each entry names its worker, and the helper only speaks for that one, so
- * workers sharing a folder (the board agents, in the project itself) don't report for each other.
+ * workers sharing a folder (the project itself) don't report for each other.
  * Says whether they're in: a hooks.json the office can't read is left as it is.
  */
 export function addCursorHooks(cwd: string, hook: string, workerId: string): boolean {

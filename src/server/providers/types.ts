@@ -2,7 +2,6 @@
 // worker manager never asks which provider a worker runs. What the windows show about each (names,
 // models, efforts, spend) is the shared table in shared/providers.ts.
 import type { AgentProvider } from '../../shared/providers.js';
-import type { StationKind } from '../../shared/layout.js';
 import type { WorkerHandle } from '../workers/types.js';
 
 /** What a provider is set up with on one floor (see ProviderAdapter.prepare). */
@@ -27,8 +26,6 @@ export interface LaunchInput<S, P> {
   prompt?: string;
   /** The session it carries on, when it's resumed. */
   resumeSessionId?: string;
-  /** The board it stands by, for a board agent. */
-  station?: StationKind;
   /** The folder it runs in: its worktree, its workspace, or the project itself. */
   cwd: string;
   /** What prepare set up on this floor. */

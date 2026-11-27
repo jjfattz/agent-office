@@ -1,10 +1,9 @@
 /**
  * What you do with workers: hire one at a desk (with a task, or a shell), prompt it, wake it, send it
- * home, fix a worktree deleted outside the office, open its pull requests; ask a board agent; stand
- * at a desk; and what the hint bar says at a desk or a board agent's kiosk. Also what the boards'
- * buttons do with a worker.
+ * home, fix a worktree deleted outside the office, open its pull requests; stand at a desk; and
+ * what the hint bar says at a desk. Also what the boards' buttons do with a worker.
  */
-import { STATION_AGENT, deskSeat, type DeskDef } from '../../../shared/layout';
+import { deskSeat, type DeskDef } from '../../../shared/layout';
 import { canLabel } from '../../../shared/floorplan';
 import { officeFull, pressureNote } from '../../../shared/machine';
 import type { AgentEffort, AgentProvider, WorkerInfo } from '../../../shared/protocol';
@@ -14,7 +13,6 @@ import type { CoreState } from '../../core/ctx';
 import { seatBuilt } from '../../core/floors';
 import { aside, key } from '../../core/hint';
 import type { Parts } from '../../core/parts';
-import { STATION_INFO } from '../../core/stations';
 import { askNotifyPermission, notifyPermission } from '../../notify';
 import { repoChoices } from '../../shared/hiring';
 import { askSendHome } from '../../shared/send-home';
@@ -34,13 +32,12 @@ import { hiringPaused, usageLabel, usageTitle } from '../../ui/usage';
 declare module '../../world/types' {
   interface InteractKinds {
     desk: true;
-    station: true;
   }
 }
 
 export type WorkerActionsParts = Pick<Parts, 'worlds' | 'seating' | 'walking' | 'waiting' | 'meeting' | 'cards'>;
 
-/** Registers the worktree answer (worker.worktree), and defines what's done at a desk and at a board agent. */
+/** Registers the worktree answer (worker.worktree), and defines what's done at a desk. */
 export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerActionsParts) {
   const { player, net, me, settings } = ctx;
   const { plan, inOffice } = parts.worlds;
@@ -151,37 +148,6 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     if (w) askSendHome(net, w, plan().byId.get(w.deskId));
   }
 
-  /** E at a board agent: type it a request. It's hired with it when nobody is there yet. */
-  function askStation(deskId: string) {
-    const kind = plan().byId.get(deskId)?.station;
-    if (!kind) return;
-    const w = store.workerAtDesk(deskId);
-    const name = STATION_AGENT[kind].name;
-    const info = STATION_INFO[kind];
-    // A prompt typed into a question it's asking would answer it.
-    if (w?.status === 'needs_input') {
-      toast(`The ${name} is waiting on an answer — here's its terminal`, 'warn');
-      return openWorkerTerminal(w.id);
-    }
-    // Nobody there yet: asking hires the agent.
-    if (!w && officeIsFull()) return;
-    const subtitle = !w
-      ? `${info.does}, in a terminal of my own: press O at the kiosk to watch.`
-      : isAsleep(w.status)
-        ? `The ${name} is asleep: this wakes it up, and it carries on where it left off.`
-        : isBusy(w.status)
-          ? `The ${name} is busy. Your prompt waits in its input box until it's done.`
-          : undefined;
-    openPrompt({
-      title: `${info.icon} Ask the ${name}`,
-      subtitle,
-      placeholder: `e.g. ${info.example}`,
-      submitLabel: 'Send ✨',
-      warning: w ? undefined : pressureNote(store.machine),
-      onSubmit: (text) => net.send({ t: 'station.prompt', deskId, prompt: text }),
-    });
-  }
-
   function resumeWorker(w: WorkerInfo) {
     if (w.lost) return fixLostWorktree(w);
     if (!w.sessionId && w.kind !== 'shell') toast(`${w.name} has no saved Claude session — starting a fresh one`, 'warn');
@@ -269,7 +235,7 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     toast(w ? `You're at ${desk.label}, ${w.name}'s desk` : `You're at ${desk.label}`);
   }
 
-  /** Behind the worker, looking over their shoulder at the laptop (or in front of a board agent's kiosk). */
+  /** Behind the worker, looking over their shoulder at the laptop. */
   function standAt(desk: DeskDef) {
     const { seating } = parts;
     if (player.seat) seating.standUp();
@@ -304,7 +270,7 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
       player.lookPitch = -0.2;
       return;
     }
-    let spot = deskSeat(desk, desk.station ? -1.6 : desk.beanbag ? 1.6 : 2.4);
+    let spot = deskSeat(desk, desk.beanbag ? 1.6 : 2.4);
     // On a map of its own, the office's distances can land in a pillar: the nearest open floor to it.
     const world = ctx.world();
     if (!inOffice() && (!player.fits(spot.x, spot.z, 0) || !world.nav.walkable(spot.x, spot.z))) {
@@ -385,39 +351,6 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     return prReady(w) ? key('O', `Open PRs (${repos.length} repos)`) : '';
   }
 
-  function stationHint(deskId: string): Hint {
-    const kind = plan().byId.get(deskId)?.station;
-    if (!kind) return { k: '', parts: [] };
-    const w = store.workerAtDesk(deskId);
-    const info = STATION_INFO[kind];
-    if (!w) {
-      const m = store.machine;
-      const full = officeFull(m);
-      return {
-        k: `${full}|${m.workers}|${m.limit}`,
-        parts: [
-          h('span.title', {}, `${info.icon} ${STATION_AGENT[kind].name}`),
-          aside(info.offer.replace(/^Ask me /, '')),
-          full ? h('span.cost', {}, `🚫 Office full · ${m.workers} of ${m.limit} workers`) : key('E', 'Prompt'),
-        ],
-      };
-    }
-    const doing = w.activity ? clip(w.activity, 48) : '';
-    const provider = resolvedProvider(w.provider, store.project);
-    const spent = w.usage ? usageLabel(w.usage, provider) : '';
-    return {
-      k: w.status + w.id + doing + spent,
-      parts: [
-        h('span.title', {}, `${info.icon} ${w.name} · ${STATUS_LABEL[w.status]}`),
-        doing ? aside(doing) : '',
-        spent ? h('span.cost', { title: usageTitle(w.usage!, provider) }, spent) : '',
-        key('E', isAsleep(w.status) ? 'Wake with a prompt' : 'Prompt'),
-        key('O', 'Terminal'),
-        key('X', 'Send home'),
-      ],
-    };
-  }
-
   ctx.interactions.define('desk', {
     reach: 4.5,
     hint: (it) => (it.deskId ? deskHint(it.deskId) : { k: '', parts: [] }),
@@ -436,18 +369,6 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
       if (key === 'O' && w) return pullRequestFor(w);
     },
   });
-  ctx.interactions.define('station', {
-    reach: 4.5,
-    hint: (it) => (it.deskId ? stationHint(it.deskId) : { k: '', parts: [] }),
-    use: (it, key) => {
-      if (!it.deskId) return;
-      const w = store.workerAtDesk(it.deskId);
-      if (key === 'E' || key === 'P') return askStation(it.deskId);
-      if (key === 'O' && w) return openWorkerTerminal(w.id);
-      if (key === 'X' && w) return killWorker(w.id);
-    },
-  });
-
   /** A prompt from the boards goes to a new worker at a free desk, or to one already at a desk. With `issue`, that worker takes the issue. */
   function sendToWorker(title: string, text: { context?: string; initial?: string }, issue?: number) {
     const desk = freeDesk();

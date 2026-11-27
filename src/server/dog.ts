@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { DESK_BY_ID, FLOOR, KIOSK, type DeskDef } from '../shared/layout.js';
+import { DESK_BY_ID, FLOOR, type DeskDef } from '../shared/layout.js';
 import { DOG_BREEDS, DOG_COATS, cleanDogName, dogAt, dogDefaults, legSeconds, type DogAct, type DogBreed, type DogState } from '../shared/dog.js';
 import { deskPoint, nearestWalkable, route, walkable, type Pt } from '../shared/nav.js';
 import type { PeerInfo, WorkerInfo } from '../shared/protocol.js';
@@ -265,8 +265,7 @@ export class Dog {
     this.waking = false;
     const call = this.nextCall();
     if (call) return this.barkAt(call);
-    // Only at a desk or a bean bag: a board agent's kiosk has nothing to curl up under.
-    const busy = this.env.workers().filter((w) => w.status === 'working' && DESK_BY_ID.has(w.deskId) && !DESK_BY_ID.get(w.deskId)?.station);
+    const busy = this.env.workers().filter((w) => w.status === 'working' && DESK_BY_ID.has(w.deskId));
     const people = this.env.people().filter((p) => p.y < 0.5);
     const was = this.mode;
     const options: [number, () => void][] = [
@@ -359,9 +358,8 @@ export class Dog {
     this.follow = undefined;
     if (!already) {
       const side = this.sideOf(desk);
-      // At a board agent, out in front of its kiosk, looking up at the agent behind it.
-      const spot = desk.station ? deskPoint(desk, side * 0.6, -1.1) : deskPoint(desk, side * 0.75, 1.45);
-      this.walkTo(spot, RUN, 'bark', { workerId: w.id, face: toward(spot, deskPoint(desk, 0, desk.station ? KIOSK.stand : 0.9)) });
+      const spot = deskPoint(desk, side * 0.75, 1.45);
+      this.walkTo(spot, RUN, 'bark', { workerId: w.id, face: toward(spot, deskPoint(desk, 0, 0.9)) });
     }
     // Checks now and then that it's still the one to bark at.
     this.wake(5000);
@@ -370,7 +368,6 @@ export class Dog {
   /** Which end of a desk (-1 or +1 along its width) is nearer. */
   private sideOf(desk: DeskDef): number {
     const at = this.here();
-    const s = desk.station ? -1.1 : 1.3;
-    return dist(at, deskPoint(desk, 1, s)) <= dist(at, deskPoint(desk, -1, s)) ? 1 : -1;
+    return dist(at, deskPoint(desk, 1, 1.3)) <= dist(at, deskPoint(desk, -1, 1.3)) ? 1 : -1;
   }
 }
