@@ -19,7 +19,7 @@ body.phone-ui :is(.modal textarea, .modal input[type=text], .modal input[type=pa
   body.phone-ui .backdrop:has(> .modal.term, > .modal.board, > .modal.gh-window, > .modal.desk-changes, > .modal.meeting-window, > .modal[aria-label="Task queue"]) { padding: 0; }
   body.phone-ui .modal.term, body.phone-ui .modal.board, body.phone-ui .modal.gh-window, body.phone-ui .modal.desk-changes, body.phone-ui .modal.meeting-window,
   body.phone-ui .modal[aria-label="Task queue"] { width: 100%; height: var(--vv-height, 100dvh); max-height: var(--vv-height, 100dvh); border: 0; border-radius: 0; box-shadow: none; padding-top: env(safe-area-inset-top); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
-  body.phone-ui .modal.term .term-host { padding: 6px 2px 2px 6px; }
+  body.phone-ui .modal.term .term-host .xterm { padding: 6px 2px 10px 6px; }
   body.phone-ui .modal.board .body { padding: 10px; }
   body.phone-ui .modal.board header .board-status { display: none; }
 }

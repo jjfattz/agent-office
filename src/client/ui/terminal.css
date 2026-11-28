@@ -3,8 +3,14 @@
 /* Terminal modal */
 .modal.term { width: min(1200px, 100%); height: min(820px, calc(100vh - 32px)); background: #1e1f2e; }
 .modal.term header { background: var(--paper); }
-.modal.term .term-host { flex: 1; min-height: 0; padding: 8px 4px 4px 10px; background: #1e1f2e; }
-.modal.term .term-host .xterm { height: 100%; }
+.modal.term .term-host { flex: 1; min-height: 0; background: #1e1f2e; }
+/* The gap round the text sits on .xterm itself, not on .term-host: the fit addon takes .xterm's padding off
+   the room it fits rows into, but reads .term-host's height with its padding in (everything is border-box),
+   so padding there fitted a row too many and cut the last line (the prompt) off at the bottom. The bottom
+   gap is the widest, so the last line always has a buffer under it. */
+.modal.term .term-host .xterm { height: 100%; padding: 8px 4px 14px 10px; }
+/* xterm's stylesheet paints its viewport, which fills that gap too, black: the terminal's own colour instead. */
+.modal.term .term-host .xterm .xterm-viewport { background-color: #1e1f2e; }
 /* Files dragged over a terminal, and on their way to the office: they go in where its cursor is. */
 .modal.term .term-host { position: relative; }
 .modal.term.dropping .term-host::after, .modal.term.uploading .term-host::after { content: attr(data-drop); position: absolute; inset: 10px; z-index: 10; display: grid; place-items: center; padding: 16px; text-align: center; border: 3px dashed var(--accent); border-radius: 14px; background: rgba(30, 31, 46, .85); color: #fff; font-size: 18px; font-weight: 900; pointer-events: none; }

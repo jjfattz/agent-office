@@ -168,6 +168,18 @@ async function scrollsFullScreen(page: Page) {
   assert.doesNotMatch(input, /\x1b\[<64;/, 'and no wheel-up ones');
 }
 
+/** The terminal's last line (where the prompt is) sits wholly inside its window with a gap under it, not cut off at the bottom. */
+async function lastLineShows(page: Page, what: string) {
+  await page.waitForTimeout(100);
+  const r = await page.evaluate(() => {
+    const host = document.querySelector('.modal.term .term-host')!.getBoundingClientRect();
+    const last = document.querySelector('.modal.term .xterm-rows')!.lastElementChild!.getBoundingClientRect();
+    return { last: last.bottom, host: host.bottom };
+  });
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${what}-terminal-last-line.png`) });
+  assert.ok(r.last <= r.host - 6, `${what}: the terminal's last line ends at ${r.last}, at or past its window's bottom (${r.host})`);
+}
+
 const close = (page: Page) => page.locator('.backdrop').last().locator('.btn.close').first().click();
 
 for (const d of DEVICES) {
@@ -206,6 +218,7 @@ for (const d of DEVICES) {
       const mic = await page.locator('.term-say .dictate-mic').boundingBox();
       if (field && mic) assert.ok(mic.y >= field.y && mic.y + mic.height <= field.y + field.height, `the 🎤 (${mic.y}–${mic.y + mic.height}) is inside its box (${field.y}–${field.y + field.height})`);
       await scrollsFullScreen(page);
+      await lastLineShows(page, d.name);
       await close(page);
 
       await page.click('#btn-issues');
